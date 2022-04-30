@@ -1,0 +1,4 @@
+src/esp32-legged-robot/config_wifi.h
+src/web/node_modules
+src/web/package-lock.json
+src/esp32-legged-robot/web/index.html.gz
