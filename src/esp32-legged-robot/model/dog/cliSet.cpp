@@ -1,3 +1,5 @@
+#define CLI_MENU_COMMANDS_SET 28
+
 // TODO... too much copy-paste, IDK how to avoid it=(
 // HAL
 // HAL - trim
@@ -131,13 +133,6 @@ double _cliSetAngle(leg &_leg, int angleId, double deg)
   return _cliSetAngleError();
 }
 
-double _cliSetAngleError()
-{
-  cliError("Unable to set angle");
-
-  return 0;
-}
-
 double cliSetAngleLFAlpha(double deg) { return _cliSetAngle(legs[LEGLF], ALPHA, deg); }
 double cliSetAngleLFBeta(double deg)  { return _cliSetAngle(legs[LEGLF], BETA,  deg); }
 double cliSetAngleLFGamma(double deg) { return _cliSetAngle(legs[LEGLF], GAMMA, deg); }
@@ -173,3 +168,34 @@ double cliSetServoToInit(double i) {
   return cliGetHALState(1);
   
 }
+
+const cliCommand cliCommandsSet[CLI_MENU_COMMANDS_SET] = {
+  { "help",              cliSetHelp           },
+  { "LF_HAL_trim_alpha", cliSetHALTrimLFAlpha },
+  { "LF_HAL_trim_beta",  cliSetHALTrimLFBeta  },
+  { "LF_HAL_trim_gamma", cliSetHALTrimLFGamma },
+  { "RF_HAL_trim_alpha", cliSetHALTrimRFAlpha },
+  { "RF_HAL_trim_beta",  cliSetHALTrimRFBeta  },
+  { "RF_HAL_trim_gamma", cliSetHALTrimRFGamma },
+  { "LH_HAL_trim_alpha", cliSetHALTrimLHAlpha },
+  { "LH_HAL_trim_beta",  cliSetHALTrimLHBeta  },
+  { "LH_HAL_trim_gamma", cliSetHALTrimLHGamma },
+  { "RH_HAL_trim_alpha", cliSetHALTrimRHAlpha },
+  { "RH_HAL_trim_beta",  cliSetHALTrimRHBeta  },
+  { "RH_HAL_trim_gamma", cliSetHALTrimRHGamma },
+  { "HAL",               cliSetHALState       },
+  { "LF_angle_alpha",    cliSetAngleLFAlpha   },
+  { "LF_angle_beta",     cliSetAngleLFBeta    },
+  { "LF_angle_gamma",    cliSetAngleLFGamma   },
+  { "RF_angle_alpha",    cliSetAngleRFAlpha   },
+  { "RF_angle_beta",     cliSetAngleRFBeta    },
+  { "RF_angle_gamma",    cliSetAngleRFGamma   },
+  { "LH_angle_alpha",    cliSetAngleLHAlpha   },
+  { "LH_angle_beta",     cliSetAngleLHBeta    },
+  { "LH_angle_gamma",    cliSetAngleLHGamma   },
+  { "RH_angle_alpha",    cliSetAngleRHAlpha   },
+  { "RH_angle_beta",     cliSetAngleRHBeta    },
+  { "RH_angle_gamma",    cliSetAngleRHGamma   },
+  { "servo_calib",       cliSetServoCalib     },
+  { "servo_to_init",     cliSetServoToInit    }
+};

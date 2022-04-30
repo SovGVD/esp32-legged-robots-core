@@ -1,6 +1,4 @@
-#define CLI_MENU_COMMANDS_GET 30
-#define CLI_MENU_COMMANDS_SET 28
-#define CLI_MENU_COMMANDS_RUN 5
+// @TODO that is all not great
 
 char cliChar;
 bool cliErrorState = false;
@@ -9,69 +7,7 @@ char cliValues[CLI_VALUES][CLI_VALUE_LEN];
 unsigned int cliPosCommand = 0;
 unsigned int cliPosState = 0;
 
-const cliCommand cliCommandsGet[CLI_MENU_COMMANDS_GET] = {
-  { "help",              cliGetHelp           },
-  { "LF_HAL_trim_alpha", cliGetHALTrimLFAlpha },
-  { "LF_HAL_trim_beta",  cliGetHALTrimLFBeta  },
-  { "LF_HAL_trim_gamma", cliGetHALTrimLFGamma },
-  { "RF_HAL_trim_alpha", cliGetHALTrimRFAlpha },
-  { "RF_HAL_trim_beta",  cliGetHALTrimRFBeta  },
-  { "RF_HAL_trim_gamma", cliGetHALTrimRFGamma },
-  { "LH_HAL_trim_alpha", cliGetHALTrimLHAlpha },
-  { "LH_HAL_trim_beta",  cliGetHALTrimLHBeta  },
-  { "LH_HAL_trim_gamma", cliGetHALTrimLHGamma },
-  { "RH_HAL_trim_alpha", cliGetHALTrimRHAlpha },
-  { "RH_HAL_trim_beta",  cliGetHALTrimRHBeta  },
-  { "RH_HAL_trim_gamma", cliGetHALTrimRHGamma },
-  { "HAL",               cliGetHALState       },
-  { "LF_angle_alpha",    cliGetAngleLFAlpha   },
-  { "LF_angle_beta",     cliGetAngleLFBeta    },
-  { "LF_angle_gamma",    cliGetAngleLFGamma   },
-  { "RF_angle_alpha",    cliGetAngleRFAlpha   },
-  { "RF_angle_beta",     cliGetAngleRFBeta    },
-  { "RF_angle_gamma",    cliGetAngleRFGamma   },
-  { "LH_angle_alpha",    cliGetAngleLHAlpha   },
-  { "LH_angle_beta",     cliGetAngleLHBeta    },
-  { "LH_angle_gamma",    cliGetAngleLHGamma   },
-  { "RH_angle_alpha",    cliGetAngleRHAlpha   },
-  { "RH_angle_beta",     cliGetAngleRHBeta    },
-  { "RH_angle_gamma",    cliGetAngleRHGamma   },
-  { "angles",            cliGetAngles         },
-  { "power",             cliGetPower          },
-  { "imu",               cliGetIMU            },
-  { "debug",             cliGetDebug          }
-};
-
-const cliCommand cliCommandsSet[CLI_MENU_COMMANDS_SET] = {
-  { "help",              cliSetHelp           },
-  { "LF_HAL_trim_alpha", cliSetHALTrimLFAlpha },
-  { "LF_HAL_trim_beta",  cliSetHALTrimLFBeta  },
-  { "LF_HAL_trim_gamma", cliSetHALTrimLFGamma },
-  { "RF_HAL_trim_alpha", cliSetHALTrimRFAlpha },
-  { "RF_HAL_trim_beta",  cliSetHALTrimRFBeta  },
-  { "RF_HAL_trim_gamma", cliSetHALTrimRFGamma },
-  { "LH_HAL_trim_alpha", cliSetHALTrimLHAlpha },
-  { "LH_HAL_trim_beta",  cliSetHALTrimLHBeta  },
-  { "LH_HAL_trim_gamma", cliSetHALTrimLHGamma },
-  { "RH_HAL_trim_alpha", cliSetHALTrimRHAlpha },
-  { "RH_HAL_trim_beta",  cliSetHALTrimRHBeta  },
-  { "RH_HAL_trim_gamma", cliSetHALTrimRHGamma },
-  { "HAL",               cliSetHALState       },
-  { "LF_angle_alpha",    cliSetAngleLFAlpha   },
-  { "LF_angle_beta",     cliSetAngleLFBeta    },
-  { "LF_angle_gamma",    cliSetAngleLFGamma   },
-  { "RF_angle_alpha",    cliSetAngleRFAlpha   },
-  { "RF_angle_beta",     cliSetAngleRFBeta    },
-  { "RF_angle_gamma",    cliSetAngleRFGamma   },
-  { "LH_angle_alpha",    cliSetAngleLHAlpha   },
-  { "LH_angle_beta",     cliSetAngleLHBeta    },
-  { "LH_angle_gamma",    cliSetAngleLHGamma   },
-  { "RH_angle_alpha",    cliSetAngleRHAlpha   },
-  { "RH_angle_beta",     cliSetAngleRHBeta    },
-  { "RH_angle_gamma",    cliSetAngleRHGamma   },
-  { "servo_calib",       cliSetServoCalib     },
-  { "servo_to_init",     cliSetServoToInit    }
-};
+#define CLI_MENU_COMMANDS_RUN 5
 
 const cliCommand cliCommandsRun[CLI_MENU_COMMANDS_RUN] = {
   { "help",         cliRunHelp        },
@@ -80,6 +16,8 @@ const cliCommand cliCommandsRun[CLI_MENU_COMMANDS_RUN] = {
   { "wifiinfo",     WiFiInfo          },
   { "sbscr",        subscriptionState }
 };
+
+#include "model/cli.h"
 
 void initCLI() {
   cliInitHelp();
@@ -260,4 +198,34 @@ void cliClearCommand() {
   
   cliPosCommand = 0;
   cliPosState = 0;
+}
+
+void cliPrintPoint(LR_point p, int n)
+{
+  cliSerial->print("{");
+  cliSerial->print(p.x, n);
+  cliSerial->print(", ");
+  cliSerial->print(p.y, n);
+  cliSerial->print(", ");
+  cliSerial->print(p.z, n);
+  cliSerial->print("} ");
+}
+
+void cliPrintAngle(LR_angle p, int n)
+{
+  cliSerial->print("{");
+  cliSerial->print(degToRad(p.pitch), n);
+  cliSerial->print(", ");
+  cliSerial->print(degToRad(p.roll), n);
+  cliSerial->print(", ");
+  cliSerial->print(degToRad(p.yaw), n);
+  cliSerial->print("} ");
+}
+
+
+double _cliSetAngleError()
+{
+  cliError("Unable to set angle");
+
+  return 0;
 }

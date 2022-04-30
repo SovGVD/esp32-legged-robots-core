@@ -144,6 +144,15 @@ servoProfile servoMainProfile = {
  * 2 leg trim {9.969466, 0.000000, 2.979381}
  * 3 leg trim {4.927437, 0.000000, -7.104677}
  */
+ 
+/**
+ * Hardware
+ */
+#define PWM_CONTROLLER_TYPE  ESP32PWM
+#define IMU_ADDRESS          0x68
+#define IMU_TYPE             MPU9250
+#define POWER_SENSOR         INA219
 
-#include "../libraries/MODEL_dog/IK/IK.h"
-#include "../libraries/MODEL_dog/IK/IK.cpp"
+
+#include "../../libraries/MODEL_dog/IK/IK.h"
+#include "../../libraries/MODEL_dog/IK/IK.cpp"

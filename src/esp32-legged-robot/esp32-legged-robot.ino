@@ -5,19 +5,13 @@
 #include "libraries/transition/transition.h"
 #include "libraries/PID/AnglePID.h"
 #include "def/def.h"
+#include "def/cli.h"
+#include "def/subscription.h"
 #include "config.h"
-
-#if ROBOT_MODEL == MODEL_DOG
-  #include "model/dog.h"
-#endif
-
+#include "model/model.h"
 #include "config_wifi.h"
 #include "libraries/gait/gait.h"
-
-#if ROBOT_MODEL == MODEL_DOG
-  #include "model/gait_dog.h"
-#endif
-
+#include "model/gait.h"
 #include "libraries/planner/planner.h"
 #include "libraries/balance/balance.h"
 #include "libraries/HAL_body/HAL_body.h"
@@ -26,14 +20,11 @@
 #include "WiFi.h"
 #include "ESPAsyncWebServer.h"
 #include "web/index.html.gz.h"
-#include "cli.h"
-#include "subscription.h"
 
 #include <MPU9250_WE.h> // v 1.1.3
 #include <Wire.h>
 
 #include "libraries/PID/AnglePID.cpp"
-//#include "libraries/IK/IK_simple.cpp"  // TODO this is for small dog only!!!
 #include "libraries/transition/transition.cpp"
 #include "libraries/planner/planner.cpp"
 #include "libraries/balance/balance.cpp"

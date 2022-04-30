@@ -1,3 +1,5 @@
+#define CLI_MENU_COMMANDS_GET 30
+
 // HAL
 
 // HAL - trim
@@ -170,24 +172,35 @@ double cliGetDebug(double id)
 }
 
 
-void cliPrintPoint(LR_point p, int n)
-{
-  cliSerial->print("{");
-  cliSerial->print(p.x, n);
-  cliSerial->print(", ");
-  cliSerial->print(p.y, n);
-  cliSerial->print(", ");
-  cliSerial->print(p.z, n);
-  cliSerial->print("} ");
-}
-
-void cliPrintAngle(LR_angle p, int n)
-{
-  cliSerial->print("{");
-  cliSerial->print(degToRad(p.pitch), n);
-  cliSerial->print(", ");
-  cliSerial->print(degToRad(p.roll), n);
-  cliSerial->print(", ");
-  cliSerial->print(degToRad(p.yaw), n);
-  cliSerial->print("} ");
-}
+const cliCommand cliCommandsGet[CLI_MENU_COMMANDS_GET] = {
+  { "help",              cliGetHelp           },
+  { "LF_HAL_trim_alpha", cliGetHALTrimLFAlpha },
+  { "LF_HAL_trim_beta",  cliGetHALTrimLFBeta  },
+  { "LF_HAL_trim_gamma", cliGetHALTrimLFGamma },
+  { "RF_HAL_trim_alpha", cliGetHALTrimRFAlpha },
+  { "RF_HAL_trim_beta",  cliGetHALTrimRFBeta  },
+  { "RF_HAL_trim_gamma", cliGetHALTrimRFGamma },
+  { "LH_HAL_trim_alpha", cliGetHALTrimLHAlpha },
+  { "LH_HAL_trim_beta",  cliGetHALTrimLHBeta  },
+  { "LH_HAL_trim_gamma", cliGetHALTrimLHGamma },
+  { "RH_HAL_trim_alpha", cliGetHALTrimRHAlpha },
+  { "RH_HAL_trim_beta",  cliGetHALTrimRHBeta  },
+  { "RH_HAL_trim_gamma", cliGetHALTrimRHGamma },
+  { "HAL",               cliGetHALState       },
+  { "LF_angle_alpha",    cliGetAngleLFAlpha   },
+  { "LF_angle_beta",     cliGetAngleLFBeta    },
+  { "LF_angle_gamma",    cliGetAngleLFGamma   },
+  { "RF_angle_alpha",    cliGetAngleRFAlpha   },
+  { "RF_angle_beta",     cliGetAngleRFBeta    },
+  { "RF_angle_gamma",    cliGetAngleRFGamma   },
+  { "LH_angle_alpha",    cliGetAngleLHAlpha   },
+  { "LH_angle_beta",     cliGetAngleLHBeta    },
+  { "LH_angle_gamma",    cliGetAngleLHGamma   },
+  { "RH_angle_alpha",    cliGetAngleRHAlpha   },
+  { "RH_angle_beta",     cliGetAngleRHBeta    },
+  { "RH_angle_gamma",    cliGetAngleRHGamma   },
+  { "angles",            cliGetAngles         },
+  { "power",             cliGetPower          },
+  { "imu",               cliGetIMU            },
+  { "debug",             cliGetDebug          }
+};
