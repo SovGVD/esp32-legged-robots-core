@@ -146,11 +146,19 @@ HAL_body bodyUpdate(vector, imuCorrection, body, legs);
 
 // WebServer
 bool clientOnline = false;
+AsyncWebSocketClient * wsclient;
 int WiFiMode = AP_MODE;
 IPAddress WiFiIP;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 uint8_t telemetryPackage[P_TELEMETRY_LEN];
+
+#ifdef ESP32CAMERA
+  #include "libraries/camera/esp32camera.h"
+  #include "libraries/camera/esp32camera.cpp"
+  esp32camera mainCamera(wsclient, ESP32CAMERA_FRAMESIZE, ESP32CAMERA_FPS, ESP32CAMERA_JPEG_QUALITY);
+#endif
+
 
 // CLI
 Stream *cliSerial;
@@ -253,6 +261,12 @@ void servicesLoop(void * pvParameters) {
 
   while(mainLoopReady && serviceLoopReady) {
     serviceCurrentTime = micros();
+
+    #ifdef ESP32CAMERA
+      if (clientOnline) {
+        mainCamera.cameraHandleStream();  // @TODO send by request only!!!
+      }
+    #endif
 
     if (serviceCurrentTime - serviceFastPreviousTime >= SERVICE_FAST_LOOP_TIME) {
       serviceFastPreviousTime = serviceCurrentTime;

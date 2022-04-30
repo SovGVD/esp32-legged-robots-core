@@ -17,9 +17,16 @@
  * Supported I2C devices
  *  - PWM PCA9685
  *  - IMU MPU 9250
+ * Other devices
+ *  - ESP32CAM
  */
 
-#define PWM_CONTROLLER_ADDRESS 0x40
+//#define ESP32CAMERA
+//#define ESP32CAMERA_FRAMESIZE    FRAMESIZE_QVGA
+//#define ESP32CAMERA_JPEG_QUALITY 12
+//#define ESP32CAMERA_FPS          25
+
+//#define PWM_CONTROLLER_ADDRESS 0x40
 //#define PWM_CONTROLLER_TYPE    PCA9685
 //#define PWM_CONTROLLER_TYPE    ESP32PWM
 

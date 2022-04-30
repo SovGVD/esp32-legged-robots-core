@@ -13,7 +13,11 @@ void initWebServerRoutes() {
     
   // Dinamic config
   server.on("/c.js", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(200, "application/x-javascript", "var c={w:'ws://" + WiFiIP.toString() + "/ws'}");
+    #ifdef ESP32CAMERA
+      request->send(200, "application/x-javascript", "var c={w:'ws://" + WiFiIP.toString() + "/ws',c:" + ESP32CAMERA_FRAMESIZE + "};");  // @TODO better config option
+    #else
+      request->send(200, "application/x-javascript", "var c={w:'ws://" + WiFiIP.toString() + "/ws',c:0};");
+    #endif
   });
 
   ws.onEvent(onWsEvent);
@@ -25,6 +29,7 @@ void initWebServerRoutes() {
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
  
   if(type == WS_EVT_CONNECT){ 
+    wsclient = client;
     client->text("Ok");
     clientOnline = true;
   } else if (clientOnline && type == WS_EVT_DATA) {
