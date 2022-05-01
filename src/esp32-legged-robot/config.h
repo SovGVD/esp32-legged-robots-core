@@ -35,33 +35,6 @@
 
 //#define POWER_SENSOR           INA219
 
-// default angles for init state
-#define LEG_ANGLE_ALPHA    M_PI_2
-#define LEG_ANGLE_BETA     M_PI_2
-#define LEG_ANGLE_GAMMA    M_PI_2
-#define LEG_ANGLE_DELTA    M_PI_2
-#define LEG_ANGLE_EPSILON  M_PI_2
-#define LEG_ANGLE_ZETA     M_PI_2
-
-// angle limits
-#define LEG_ANGLE_ALPHA_MIN   0
-#define LEG_ANGLE_ALPHA_MAX   M_PI
-
-#define LEG_ANGLE_BETA_MIN    0
-#define LEG_ANGLE_BETA_MAX    M_PI
-
-#define LEG_ANGLE_GAMMA_MIN   0
-#define LEG_ANGLE_GAMMA_MAX   M_PI
-
-#define LEG_ANGLE_DELTA_MIN   0
-#define LEG_ANGLE_DELTA_MAX   M_PI
-
-#define LEG_ANGLE_EPSILON_MIN 0
-#define LEG_ANGLE_EPSILON_MAX M_PI
-
-#define LEG_ANGLE_ZETA_MIN    0
-#define LEG_ANGLE_ZETA_MAX    M_PI
-
 #define LEG_TRIM_INC   0.002   // radian
 #define LEG_TRIM_LIMIT  0.24   // See settingsUint8ToDouble()
 

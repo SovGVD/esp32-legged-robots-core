@@ -42,17 +42,17 @@ leg legs[LEG_NUM] = {
     { -LEG_BODY_X,  LEG_BODY_Y_F,   LEG_BODY_Z},
     {-LEG_POINT_X, LEG_POINT_Y_F, -LEG_POINT_Z},
     { LEG_SIZE_L1,   LEG_SIZE_L2,  LEG_SIZE_L3},
-    {LEG_ANGLE_ALPHA_MIN, LEG_ANGLE_BETA_MIN, LEG_ANGLE_GAMMA_MIN},
-    {LEG_ANGLE_ALPHA_MAX, LEG_ANGLE_BETA_MAX, LEG_ANGLE_GAMMA_MAX},
+    {    0,    0,    0 },
+    { M_PI, M_PI, M_PI },
     {
-      {M_PI_2, M_PI_2, M_PI_2},  // hardware middle
-      { 25, 26, 27},             // 3 servo pins
-      {  0,  0,  0},             // servo middle trim
-      {  2,  1,  1}              // gear ratio, first and last one is 16 groves on servo and 24 groves on leg
+      { M_PI_2, M_PI_2, M_PI_2 },             // hardware middle
+      {     25,     26,     27 },             // 3 servo pins
+      {      0,      0,      0 },             // servo middle trim
+      {      2,      1,      1 }              // gear ratio, first and last one is 16 groves on servo and 24 groves on leg
     },
-    {    -LEG_BODY_X,   LEG_BODY_Y_F,      LEG_BODY_Z},
-    {   -LEG_POINT_X,  LEG_POINT_Y_F,    -LEG_POINT_Z},
-    {LEG_ANGLE_ALPHA, LEG_ANGLE_BETA, LEG_ANGLE_GAMMA},
+    {  -LEG_BODY_X,  LEG_BODY_Y_F,   LEG_BODY_Z },
+    { -LEG_POINT_X, LEG_POINT_Y_F, -LEG_POINT_Z },
+    {       M_PI_2,        M_PI_2,       M_PI_2 },
     {true, true, false, false, true, true},
     {true, 0, 0}
   },
@@ -62,8 +62,8 @@ leg legs[LEG_NUM] = {
     { LEG_BODY_X,  LEG_BODY_Y_F,   LEG_BODY_Z},
     {LEG_POINT_X, LEG_POINT_Y_F, -LEG_POINT_Z},
     {LEG_SIZE_L1,   LEG_SIZE_L2,  LEG_SIZE_L3},
-    {LEG_ANGLE_ALPHA_MIN, LEG_ANGLE_BETA_MIN, LEG_ANGLE_GAMMA_MIN},
-    {LEG_ANGLE_ALPHA_MAX, LEG_ANGLE_BETA_MAX, LEG_ANGLE_GAMMA_MAX},
+    {0, 0, 0},
+    {M_PI, M_PI, M_PI},
     {
       {M_PI_2, M_PI_2, M_PI_2},
       { 16, 18, 17},
@@ -72,7 +72,7 @@ leg legs[LEG_NUM] = {
     },
     {     LEG_BODY_X,   LEG_BODY_Y_F,      LEG_BODY_Z},
     {    LEG_POINT_X,  LEG_POINT_Y_F,    -LEG_POINT_Z},
-    {LEG_ANGLE_ALPHA, LEG_ANGLE_BETA, LEG_ANGLE_GAMMA},
+    {M_PI_2, M_PI_2, M_PI_2},
     {false, true, false, true, false, false},
     {true, 0, 0}
   },
@@ -82,8 +82,8 @@ leg legs[LEG_NUM] = {
     { -LEG_BODY_X,  -LEG_BODY_Y_H,   LEG_BODY_Z},
     {-LEG_POINT_X, -LEG_POINT_Y_H, -LEG_POINT_Z},
     { LEG_SIZE_L1,    LEG_SIZE_L2,  LEG_SIZE_L3},
-    {LEG_ANGLE_ALPHA_MIN, LEG_ANGLE_BETA_MIN, LEG_ANGLE_GAMMA_MIN},
-    {LEG_ANGLE_ALPHA_MAX, LEG_ANGLE_BETA_MAX, LEG_ANGLE_GAMMA_MAX},
+    {0, 0, 0},
+    {M_PI, M_PI, M_PI},
     {
       {M_PI_2, M_PI_2, M_PI_2},
       { 13, 12, 14},
@@ -92,7 +92,7 @@ leg legs[LEG_NUM] = {
     },
     {    -LEG_BODY_X,  -LEG_BODY_Y_H,      LEG_BODY_Z},
     {   -LEG_POINT_X, -LEG_POINT_Y_H,    -LEG_POINT_Z},
-    {LEG_ANGLE_ALPHA, LEG_ANGLE_BETA, LEG_ANGLE_GAMMA},
+    {M_PI_2, M_PI_2, M_PI_2},
     {true, true, false, true, true, true},
     {true, 0, 0}
   },
@@ -102,8 +102,8 @@ leg legs[LEG_NUM] = {
     { LEG_BODY_X,  -LEG_BODY_Y_H,   LEG_BODY_Z},
     {LEG_POINT_X, -LEG_POINT_Y_H, -LEG_POINT_Z},
     {LEG_SIZE_L1,    LEG_SIZE_L2,  LEG_SIZE_L3},
-    {LEG_ANGLE_ALPHA_MIN, LEG_ANGLE_BETA_MIN, LEG_ANGLE_GAMMA_MIN},
-    {LEG_ANGLE_ALPHA_MAX, LEG_ANGLE_BETA_MAX, LEG_ANGLE_GAMMA_MAX},
+    {0, 0, 0},
+    {M_PI, M_PI, M_PI},
     {
       {M_PI_2, M_PI_2, M_PI_2},
       {  4,  2, 15},
@@ -112,7 +112,7 @@ leg legs[LEG_NUM] = {
     },
     {     LEG_BODY_X,  -LEG_BODY_Y_H,      LEG_BODY_Z},
     {    LEG_POINT_X, -LEG_POINT_Y_H,    -LEG_POINT_Z},
-    {LEG_ANGLE_ALPHA, LEG_ANGLE_BETA, LEG_ANGLE_GAMMA},
+    {M_PI_2, M_PI_2, M_PI_2},
     {false, true, false, false, false, false},
     {true, 0, 0}
   }
