@@ -20,3 +20,6 @@ This code mostly based on [ESP32 robot dog](https://github.com/SovGVD/esp32-robo
    - MPU9650
  - Other sensors
    - IMA219 - power sensor
+
+## Build CLI (./build.sh)
+Command line interface tool to setup dev environment and install required libraries.

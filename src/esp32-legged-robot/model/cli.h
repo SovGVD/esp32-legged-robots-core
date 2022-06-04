@@ -3,7 +3,7 @@
   #include "dog/cliSet.cpp"
 #endif
 
-#if ROBOT_MODEL == MODEL_PIPED
+#if ROBOT_MODEL == MODEL_BIPED
   #include "biped/cliGet.cpp"
   #include "biped/cliSet.cpp"
 #endif

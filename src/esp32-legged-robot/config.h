@@ -43,4 +43,3 @@
 #define SERVO_MAX 2400
 #define SERVO_FREQ 330
 
-#define ROBOT_MODEL MODEL_DOG

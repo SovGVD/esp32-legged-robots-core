@@ -8,6 +8,7 @@
 #include "def/cli.h"
 #include "def/subscription.h"
 #include "config.h"
+#include "config_model.h"
 #include "model/model.h"
 #include "config_wifi.h"
 #include "libraries/gait/gait.h"
