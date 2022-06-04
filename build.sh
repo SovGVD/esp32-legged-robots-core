@@ -68,7 +68,7 @@ compile() {
 			BOARD="esp32:esp32:esp32doit-devkit-v1"
 			;;
 		robot-biped)
-			MODEL="MODEL_BIPED"			
+			MODEL="MODEL_BIPED"
 			BOARD="esp32:esp32:esp32cam"
 			;;
 		*)
@@ -80,6 +80,7 @@ compile() {
 	# Compile
 	echo "Compile: ${ARDUINO_CLI} compile --fqbn ${BOARD} ${SRC}"
 	echo "#define ROBOT_MODEL ${MODEL}" > $SRC_CONFIG_MODEL
+	$ARDUINO_CLI cache clean
 	$ARDUINO_CLI compile --fqbn $BOARD $SRC -v
 	rm $SRC_CONFIG_MODEL
 }
@@ -87,7 +88,8 @@ compile() {
 help-header() {
 	echo "ESP32 legged robot build command line interface."
 	echo ""
-}	
+}
+
 help() {
 	help-header
 	echo "Usage:"

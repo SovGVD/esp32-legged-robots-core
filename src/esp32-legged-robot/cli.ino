@@ -1,20 +1,8 @@
-// @TODO that is all not great
+#define CLI_COMMANDS 2
 
-char cliChar;
-bool cliErrorState = false;
-bool cliHideReturn = false;
-char cliValues[CLI_VALUES][CLI_VALUE_LEN];
-unsigned int cliPosCommand = 0;
-unsigned int cliPosState = 0;
-
-#define CLI_MENU_COMMANDS_RUN 5
-
-const cliCommand cliCommandsRun[CLI_MENU_COMMANDS_RUN] = {
-  { "help",         cliRunHelp        },
-  { "i2cscan",      runI2CScan        },
-  { "calibrateimu", calibrateIMU      },
-  { "wifiinfo",     WiFiInfo          },
-  { "sbscr",        subscriptionState }
+const cliCommand cliCommands[CLI_COMMANDS] = {
+  { "help",         cliHelp   , 0 },
+  { "i2cscan",      cliI2cScan, 0 }
 };
 
 #include "model/cli.h"
@@ -26,206 +14,98 @@ void initCLI() {
 void cliInitHelp()
 {
   cliSerial->println();
-  cliSerial->println(" CLI: type `get|set|run|sbs help` to see available methods.");
+  cliSerial->println(" CLI: type `help` to see available methods.");
   cliSerial->println();
+}
 
+bool CLI_get(char * CLI_BUFFER)
+{
+  static uint8_t CLI_charsRead = 0;
+  while (cliSerial->available()) {
+    char CLI_c = cliSerial->read();
+    switch (CLI_c) {
+      case CLI_CR:      //likely have full command in buffer now, commands are terminated by CR and/or LS
+      case CLI_LF:
+        CLI_BUFFER[CLI_charsRead] = CLI_NULLCHAR;       //null terminate our command char array
+        if (CLI_charsRead > 0)  {
+          CLI_charsRead = 0;                           //charsRead is static, so have to reset
+          cliSerial->print("> ");
+          cliSerial->println(CLI_BUFFER);
+          return true;
+        }
+        break;
+      default:
+        if (CLI_c == 32) {
+          CLI_params++;
+        }
+        if (CLI_charsRead < CLI_BUFFER_LENGTH) {
+          CLI_BUFFER[CLI_charsRead++] = CLI_c;
+        }
+        CLI_BUFFER[CLI_charsRead] = CLI_NULLCHAR;     //just in case
+        break;
+    }
+  }
+  return false;
+}
+
+int CLI_readInt() {
+  char * numTextPtr = strtok(NULL, CLI_delimiters);   //K&R string.h  pg. 250
+  return atoi(numTextPtr);                            //K&R string.h  pg. 251
+}
+
+float CLI_readFloat() {
+  char * floatTextPtr = strtok(NULL, CLI_delimiters);
+  return atof(floatTextPtr);
+}
+
+char * CLI_readWord() {
+  char * word = strtok(NULL, CLI_delimiters);         //K&R string.h  pg. 250
+  return word;
+}
+
+void CLI_doCommand() {
+  char * commandName = strtok(CLI_BUFFER, CLI_delimiters);
+  /**
+   * Default commands
+   */
+  for (int i = 0; i < CLI_COMMANDS; i++) {
+    if (strcmp(commandName, cliCommands[i].commandName) == 0) {
+      if (cliCommands[i].params != CLI_params) {
+        cliSerial->print(CLI_params);
+        cliSerial->println(" incorrect params number.");
+        CLI_params = 0;
+        return;
+      }
+      CLI_params = 0;
+      cliCommands[i].func();
+      return;
+    }
+  }
+
+  /**
+   * Model commands
+   */
+  for (int i = 0; i < MODEL_CLI_MENU_COMMANDS; i++) {
+    if (strcmp(commandName, modelCliCommands[i].commandName) == 0) {
+      if (modelCliCommands[i].params != CLI_params) {
+        cliSerial->print(CLI_params);
+        cliSerial->println(" incorrect params number.");
+        CLI_params = 0;
+        return;
+      }
+      CLI_params = 0;
+      modelCliCommands[i].func();
+      return;
+    }
+  }
+
+  CLI_params = 0;
+  cliSerial->println("Unknown command.");
 }
 
 void updateCLI()
 {
-  if (cliSerial->available()) {
-    cliChar = cliSerial->read();
-    
-    if (cliPosCommand >= CLI_VALUES || cliPosState >= CLI_VALUE_LEN) {
-      cliFailCommand();
-    }
-    
-    switch (cliChar) {
-      case 10:
-      case 13:
-        cliRunCommand();
-        break;
-        
-      case 32:
-        cliPosState = 0;
-        cliPosCommand++;
-        break;
-        
-      default:
-        cliValues[cliPosCommand][cliPosState] = cliChar;
-        cliPosState++;
-        break;
-    }
-  }
-}
-
-void cliRunCommand()
-{
-  cliSerial->print(CLI_TERMINAL_SIGN);
-  if (strcmp(cliValues[0], "get") == 0) {
-    cliRunCommandGet();
-  } else if (strcmp(cliValues[0], "set") == 0) {
-    cliRunCommandSet();
-  } else if (strcmp(cliValues[0], "run") == 0) {
-    cliRunCommandRun();
-  } else if (strcmp(cliValues[0], "sbs") == 0) {
-    cliRunCommandSubscription();
-  } else {
-    //cliUnknownCommand();
-  }
-
-  cliClearError();
-  cliClearCommand();
-}
-
-void cliUnknownCommand()
-{
-  cliSerial->println("UNKNOWN");
-  cliInitHelp();
-}
-
-void cliRunCommandGet() {
-  cliSerial->print("GET ");
-  cliSerial->println(cliValues[1]);
-  for (int i = 0; i < CLI_MENU_COMMANDS_GET; i++) {
-    if (strcmp(cliValues[1], cliCommandsGet[i].commandName) == 0) {
-      double r = cliCommandsGet[i].func(atof(cliValues[2]));
-      if (!cliErrorState && !cliHideReturn) {
-        cliSerial->println(r, CLI_DP);
-      }
-    }
-  }
-  cliHideReturn = false;
-}
-
-void cliRunCommandSubscription() {
-  cliSerial->print("SBS ");
-  cliSerial->println(cliValues[1]);
-  cliSerial->println(cliValues[2]);
-  cliSerial->println(cliValues[3]);
-  for (int i = 1; i < CLI_MENU_COMMANDS_GET; i++) { // ignore `help`
-    if (strcmp(cliValues[1], cliCommandsGet[i].commandName) == 0) {
-      subscribe(i, atoi(cliValues[2]) == 1, atoi(cliValues[3]) == 1);
-    }
-  }
-  cliHideReturn = false;
-}
-
-
-void cliRunCommandSet() {
-  cliSerial->print("SET ");
-  cliSerial->print(cliValues[1]);
-  cliSerial->print(" ");
-  cliSerial->println(atof(cliValues[2]), CLI_DP);
-  for (int i = 0; i < CLI_MENU_COMMANDS_SET; i++) {
-    if (strcmp(cliValues[1], cliCommandsSet[i].commandName) == 0) {
-      double r = cliCommandsSet[i].func(atof(cliValues[2]));
-      if (!cliErrorState && !cliHideReturn) {
-        cliSerial->println(r, CLI_DP);
-      }
-    }
-  }
-  cliHideReturn = false;
-}
-
-void cliRunCommandRun() {
-  cliSerial->print("RUN ");
-  cliSerial->println(cliValues[1]);
-  for (int i = 0; i < CLI_MENU_COMMANDS_RUN; i++) {
-    if (strcmp(cliValues[1], cliCommandsRun[i].commandName) == 0) {
-      cliCommandsRun[i].func(atof(cliValues[2]));
-    }
-  }
-  cliHideReturn = false;
-}
-
-void cliDisplayHelp(cliCommand *_commands, int num)
-{
-  cliHideReturn = true;
-  for (int i = 1; i < num; i++) { // first command is `help`, we don't need to print it
-    cliSerial->print(i);
-    cliSerial->print(CLI_DELIMITER);
-    cliSerial->println(_commands[i].commandName);
-  }
-  
-}
-
-double cliGetHelp(double id) {
-  int num = CLI_MENU_COMMANDS_GET;
-  cliDisplayHelp(cliCommandsGet, num);
-  return num;
-}
-
-double cliSetHelp(double id) {
-  int num = CLI_MENU_COMMANDS_SET;
-  cliDisplayHelp(cliCommandsSet, num);
-  return num;
-}
-
-double cliRunHelp(double id) {
-  int num = CLI_MENU_COMMANDS_RUN;
-  cliDisplayHelp(cliCommandsRun, num);
-  return num;
-}
-
-void cliFailCommand() {
-  cliError("Command too long");
-}
-
-void cliError(String msg) {
-  cliClearCommand();
-  cliWasError();
-  cliSerial->print("ERROR: ");
-  cliSerial->println(msg);
-}
-
-void cliWasError()
-{
-  cliErrorState = true;
-}
-
-void cliClearError()
-{
-  cliErrorState = false;
-}
-
-void cliClearCommand() {
-  for (cliPosCommand = 0; cliPosCommand < CLI_VALUES; cliPosCommand++) {
-    for (cliPosState = 0; cliPosState < CLI_VALUE_LEN; cliPosState++) {
-      cliValues[cliPosCommand][cliPosState] = 0;
-    }
-  }
-  
-  cliPosCommand = 0;
-  cliPosState = 0;
-}
-
-void cliPrintPoint(LR_point p, int n)
-{
-  cliSerial->print("{");
-  cliSerial->print(p.x, n);
-  cliSerial->print(", ");
-  cliSerial->print(p.y, n);
-  cliSerial->print(", ");
-  cliSerial->print(p.z, n);
-  cliSerial->print("} ");
-}
-
-void cliPrintAngle(LR_angle p, int n)
-{
-  cliSerial->print("{");
-  cliSerial->print(degToRad(p.pitch), n);
-  cliSerial->print(", ");
-  cliSerial->print(degToRad(p.roll), n);
-  cliSerial->print(", ");
-  cliSerial->print(degToRad(p.yaw), n);
-  cliSerial->print("} ");
-}
-
-
-double _cliSetAngleError()
-{
-  cliError("Unable to set angle");
-
-  return 0;
+	if (CLI_get(CLI_BUFFER)){
+	  CLI_doCommand();
+	}
 }

@@ -164,10 +164,6 @@ uint8_t telemetryPackage[P_TELEMETRY_LEN];
 // CLI
 Stream *cliSerial;
 
-// Subscriptions
-bool subscriptionEnabled = false;
-bool subscriptionBinary = false;
-
 bool mainLoopReady = false;
 bool serviceLoopReady = false;
 
@@ -220,7 +216,6 @@ void loop()
     previousTime = currentTime;
 
     updateFailsafe();
-    updateCLI();  // hmm...
     updatePower();  // TODO not so often!
 
     updateIMU();
@@ -246,7 +241,6 @@ void loop()
 void servicesSetup() {
   cliSerial = &Serial;
   initCLI();
-  initSubscription();
 
   initWiFi();
   delay(100);
@@ -272,9 +266,6 @@ void servicesLoop(void * pvParameters) {
     if (serviceCurrentTime - serviceFastPreviousTime >= SERVICE_FAST_LOOP_TIME) {
       serviceFastPreviousTime = serviceCurrentTime;
       
-      runFASTCommand();
-      doFASTSubscription();
-
       serviceFastLoopTime = micros() - serviceCurrentTime;
       if (serviceFastLoopTime > LOOP_TIME) {
         Serial.print("WARNING! Increase SERVICE_FAST_LOOP_TIME: ");
@@ -285,11 +276,9 @@ void servicesLoop(void * pvParameters) {
     if (serviceCurrentTime - servicePreviousTime >= SERVICE_LOOP_TIME) {
       servicePreviousTime = serviceCurrentTime;
 
+      updateCLI();
       updateWiFi();
-      runSLOWCommand();
       
-      doSLOWSubscription();
-
       serviceLoopTime = micros() - serviceCurrentTime;  // this loop + service fast loop
       if (serviceLoopTime > LOOP_TIME) {
         Serial.print("WARNING! Increase SERVICE_LOOP_TIME: ");
@@ -301,24 +290,7 @@ void servicesLoop(void * pvParameters) {
   }
 }
 
-void runFASTCommand()
-{
-  if (runCommandFASTCore) {
-    runCommandFASTCore = false;
-    cliFunctionFAST(cliFunctionFASTVar);
-  }
-}
-
-void runSLOWCommand()
-{
-  if (runCommandSLOWCore) {
-    runCommandSLOWCore = false;
-    cliFunctionSLOW(cliFunctionSLOWVar);
-  }
-}
-
 /**
    TODO
     - calculate center of mass and use it for balance
-    - make the queue of tasks by core, e.g. not just   cliFunctionFAST = runI2CScanFAST; but array/list with commands
 */
