@@ -16,16 +16,17 @@ SRC="${CWD}/src/esp32-legged-robot"
 SRC_CONFIG_MODEL="${SRC}/config_model.h"
 
 COMMAND="$1"
-SUB_COMMAND="$2"
+PARAM1="$2"
+PARAM2="$3"
 
-install-arduino-cli()
+installArduinoCli()
 {
 	# Create folders for Arduino CLI
 	mkdir -p $ARDUINO_BIN_DIR
 	curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=$ARDUINO_BIN_DIR sh
 }
 
-build-env() {
+buildEnv() {
 	# Create folders for Arduino
 	mkdir -p $ARDUINO_PATH
 	mkdir -p $ARDUINO_DATA
@@ -55,14 +56,14 @@ build-env() {
 	# Install libraries
 	# TODO specify versions for git
 	$ARDUINO_CLI lib install --git-url https://github.com/me-no-dev/ESPAsyncWebServer.git https://github.com/me-no-dev/AsyncTCP.git
-	$ARDUINO_CLI lib install ESP32_ISR_Servo@1.1.0
+	$ARDUINO_CLI lib install ESP32_ISR_Servo@1.3.0
 	$ARDUINO_CLI lib install MPU9250_WE@1.1.3
 	$ARDUINO_CLI lib install INA219_WE@1.3.1
 	$ARDUINO_CLI lib install "Adafruit PWM Servo Driver Library"@2.4.0
 }
 
-compile() {
-	case $SUB_COMMAND in
+setModelAndBoard() {
+	case $PARAM1 in
 		robot-dog)
 			MODEL="MODEL_DOG"
 			BOARD="esp32:esp32:esp32doit-devkit-v1"
@@ -76,22 +77,37 @@ compile() {
 			exit 0
 			;;
 	esac
+}
 
+compile() {
+	setModelAndBoard
 	# Compile
-	echo "Compile: ${ARDUINO_CLI} compile --fqbn ${BOARD} ${SRC}"
+	echo "Compile: ${ARDUINO_CLI} compile --fqbn ${BOARD} ${SRC}..."
 	echo "#define ROBOT_MODEL ${MODEL}" > $SRC_CONFIG_MODEL
 	$ARDUINO_CLI cache clean
 	$ARDUINO_CLI compile --fqbn $BOARD $SRC -v
 	rm $SRC_CONFIG_MODEL
 }
 
-help-header() {
+upload() {
+	[[ -z "$PARAM2" ]] && { echo "Port required" ; exit 1; }
+	compile
+	echo "Uploading ${MODEL}. Port:${PARAM2}..."
+	$ARDUINO_CLI upload -p ${PARAM2} --fqbn $BOARD $SRC -v
+}
+monitor() {
+	[[ -z "$PARAM1" ]] && { echo "Port required" ; exit 1; }
+	echo "Press Ctrl-C to exit"
+	$ARDUINO_CLI monitor -p ${PARAM1} -c baudrate=115200
+}
+
+helpHeader() {
 	echo "ESP32 legged robot build command line interface."
 	echo ""
 }
 
 help() {
-	help-header
+	helpHeader
 	echo "Usage:"
 	echo "  ./build.sh [command]"
 	echo ""
@@ -102,15 +118,17 @@ help() {
 	echo "  install-arduino-cli Install latest version of Arduino CLI from Arduno CLI repository"
 	echo "  build-env           Build environment for ESP32 and install required libraries"
 	echo "  compile             Compile ESP32 binary"
+	echo "  upload              Compile and upload"
+	echo "  cli                 Arduino monitor, terminal"
 }
 
-compile-help() {
-	help-header
+compileHelp() {
+	helpHeader
 	echo "Usage:"
-	echo "  ./build.sh ROBOT_MODEL"
+	echo "  ./build.sh compile ROBOT_MODEL"
 	echo ""
 	echo "Examples:"
-	echo "  ./build.sh robot-dog"
+	echo "  ./build.sh compile robot-dog"
 	echo ""
 	echo "Available Commands:"
 	echo "  robot-dog   quadruped dog-like robot"
@@ -119,13 +137,19 @@ compile-help() {
 
 case $COMMAND in
 	install-arduino-cli)
-		install-arduino-cli
+		installArduinoCli
 		;;
 	build-env)
-		build-env
+		buildEnv
 		;;
 	compile)
 		compile
+		;;
+	upload)
+		upload
+		;;
+	cli)
+		monitor
 		;;
 	*)
 		help
