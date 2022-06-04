@@ -6,21 +6,23 @@
  * LEFT side view
  *
  *  <- front
- *   +-------+
- *   |   o   |
- *   +--- \ -+
+ * 
+ *   |        |
+ *   +--------*
+ *       |
+ *       o               <- 3DOF (alpha, beta, gamma), LEG_BODY_(X,Y,Z)
+ *        \
  *         \  L1
- *          o
+ *          o            <- 1DOF (delta)
  *         /
  *        / L2
- *       o
- *       | L3 (from joint to the ground)
+ *       o               <- 2 DOF (epsilon, zeta), LEG_FOOT_(X,Y,Z)
+ *       | L3            <- from joint to the ground
  *    -------
  *    / / / /
  *                    ^ z
  *                    |
  *               y <--*
- *
  */
 
 // default legs state
