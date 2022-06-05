@@ -15,7 +15,6 @@ void updateHAL() {
 }
 
 void doHAL() {
-  //if (!isHALEnabled()) return;
   servoSet();
 }
 
@@ -56,50 +55,43 @@ double getHALAngle(double angle, double mid, double trimAngle, double gearRatio,
   return angle;
 }
 
-/*double getHALTrim (leg &_leg, int angleId)
-{
-  switch (angleId) {
-    case ALPHA:
-      return _leg.hal.trim.alpha;
-      break;
-    case BETA:
-      return _leg.hal.trim.beta;
-      break;
-    case GAMMA:
-      return _leg.hal.trim.gamma;
-      break;
-  }
-
-  return 0;
-}
-
-bool setHALTrim (leg &_leg, int angleId, double deg)
-{
-  double rad = degToRad(deg);
-  if (rad >= LEG_TRIM_LIMIT || rad <= -LEG_TRIM_LIMIT) {
-    return false;
-  }
-  
-  switch (angleId) {
-    case ALPHA:
-      _leg.hal.trim.alpha = rad;
-      break;
-    case BETA:
-      _leg.hal.trim.beta  = rad;
-      break;
-    case GAMMA:
-      _leg.hal.trim.gamma = rad;
-      break;
-  }
-
-  settingsSaveTrimLeg(_leg);
-  _leg.hal.trim = settingsLoadTrimLeg(_leg);
-
-  return true;
-}*/
-
 bool isHALEnabled()
 {
   // This not correct, we are not enbale/disable HAL, but just disable servo position calculations
   return HALEnabled;
+}
+
+void enableHAL()
+{
+	HALEnabled = true;
+}
+
+void disableHAL()
+{
+	HALEnabled = false;
+}
+
+void cliHal()
+{
+	char* mode = CLI_readWord();
+	if (strcmp(mode, TITLE_ON) == 0) {
+		enableHAL();
+	}
+	if (strcmp(mode, TITLE_OFF) == 0) {
+		disableHAL();
+	}
+	if (strcmp(mode, TITLE_STATE) == 0) {
+	}
+
+	cliDisplayState();
+}
+
+void cliDisplayState()
+{
+	Serial.print("HAL: ");
+	if (isHALEnabled()) {
+		Serial.println(TITLE_ON);
+	} else {
+		Serial.println(TITLE_OFF);
+	}
 }

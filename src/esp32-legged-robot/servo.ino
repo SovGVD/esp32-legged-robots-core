@@ -5,18 +5,9 @@ bool testAngleWay = true;
 
 void initServo()
 {
-  Serial.print("Servo ");
-
-  initServoHAL();
-
-  Serial.println();
-}
-
-void setServoToMiddle()
-{ // remove it
-  for (uint8_t i = 0; i < LEG_NUM; i++) {
-    runServoCalibrate(legs[i]);
-  }
+	Serial.print("Servo ");
+	initServoHAL();
+	Serial.println();
 }
 
 /**
@@ -32,7 +23,6 @@ void setServoToInit()
     setLegPWM(legs[i]);
   }
 }
-
 
 void servoSet()
 {

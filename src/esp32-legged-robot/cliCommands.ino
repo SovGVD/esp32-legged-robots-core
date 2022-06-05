@@ -22,3 +22,25 @@ void cliI2cScan()
     }
   }
 }
+
+void cliCalibrate()
+{
+	char* mode = CLI_readWord();
+	if (strcmp(mode, TITLE_IMU) == 0) {
+		calibrateIMU();
+		return;
+	}
+	if (strcmp(mode, TITLE_SERVO) == 0) {
+		setServoToInit();
+		return;
+	}
+	
+	Serial.println("Unknown calibration hardware");
+}
+
+void cliSetServoToInit() {
+  disableHAL();
+  delay(1000); // that it terrible, but we need to wait to make sure HAL disabled
+
+  setServoToInit();
+}

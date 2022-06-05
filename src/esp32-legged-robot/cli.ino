@@ -1,15 +1,18 @@
-#define CLI_COMMANDS 4
+#define CLI_COMMANDS 6
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
-  { "help",         cliHelp,      "Show list of methods",       0 },
-  { "i2cscan",      cliI2cScan,   "Scan available i2c devices", 0 },
-  { "wifi",         WiFiInfo,     "WiFi AP information",        0 },
-  { "save",         settingsSave, "Save setting to EEPROM",     0 }
+  { "help",      cliHelp,       "Show list of methods",              0 },
+  { "i2cscan",   cliI2cScan,    "Scan available i2c devices",        0 },
+  { "wifi",      WiFiInfo,      "WiFi AP information",               0 },
+  { "save",      settingsSave,  "Save setting to EEPROM",            0 },
+  { "calib",     cliCalibrate,  "Calibrate [imu|servo]",             1 },
+  { "hal",       cliHal,        "[on|off|state] leg calculation",    1 }
 };
 
 #include "model/cli.h"
 
-void initCLI() {
+void initCLI()
+{
   cliInitHelp();
 }
 
@@ -65,7 +68,8 @@ char * CLI_readWord() {
   return word;
 }
 
-void CLI_doCommand() {
+void CLI_doCommand()
+{
   char * commandName = strtok(CLI_BUFFER, CLI_delimiters);
   /**
    * Default commands

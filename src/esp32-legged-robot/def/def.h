@@ -48,6 +48,19 @@
 /* Debug (SLOW!!!)*/
 //#define DEBUG_HAL_LEG
 
+/**
+ * Hardware option titles
+ */
+#define TITLE_SERVO "servo"
+#define TITLE_IMU   "imu"
+
+/**
+ * Other titles
+ */
+#define TITLE_ON    "on"
+#define TITLE_OFF   "off"
+#define TITLE_STATE "state"
+
 typedef struct {
   uint8_t minAngle; // minimal servo angle, deg
   uint8_t maxAngle; // maximal servo angle, deg
