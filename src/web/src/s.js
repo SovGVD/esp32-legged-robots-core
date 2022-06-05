@@ -267,6 +267,25 @@ let control = {
 	}
 }
 
+/*
+var stream = {
+	obj: null,
+	urlObject: null,
+	// TODO frame size from c.c
+	display: function (binData) {
+		if (!stream.obj) {
+			G('stream_container').style.display = 'block';
+			stream.obj = G('stream');
+		}
+		if (stream.urlObject) {
+			URL.revokeObjectURL(stream.urlObject);
+		}
+		stream.urlObject = URL.createObjectURL(new Blob([binData]));
+		stream.obj.src   = stream.urlObject;
+	}
+};
+*/
+
 control.init();
 gui.init();
 packet.init();

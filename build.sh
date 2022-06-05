@@ -82,6 +82,7 @@ setModelAndBoard() {
 compile() {
 	setModelAndBoard
 	# Compile
+	# TODO: exit on error!
 	echo "Compile: ${ARDUINO_CLI} compile --fqbn ${BOARD} ${SRC}..."
 	echo "#define ROBOT_MODEL ${MODEL}" > $SRC_CONFIG_MODEL
 	$ARDUINO_CLI cache clean

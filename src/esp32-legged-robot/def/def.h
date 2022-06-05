@@ -42,8 +42,10 @@
 /* Packages code */
 #define P_TELEMETRY_LEN 14
 
-#define P_MOVE      77  // ASCII "M"
-#define P_TELEMETRY 84  //       "T"
+#define P_MOVE         77  // ASCII "M"
+#define P_TELEMETRY    84  //       "T"
+#define P_START_VIDEO  86  //       "V" (capital V)
+#define P_STOP_VIDEO  118  //       "v" (small V)
 
 /* Debug (SLOW!!!)*/
 //#define DEBUG_HAL_LEG
@@ -60,6 +62,8 @@
 #define TITLE_ON    "on"
 #define TITLE_OFF   "off"
 #define TITLE_STATE "state"
+
+#define WEB_SERVER_VERSION 1
 
 typedef struct {
   uint8_t minAngle; // minimal servo angle, deg

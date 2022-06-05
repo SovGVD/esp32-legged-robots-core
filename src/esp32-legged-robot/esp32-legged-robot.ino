@@ -158,11 +158,12 @@ const byte DNS_PORT = 53;
 DNSServer dnsServer;
 
 #ifdef ESP32CAMERA
-  #include "libraries/camera/esp32camera.h"
-  #include "libraries/camera/esp32camera.cpp"
-  esp32camera mainCamera(wsclient, ESP32CAMERA_FRAMESIZE, ESP32CAMERA_FPS, ESP32CAMERA_JPEG_QUALITY);
+	#define CAMERAENABLED
+	#include "libraries/camera/esp32camera.h"
+	#include "libraries/camera/esp32camera.cpp"
+	esp32camera mainCamera(wsclient, ESP32CAMERA_FRAMESIZE, ESP32CAMERA_FPS, ESP32CAMERA_JPEG_QUALITY);
+	bool mainCameraStream = false
 #endif
-
 
 // CLI
 Stream *cliSerial;
@@ -247,22 +248,11 @@ void mainLoop()
 void servicesLoop() {
     serviceCurrentTime = micros();
 
-    #ifdef ESP32CAMERA
-      if (clientOnline) {
-        mainCamera.cameraHandleStream();  // @TODO send by request only!!!
+    #ifdef CAMERAENABLED
+      if (clientOnline && mainCameraStream) {
+        mainCamera.cameraHandleStream();
       }
     #endif
-
-/*    if (serviceCurrentTime - serviceFastPreviousTime >= SERVICE_FAST_LOOP_TIME) {
-      serviceFastPreviousTime = serviceCurrentTime;
-      
-      serviceFastLoopTime = micros() - serviceCurrentTime;
-      if (serviceFastLoopTime > SERVICE_FAST_LOOP_TIME) {
-        Serial.print("WARNING! Increase SERVICE_FAST_LOOP_TIME: ");
-        Serial.println(serviceFastLoopTime);
-      }      
-    }
-*/
 
     if (serviceCurrentTime - servicePreviousTime >= SERVICE_LOOP_TIME) {
       servicePreviousTime = serviceCurrentTime;
