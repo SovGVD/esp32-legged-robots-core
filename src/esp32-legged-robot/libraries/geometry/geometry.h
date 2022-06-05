@@ -8,6 +8,14 @@
 #define DELTA 3
 #define EPSILON 4
 #define ZETA 5
+#define UNKNOWN_ANGLE 127
+
+#define TITLE_ALPHA   "alpha"
+#define TITLE_BETA    "beta"
+#define TITLE_GAMMA   "gamma"
+#define TITLE_DELTA   "delta"
+#define TITLE_EPSILON "epsilon"
+#define TITLE_ZETA    "zeta"
 
 #define XAXIS     0
 #define YAXIS     1

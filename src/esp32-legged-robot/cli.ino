@@ -1,9 +1,10 @@
-#define CLI_COMMANDS 3
+#define CLI_COMMANDS 4
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
-  { "help",         cliHelp   , 0 },
-  { "i2cscan",      cliI2cScan, 0 },
-  { "wifi",         WiFiInfo,   0 }
+  { "help",         cliHelp,      "Show list of methods",       0 },
+  { "i2cscan",      cliI2cScan,   "Scan available i2c devices", 0 },
+  { "wifi",         WiFiInfo,     "WiFi AP information",        0 },
+  { "save",         settingsSave, "Save setting to EEPROM",     0 }
 };
 
 #include "model/cli.h"
@@ -72,8 +73,7 @@ void CLI_doCommand() {
   for (int i = 0; i < CLI_COMMANDS; i++) {
     if (strcmp(commandName, cliCommands[i].commandName) == 0) {
       if (cliCommands[i].params != CLI_params) {
-        cliSerial->print(CLI_params);
-        cliSerial->println(" incorrect params number.");
+        cliSerial->printf("%u incorrect params number, expected %u.\n", CLI_params, cliCommands[i].params);
         CLI_params = 0;
         return;
       }
@@ -90,7 +90,7 @@ void CLI_doCommand() {
     if (strcmp(commandName, modelCliCommands[i].commandName) == 0) {
       if (modelCliCommands[i].params != CLI_params) {
         cliSerial->print(CLI_params);
-        cliSerial->println(" incorrect params number.");
+        cliSerial->printf("%u incorrect params number, expected %u.\n", CLI_params, modelCliCommands[i].params);
         CLI_params = 0;
         return;
       }
@@ -109,4 +109,13 @@ void updateCLI()
 	if (CLI_get(CLI_BUFFER)){
 	  CLI_doCommand();
 	}
+}
+
+void printAvailableLegs()
+{
+	cliSerial->print("Legs: ");
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		cliSerial->printf("[%s],", legs[i].id.title);
+	}
+	cliSerial->println();
 }

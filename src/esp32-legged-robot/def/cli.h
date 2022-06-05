@@ -23,7 +23,8 @@ uint8_t CLI_params = 0;
 typedef void (*cliFunction)();
 
 const typedef struct cliCommand_t {
-  char *commandName;
+  char commandName[8];
   cliFunction func;
+  char description[32];
   uint8_t params;	// number of parameters
 } cliCommand;

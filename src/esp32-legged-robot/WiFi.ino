@@ -29,7 +29,7 @@ void updateWiFi()
 
 void WiFiInfo()
 {
-	cliSerial->print("IP: ");
+	cliSerial->print("IP:   ");
 	cliSerial->println(WiFiIP);
 	cliSerial->print("SSID: ");
 	cliSerial->println(wifiSsid);

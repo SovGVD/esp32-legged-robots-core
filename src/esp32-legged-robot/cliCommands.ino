@@ -1,14 +1,10 @@
 void cliHelp()
 {
   for (int i = 0; i < CLI_COMMANDS; i++) {
-    cliSerial->print(cliCommands[i].commandName);
-    cliSerial->print(" ");
-    cliSerial->println(cliCommands[i].params);
+    cliSerial->printf(" - [%-8s] %s\n", cliCommands[i].commandName, cliCommands[i].description);
   }
   for (int i = 0; i < MODEL_CLI_MENU_COMMANDS; i++) {
-    cliSerial->print(modelCliCommands[i].commandName);
-    cliSerial->print(" ");
-    cliSerial->println(modelCliCommands[i].params);
+    cliSerial->printf(" - [%-8s] %s\n",  modelCliCommands[i].commandName, modelCliCommands[i].description);
   }
 }
 

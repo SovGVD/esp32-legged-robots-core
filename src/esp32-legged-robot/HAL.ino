@@ -56,7 +56,7 @@ double getHALAngle(double angle, double mid, double trimAngle, double gearRatio,
   return angle;
 }
 
-double getHALTrim (leg &_leg, int angleId)
+/*double getHALTrim (leg &_leg, int angleId)
 {
   switch (angleId) {
     case ALPHA:
@@ -96,7 +96,7 @@ bool setHALTrim (leg &_leg, int angleId, double deg)
   _leg.hal.trim = settingsLoadTrimLeg(_leg);
 
   return true;
-}
+}*/
 
 bool isHALEnabled()
 {

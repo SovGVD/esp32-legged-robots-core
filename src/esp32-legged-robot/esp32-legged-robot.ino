@@ -13,6 +13,7 @@
 #include "config_wifi.h"
 #include "libraries/gait/gait.h"
 #include "model/gait.h"
+#include "model/settings.h"
 #include "libraries/planner/planner.h"
 #include "libraries/balance/balance.h"
 #include "libraries/HAL_body/HAL_body.h"
@@ -165,6 +166,9 @@ DNSServer dnsServer;
 
 // CLI
 Stream *cliSerial;
+
+// Settings
+modelSettings settings;
 
 bool mainLoopReady = false;
 bool serviceLoopReady = false;
