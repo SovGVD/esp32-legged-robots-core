@@ -21,7 +21,7 @@ class CaptiveRequestHandler : public AsyncWebHandler {
 	void handleRequest(AsyncWebServerRequest *request) {
 		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html",  index_html_gz, index_html_gz_len);
 		response->addHeader("Content-Encoding", "gzip");
-		request->send(response); 
+		request->send(response);
 	}
 };
 
