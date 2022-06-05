@@ -64,53 +64,30 @@ uint16_t angleToPulse(double angleRad) {
 
 void setLegPWM(leg &_leg)
 {
-  uint8_t l = _leg.id.id*3;
-  uint16_t p1 = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha)));
-  uint16_t p2 = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta )));
-  uint16_t p3 = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma)));
-  ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+0], p1);
-  ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+1], p2);
-  ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+2], p3);
-
-//  Serial.print("Servo on leg ");
-//  Serial.println(_leg.id.id);
-//  Serial.print("Servo ID ");
-//  Serial.println(esp32pwmServos[l+0]);
-//  Serial.println(esp32pwmServos[l+1]);
-//  Serial.println(esp32pwmServos[l+2]);
-//
-//  Serial.print("   ");
-//  Serial.print(angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha))));
-//  Serial.print(" ");
-//  Serial.println(radToDeg(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha))));
-//
-//  Serial.print("   ");
-//  Serial.print(angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta ))));
-//  Serial.print(" ");
-//  Serial.println(radToDeg(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta ))));
-//
-//  Serial.print("   ");
-//  Serial.print(angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma))));
-//  Serial.print(" ");
-//  Serial.println(radToDeg(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma))));
+	uint8_t l = _leg.id.id*3;
+	uint16_t p1 = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha)));
+	uint16_t p2 = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta )));
+	uint16_t p3 = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma)));
+	ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+0], p1);
+	ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+1], p2);
+	ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+2], p3);
 }
 
 void runServoCalibrate(leg &_leg)
 {
-  uint8_t l = _leg.id.id*3;
-  ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+0], servoMainProfile.deg90);
-  ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+1], servoMainProfile.deg90);
-  ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+2], servoMainProfile.deg90);
+	uint8_t l = _leg.id.id*3;
+	ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+0], servoMainProfile.deg90);
+	ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+1], servoMainProfile.deg90);
+	ESP32_ISR_Servos.setPulseWidth(esp32pwmServos[l+2], servoMainProfile.deg90);
 }
 
 void disableServos()
 {
-  ESP32_ISR_Servos.disableAll();
+	ESP32_ISR_Servos.disableAll();
 }
 
 void enableServos()
 {
-  ESP32_ISR_Servos.enableAll();
+	ESP32_ISR_Servos.enableAll();
 }
-
 #endif

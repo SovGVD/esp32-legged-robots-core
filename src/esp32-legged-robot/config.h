@@ -41,5 +41,5 @@
 // Servo config (set as max as possible for init, but use servoProfile)
 #define SERVO_MIN 600
 #define SERVO_MAX 2400
-#define SERVO_FREQ 330
+#define SERVO_FREQ 330	// for PCA9685
 
