@@ -21,6 +21,7 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiAP.h>
+#include <DNSServer.h>
 #include "ESPAsyncWebServer.h"
 #include "web/index.html.gz.h"
 
@@ -150,6 +151,10 @@ IPAddress WiFiIP;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 uint8_t telemetryPackage[P_TELEMETRY_LEN];
+
+// DNS server
+const byte DNS_PORT = 53;
+DNSServer dnsServer;
 
 #ifdef ESP32CAMERA
   #include "libraries/camera/esp32camera.h"
@@ -298,6 +303,7 @@ void setup()
 void loop()
 {
 	if(mainLoopReady && serviceLoopReady) {
+		dnsServer.processNextRequest();
 		mainLoop();
 	}
 }

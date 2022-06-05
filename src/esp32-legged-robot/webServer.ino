@@ -4,13 +4,28 @@ void initWebServer() {
   Serial.println();
 }
 
-void initWebServerRoutes() {  
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html",  index_html_gz, index_html_gz_len);
-    response->addHeader("Content-Encoding", "gzip");
-    request->send(response);  
-  });
-    
+/**
+ * This is opening caprive portal as soon as client connect to WiFi
+ * it is working, but my phone switching back to WiFi with internet
+ */
+class CaptiveRequestHandler : public AsyncWebHandler {
+	public:
+		CaptiveRequestHandler() {}
+		virtual ~CaptiveRequestHandler() {}
+
+	bool canHandle(AsyncWebServerRequest *request){
+		//request->addInterestingHeader("ANY");
+		return true;
+	}
+
+	void handleRequest(AsyncWebServerRequest *request) {
+		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html",  index_html_gz, index_html_gz_len);
+		response->addHeader("Content-Encoding", "gzip");
+		request->send(response); 
+	}
+};
+
+void initWebServerRoutes() {
   // Dinamic config
   server.on("/c.js", HTTP_GET, [](AsyncWebServerRequest *request){
     #ifdef ESP32CAMERA
@@ -22,6 +37,7 @@ void initWebServerRoutes() {
 
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
+  server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER);
  
   server.begin();
 }
