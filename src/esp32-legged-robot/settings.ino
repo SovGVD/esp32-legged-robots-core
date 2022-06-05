@@ -78,7 +78,6 @@ uint8_t settingsDoubleToUint8(double value) {
   return value*500+128;
 }
 
-
 void settingsLoad() {
   settingsLoadTrim();
   WiFiMode = settingsLoadWiFi();

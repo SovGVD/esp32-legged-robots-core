@@ -1,66 +1,36 @@
-void initWiFi() {
-  Serial.print("WiFi");
+void initWiFi()
+{
+  WiFi.persistent(false);
   WiFi.onEvent(WiFiEvent);
-  if (WiFiMode == AP_MODE) {
-    Serial.println("_AP");
-    WiFiSetMode(AP_MODE);
-  } else {
-    Serial.println("_CLIENT");
-    WiFiSetMode(WiFiMode);
-  }
+  WiFi.softAP(wifiSsid, wifiPass);
 }
 
-void WiFiEvent(WiFiEvent_t event){
-    switch(event) {
-        case SYSTEM_EVENT_AP_START:
-            WiFi.softAPsetHostname(wifiSsid[WiFiMode]);
-            WiFiIP = WiFi.softAPIP();
-            Serial.print("WiFi AP IP: ");
-            Serial.println(WiFiIP);
-            break;
-        case SYSTEM_EVENT_AP_STOP:
-            break;
-        case SYSTEM_EVENT_STA_START:
-            WiFi.setHostname(wifiSsid[WiFiMode]);
-            break;
-        case SYSTEM_EVENT_STA_GOT_IP:
-            WiFiIP = WiFi.localIP();
-            Serial.print("WiFi STA IP: ");
-            Serial.println(WiFiIP);
-            break;
-        default:
-            break;
-    }
+void WiFiEvent(WiFiEvent_t event)
+{
+	switch(event) {
+		case ARDUINO_EVENT_WIFI_AP_START:
+			WiFi.softAPsetHostname(wifiSsid);
+			WiFi.softAPConfig(apIP, apGateway, apSubnet);
+			WiFiIP = WiFi.softAPIP();
+			Serial.print("WiFi AP IP: ");
+			Serial.println(WiFiIP);
+			break;
+		default:
+			break;
+	}
 }
 
-void WiFiSetMode(int setWiFiMode) {
-  WiFiMode = settingsSaveWiFi(setWiFiMode);
-  if (WiFiMode == AP_MODE) {
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(wifiSsid[WiFiMode], wifiPass[WiFiMode]);
-  } else {
-    WiFi.begin(wifiSsid[WiFiMode], wifiPass[WiFiMode]);
-  }
-}
-
-void menuWiFiSetMode(int setWiFiMode) {
-  WiFiSetMode(setWiFiMode);
-}
-
-void updateWiFi() {
+void updateWiFi()
+{
   
 }
 
-double WiFiInfo(double info) {
-  cliSerial->print("IP: ");
-  cliSerial->println(WiFiIP);
-  cliSerial->print("SSID: ");
-  cliSerial->println(wifiSsid[WiFiMode]);
-    
-  if (WiFiMode == AP_MODE) {
-    cliSerial->print("Pass: ");
-    cliSerial->println(wifiPass[WiFiMode]);
-  }
-
-  return 1;
+void WiFiInfo()
+{
+	cliSerial->print("IP: ");
+	cliSerial->println(WiFiIP);
+	cliSerial->print("SSID: ");
+	cliSerial->println(wifiSsid);
+	cliSerial->print("Pass: ");
+	cliSerial->println(wifiPass);
 }

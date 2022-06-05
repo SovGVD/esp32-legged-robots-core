@@ -1,3 +1,4 @@
+bool imuSensorReady = false;
 void initIMU()
 {
   Serial.print("IMU ");
@@ -11,36 +12,43 @@ void setupIMU()
   
   if(!IMU.init()){
     Serial.println("IMU does not respond");
+    return;
   }
 
   IMU.setAccRange(MPU9250_ACC_RANGE_2G);
   IMU.enableAccDLPF(true);
   IMU.setAccDLPF(MPU9250_DLPF_6);
   //IMU.setSampleRateDivider(255);
+  imuSensorReady = true;
 }
 
-double calibrateIMU(double id)
+void calibrateIMU()
 {
-  // TODO save offset to EEPROM and restore on boot!!!
-  disableServos();
-  Serial.println("Calibrating ACC and GYRO in 5 seconds. Put device on flat leveled surface.");
-  delay(5000);
-  Serial.print("Calibration...");
-  IMU.autoOffsets();
-  Serial.println("Done.");
-  delay(1000);
-  enableServos();
-
-  return 1;
+	if (!imuSensorReady) {
+		Serial.println("IMU is not available.");
+		return;
+	}
+	// TODO save offset to EEPROM and restore on boot!!!
+	disableServos();
+	Serial.println("Calibrating ACC and GYRO in 5 seconds. Put device on flat leveled surface.");
+	delay(5000);
+	Serial.print("Calibration...");
+	IMU.autoOffsets();
+	Serial.println("Done.");
+	delay(1000);
+	enableServos();
 }
 
 void updateIMU()
 {
-  xyzFloat angle = IMU.getAngles();
+	if (!imuSensorReady) {
+		return;
+	}
+	xyzFloat angle = IMU.getAngles();
 
-  // TODO not sure about correct mapping!!!
+	// TODO not sure about correct mapping!!!
 
-  IMU_DATA.pitch = degToRad(angle.y);
-  IMU_DATA.roll  = degToRad(angle.x);
-  IMU_DATA.yaw   = degToRad(angle.z);
+	IMU_DATA.pitch = degToRad(angle.y);
+	IMU_DATA.roll  = degToRad(angle.x);
+	IMU_DATA.yaw   = degToRad(angle.z);
 }

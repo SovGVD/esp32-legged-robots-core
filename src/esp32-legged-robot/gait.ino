@@ -1,4 +1,5 @@
 void initGait() {
+	Serial.println("Init gait ");
   ticksPerGaitItem    = GAIT_CONFIG.duration/GAIT_CONFIG.loopTime;
   ticksToNextGaitItem = ticksPerGaitItem;
 }

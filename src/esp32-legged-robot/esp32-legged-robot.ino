@@ -18,11 +18,13 @@
 #include "libraries/HAL_body/HAL_body.h"
 
 #include <EEPROM.h>
-#include "WiFi.h"
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiAP.h>
 #include "ESPAsyncWebServer.h"
 #include "web/index.html.gz.h"
 
-#include <MPU9250_WE.h> // v 1.1.3
+#include <MPU9250_WE.h>
 #include <Wire.h>
 
 #include "libraries/PID/AnglePID.cpp"
@@ -40,8 +42,8 @@
 #endif
 
 #if PWM_CONTROLLER_TYPE == ESP32PWM
-  #define USE_ESP32_TIMER_NO 3
-  #include "ESP32_ISR_Servo.h"  // v1.1.0
+  #define USE_ESP32_TIMER_NO 0
+  #include "ESP32_ISR_Servo.h"
 #endif
 
 #ifdef POWER_SENSOR
@@ -57,15 +59,7 @@
 LR_angle IMU_DATA = {0, 0, 0};
 MPU9250_WE IMU;
 
-// run commands on diferent cores (FAST for main, SLOW for services)
-bool runCommandFASTCore = false;
-bool runCommandSLOWCore = false;
-cliFunction cliFunctionFAST;
-cliFunction cliFunctionSLOW;
-double cliFunctionFASTVar = 0.0;
-double cliFunctionSLOWVar = 0.0;
-
-TaskHandle_t ServicesTask;
+TaskHandle_t core0tasks;
 
 #if PWM_CONTROLLER_TYPE == PCA9685
   Adafruit_PWMServoDriver pwm;
@@ -146,6 +140,9 @@ AnglePID imuCorrectionPID(IMU_DATA, imuTarget, imuCorrection, PID_LEVEL_P, PID_L
 HAL_body bodyUpdate(vector, imuCorrection, body, legs);
 
 // WebServer
+IPAddress apIP(192,168,1,1);
+IPAddress apGateway(192,168,1,1);
+IPAddress apSubnet(255,255,255,0);
 bool clientOnline = false;
 AsyncWebSocketClient * wsclient;
 int WiFiMode = AP_MODE;
@@ -167,94 +164,78 @@ Stream *cliSerial;
 bool mainLoopReady = false;
 bool serviceLoopReady = false;
 
-
-void setup()
+void mainSetup()
 {
-  Serial.begin(SERIAL_BAUD);
-  delay(100);
+	if (!mainLoopReady) {
+		initSettings();
+		vTaskDelay(100);
 
-  initSettings();
-  delay(100);
+		Wire.begin();
+		Wire.setClock(400000);
+		vTaskDelay(100);
 
-  Wire.begin();
-  Wire.setClock(400000);
-  delay(100);
-  
-  initHAL();
-  delay(100);
-  
-  initGait();
-  delay(100);
+		initWiFi();
+		vTaskDelay(100);
 
-  initIMU();
-  delay(100);
+		initHAL();
+		vTaskDelay(100);
 
-  initPowerSensor();
-  delay(100);
+		initGait();
+		vTaskDelay(100);
 
-  
-  xTaskCreatePinnedToCore(
-    servicesLoop,   /* Task function. */
-    "Services",     /* name of task. */
-    100000,         /* Stack size of task */
-    NULL,           /* parameter of the task */
-    1,              /* priority of the task */
-    &ServicesTask,  /* Task handle to keep track of created task */
-    0);             /* pin task to core 0 */
+		initIMU();
+		vTaskDelay(100);
 
-  mainLoopReady = true;
+		initPowerSensor();
+		vTaskDelay(100);
+
+		mainLoopReady = true;
+		Serial.println("MainSetup complete");
+	}
 }
 
-/**
-   Main loop for all major things
-   Core 1
-*/
-void loop()
+void servicesSetup()
 {
-  currentTime = micros();
-  if (mainLoopReady && serviceLoopReady && currentTime - previousTime >= LOOP_TIME) {
-    previousTime = currentTime;
+	if (!serviceLoopReady) {
+		initCLI();
+		vTaskDelay(100);
 
-    updateFailsafe();
-    updatePower();  // TODO not so often!
+		initWebServer();
+		vTaskDelay(100);
 
-    updateIMU();
-    imuCorrectionPID.update();
-    updateGait();
-    updateHAL();
-    doHAL();
-
-    FS_WS_count++;
-
-    loopTime = micros() - currentTime;
-    if (loopTime > LOOP_TIME) {
-      //Serial.print("WARNING! Increase LOOP_TIME: ");
-      //Serial.println(loopTime);
-    }
-  }
+		Serial.println("ServicesSetup complete");
+		serviceLoopReady = true;
+	}
 }
 
-/**
-   Loop for service things, like CLI
-   Core 0
-*/
-void servicesSetup() {
-  cliSerial = &Serial;
-  initCLI();
+void mainLoop()
+{
+	currentTime = micros();
+	if (currentTime - previousTime >= LOOP_TIME) {
+		previousTime = currentTime;
 
-  initWiFi();
-  delay(100);
-  
-  initWebServer();
-  delay(100);
+		updateFailsafe();
+		updatePower();  // TODO not so often!
 
-  serviceLoopReady = true;
+		updateIMU();
+		imuCorrectionPID.update();
+		updateGait();
+
+		updateHAL();
+		doHAL();
+
+		FS_WS_count++;
+
+		loopTime = micros() - currentTime;
+		if (loopTime > LOOP_TIME) {
+			Serial.print("WARNING! Increase LOOP_TIME: ");
+			Serial.println(loopTime);
+		}
+	}
 }
 
-void servicesLoop(void * pvParameters) {
-  servicesSetup();
 
-  while(mainLoopReady && serviceLoopReady) {
+void servicesLoop() {
     serviceCurrentTime = micros();
 
     #ifdef ESP32CAMERA
@@ -263,34 +244,71 @@ void servicesLoop(void * pvParameters) {
       }
     #endif
 
-    if (serviceCurrentTime - serviceFastPreviousTime >= SERVICE_FAST_LOOP_TIME) {
+/*    if (serviceCurrentTime - serviceFastPreviousTime >= SERVICE_FAST_LOOP_TIME) {
       serviceFastPreviousTime = serviceCurrentTime;
       
       serviceFastLoopTime = micros() - serviceCurrentTime;
-      if (serviceFastLoopTime > LOOP_TIME) {
+      if (serviceFastLoopTime > SERVICE_FAST_LOOP_TIME) {
         Serial.print("WARNING! Increase SERVICE_FAST_LOOP_TIME: ");
         Serial.println(serviceFastLoopTime);
       }      
     }
+*/
 
     if (serviceCurrentTime - servicePreviousTime >= SERVICE_LOOP_TIME) {
       servicePreviousTime = serviceCurrentTime;
 
       updateCLI();
-      updateWiFi();
       
       serviceLoopTime = micros() - serviceCurrentTime;  // this loop + service fast loop
-      if (serviceLoopTime > LOOP_TIME) {
+      if (serviceLoopTime > SERVICE_LOOP_TIME) {
         Serial.print("WARNING! Increase SERVICE_LOOP_TIME: ");
         Serial.println(serviceLoopTime);
       }
-
     }
-    vTaskDelay(1);  // https://github.com/espressif/arduino-esp32/issues/595
-  }
 }
 
 /**
    TODO
     - calculate center of mass and use it for balance
 */
+
+void setup()
+{
+	Serial.begin(SERIAL_BAUD);
+	cliSerial = &Serial;
+
+	mainSetup();
+	vTaskDelay(10);
+
+	xTaskCreatePinnedToCore(
+		core0loop,      /* Task function. */
+		"core0loop",    /* name of task. */
+		100000,         /* Stack size of task */
+		NULL,           /* parameter of the task */
+		0,              /* priority of the task */
+		&core0tasks,    /* Task handle to keep track of created task */
+		0);             /* pin task to core 0 */
+}
+
+/**
+   Main loop for all major things
+   Core 1
+*/
+void loop()
+{
+	if(mainLoopReady && serviceLoopReady) {
+		mainLoop();
+	}
+}
+
+void core0loop(void * pvParameters) {
+	if (mainLoopReady) {
+		servicesSetup();
+	}
+	while(mainLoopReady && serviceLoopReady) {
+		servicesLoop();
+		vTaskDelay(10);
+	}
+	vTaskDelay(100);
+}

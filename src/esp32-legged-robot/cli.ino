@@ -1,8 +1,9 @@
-#define CLI_COMMANDS 2
+#define CLI_COMMANDS 3
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
   { "help",         cliHelp   , 0 },
-  { "i2cscan",      cliI2cScan, 0 }
+  { "i2cscan",      cliI2cScan, 0 },
+  { "wifi",         WiFiInfo,   0 }
 };
 
 #include "model/cli.h"
@@ -14,7 +15,7 @@ void initCLI() {
 void cliInitHelp()
 {
   cliSerial->println();
-  cliSerial->println(" CLI: type `help` to see available methods.");
+  cliSerial->println(" CLI: type `help` to see available commands.");
   cliSerial->println();
 }
 

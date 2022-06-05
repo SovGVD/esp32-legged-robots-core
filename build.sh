@@ -73,7 +73,7 @@ setModelAndBoard() {
 			BOARD="esp32:esp32:esp32cam"
 			;;
 		*)
-			compile-help
+			compileHelp
 			exit 0
 			;;
 	esac
@@ -85,7 +85,7 @@ compile() {
 	echo "Compile: ${ARDUINO_CLI} compile --fqbn ${BOARD} ${SRC}..."
 	echo "#define ROBOT_MODEL ${MODEL}" > $SRC_CONFIG_MODEL
 	$ARDUINO_CLI cache clean
-	$ARDUINO_CLI compile --fqbn $BOARD $SRC -v
+	$ARDUINO_CLI compile --fqbn $BOARD $SRC -v --build-path $ARDUINO_BUILD
 	rm $SRC_CONFIG_MODEL
 }
 
@@ -93,7 +93,7 @@ upload() {
 	[[ -z "$PARAM2" ]] && { echo "Port required" ; exit 1; }
 	compile
 	echo "Uploading ${MODEL}. Port:${PARAM2}..."
-	$ARDUINO_CLI upload -p ${PARAM2} --fqbn $BOARD $SRC -v
+	$ARDUINO_CLI upload -p ${PARAM2} --fqbn $BOARD $SRC -v --input-dir $ARDUINO_BUILD
 }
 monitor() {
 	[[ -z "$PARAM1" ]] && { echo "Port required" ; exit 1; }
