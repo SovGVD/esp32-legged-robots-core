@@ -121,10 +121,11 @@ servoProfile servoMainProfile = {
 /**
  * Hardware
  */
-#define ESP32CAMERA
-#define ESP32CAMERA_FRAMESIZE    FRAMESIZE_QVGA
-#define ESP32CAMERA_JPEG_QUALITY 12
-#define ESP32CAMERA_FPS          25
+// @TODO temporary disabled just to not thing about it right now
+//#define ESP32CAMERA
+//#define ESP32CAMERA_FRAMESIZE    FRAMESIZE_QVGA
+//#define ESP32CAMERA_JPEG_QUALITY 12
+//#define ESP32CAMERA_FPS          25
 
 #define PWM_CONTROLLER_ADDRESS   0x40
 #define PWM_CONTROLLER_TYPE      PCA9685

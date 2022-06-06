@@ -33,14 +33,23 @@ void setLegPWM(leg &_leg)
 	pwm.setPWM(_leg.hal.pin.alpha,  0,  angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha))));
 	pwm.setPWM(_leg.hal.pin.beta,   0,  angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta ))));
 	pwm.setPWM(_leg.hal.pin.gamma,  0,  angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma))));
+	#if LEG_DOF == 6
+		pwm.setPWM(_leg.hal.pin.delta,   0,  angleToPulse(limitServoAngle(getHALAngle(_leg.angle.delta,   _leg.hal.mid.delta,   _leg.hal.trim.delta,   _leg.hal.ratio.delta,  _leg.inverse.delta))));
+		pwm.setPWM(_leg.hal.pin.epsilon, 0,  angleToPulse(limitServoAngle(getHALAngle(_leg.angle.epsilon, _leg.hal.mid.epsilon, _leg.hal.trim.epsilon, _leg.hal.ratio.epsilon, _leg.inverse.epsilon))));
+		pwm.setPWM(_leg.hal.pin.zeta,    0,  angleToPulse(limitServoAngle(getHALAngle(_leg.angle.zeta,    _leg.hal.mid.zeta,    _leg.hal.trim.zeta,    _leg.hal.ratio.zeta,    _leg.inverse.zeta))));
+	#endif
 }
 
 void runServoCalibrate(leg &_leg)
 {
-	uint8_t l = _leg.id.id*3;
 	pwm.setPWM(_leg.hal.pin.alpha, 0, servoMainProfile.deg90);
 	pwm.setPWM(_leg.hal.pin.beta,  0, servoMainProfile.deg90);
 	pwm.setPWM(_leg.hal.pin.gamma, 0, servoMainProfile.deg90);
+	#if LEG_DOF == 6
+		pwm.setPWM(_leg.hal.pin.delta,   0, servoMainProfile.deg90);
+		pwm.setPWM(_leg.hal.pin.epsilon, 0, servoMainProfile.deg90);
+		pwm.setPWM(_leg.hal.pin.zeta,    0, servoMainProfile.deg90);
+	#endif
 }
 
 void disableServos()

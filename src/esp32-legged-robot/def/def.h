@@ -55,6 +55,7 @@
  */
 #define TITLE_SERVO "servo"
 #define TITLE_IMU   "imu"
+#define TITLE_LEG   "leg"
 
 /**
  * Other titles

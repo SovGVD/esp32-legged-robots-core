@@ -11,24 +11,28 @@ void initServo()
 }
 
 /**
+ * @TODO this is for robot dog!!!
  * Set servo to init position
  *  it is 90, 45, 90
  */
 void setServoToInit()
 {
-  for (uint8_t i = 0; i < LEG_NUM; i++) {
-    legs[i].angle.alpha = M_PI_2;
-    legs[i].angle.beta  = M_PI_4;
-    legs[i].angle.gamma = M_PI_2;
-    setLegPWM(legs[i]);
-  }
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		legs[i].angle.alpha = M_PI_2;	// @TODO use model config
+		legs[i].angle.beta  = M_PI_4;
+		legs[i].angle.gamma = M_PI_2;
+		#if LEG_DOF == 6
+			
+		#endif
+		setLegPWM(legs[i]);
+	}
 }
 
 void servoSet()
 {
-  for (uint8_t i = 0; i < LEG_NUM; i++) {
-    setLegPWM(legs[i]);
-  }
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		setLegPWM(legs[i]);
+	}
 }
 
 bool setAngleDeg(leg &_leg, int angleId, double deg)

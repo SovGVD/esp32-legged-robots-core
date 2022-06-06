@@ -70,28 +70,3 @@ void disableHAL()
 {
 	HALEnabled = false;
 }
-
-void cliHal()
-{
-	char* mode = CLI_readWord();
-	if (strcmp(mode, TITLE_ON) == 0) {
-		enableHAL();
-	}
-	if (strcmp(mode, TITLE_OFF) == 0) {
-		disableHAL();
-	}
-	if (strcmp(mode, TITLE_STATE) == 0) {
-	}
-
-	cliDisplayState();
-}
-
-void cliDisplayState()
-{
-	Serial.print("HAL: ");
-	if (isHALEnabled()) {
-		Serial.println(TITLE_ON);
-	} else {
-		Serial.println(TITLE_OFF);
-	}
-}

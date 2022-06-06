@@ -23,6 +23,9 @@ void cliI2cScan()
   }
 }
 
+/**
+ * @TODO cliRunServoCalibrate and/or setServoToInit should disable HAL
+ */
 void cliCalibrate()
 {
 	char* mode = CLI_readWord();
@@ -31,7 +34,11 @@ void cliCalibrate()
 		return;
 	}
 	if (strcmp(mode, TITLE_SERVO) == 0) {
-		setServoToInit();
+		cliRunServoCalibrate();	// all servos 90deg
+		return;
+	}
+	if (strcmp(mode, TITLE_LEG) == 0) {
+		setServoToInit();	// all servos to init robot position
 		return;
 	}
 	
@@ -43,4 +50,75 @@ void cliSetServoToInit() {
   delay(1000); // that it terrible, but we need to wait to make sure HAL disabled
 
   setServoToInit();
+}
+
+int getAngleIdByAngleTitle(char* angleTitle)
+{
+	if (strcmp(angleTitle, TITLE_ALPHA) == 0) {
+		return ALPHA;
+	}
+	if (strcmp(angleTitle, TITLE_BETA) == 0) {
+		return BETA;
+	}
+	if (strcmp(angleTitle, TITLE_GAMMA) == 0) {
+		return GAMMA;
+	}
+	#if LEG_DOF == 6
+		if (strcmp(angleTitle, TITLE_DELTA) == 0) {
+			return DELTA;
+		}
+		if (strcmp(angleTitle, TITLE_EPSILON) == 0) {
+			return EPSILON;
+		}
+		if (strcmp(angleTitle, TITLE_ZETA) == 0) {
+			return ZETA;
+		}
+	#endif
+	
+	return UNKNOWN_ANGLE;
+}
+
+void cliSetTrim()
+{
+	char*  legTitle     = CLI_readWord();
+	char*  legAngle     = CLI_readWord();
+	double trimValueRad = degToRad(CLI_readFloat());
+	
+	int angleId = getAngleIdByAngleTitle(legAngle);
+	
+	if (angleId == UNKNOWN_ANGLE) {
+		cliSerial->printf("Unknown angle [%s]. \n", legAngle);
+		return;
+	}
+	cliSerial->printf("Angle %f rad, %f deg.\n", trimValueRad, radToDeg(trimValueRad));
+	
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		if (strcmp(legs[i].id.title, legTitle) == 0) {
+			switch (angleId) {
+				case ALPHA:
+					legs[i].hal.trim.alpha = trimValueRad;
+					return;
+				case BETA:
+					legs[i].hal.trim.beta  = trimValueRad;
+					return;
+				case GAMMA:
+					legs[i].hal.trim.gamma = trimValueRad;
+					return;
+				#if LEG_DOF == 6
+					case DELTA:
+						legs[i].hal.trim.delta   = trimValueRad;
+						return;
+					case EPSILON:
+						legs[i].hal.trim.epsilon = trimValueRad;
+						return;
+					case ZETA:
+						legs[i].hal.trim.zeta    = trimValueRad;
+						return;
+				#endif
+			}
+		}
+	}
+	
+	cliSerial->println("Leg is not valid.");
+	printAvailableLegs();
 }

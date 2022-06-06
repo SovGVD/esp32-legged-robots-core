@@ -2,12 +2,12 @@
 #define geometry_h
 
 // Up to 6 dof should be enought for now
-#define ALPHA 0
-#define BETA  1
-#define GAMMA 2
-#define DELTA 3
+#define ALPHA   0
+#define BETA    1
+#define GAMMA   2
+#define DELTA   3
 #define EPSILON 4
-#define ZETA 5
+#define ZETA    5
 #define UNKNOWN_ANGLE 127
 
 #define TITLE_ALPHA   "alpha"

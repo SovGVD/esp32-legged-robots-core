@@ -67,15 +67,18 @@ void settingsCommit(bool printResult)
 
 void settingsPrint()
 {
+	settingsPrintTrim();
 	modelSettingsPrint();
 }
 
 void settingsLoad() {
+	settingsLoadTrim();
 	modelSettingsLoad();
 }
 
 void settingsSave()
 {
+	settingsSaveTrim();
 	modelSettingsSave();
 	settingsCommit(true);
 }
