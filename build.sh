@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+set -e
 CWD=$(pwd -P)
 
 ARDUINO_PATH="${CWD}/arduino-cli-ide"
@@ -15,6 +15,8 @@ ARDUINO_CLI="${ARDUINO_BIN} --no-color --config-file ${ARDUINO_CONFIG}"
 SRC="${CWD}/src/esp32-legged-robot"
 SRC_CONFIG_MODEL="${SRC}/config_model.h"
 
+WEB_CLIENT_DIR="${CWD}/src/web/"
+
 COMMAND="$1"
 PARAM1="$2"
 PARAM2="$3"
@@ -24,6 +26,20 @@ installArduinoCli()
 	# Create folders for Arduino CLI
 	mkdir -p $ARDUINO_BIN_DIR
 	curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=$ARDUINO_BIN_DIR sh
+}
+
+buildWebClientEnv()
+{
+	# Check node version to fail if node was not install
+	# or at least show version for debug
+	# @see https://nodejs.org/en/download/package-manager/
+	# Expected latest LTS (currently 16.x)
+	node -v
+	npm -v
+	cd $WEB_CLIENT_DIR
+	npm install
+	npm run build
+	cd $CWD
 }
 
 buildEnv() {
@@ -96,6 +112,7 @@ upload() {
 	echo "Uploading ${MODEL}. Port:${PARAM2}..."
 	$ARDUINO_CLI upload -p ${PARAM2} --fqbn $BOARD $SRC -v --input-dir $ARDUINO_BUILD
 }
+
 monitor() {
 	[[ -z "$PARAM1" ]] && { echo "Port required" ; exit 1; }
 	echo "Press Ctrl-C to exit"
@@ -118,6 +135,7 @@ help() {
 	echo "Available Commands:"
 	echo "  install-arduino-cli Install latest version of Arduino CLI from Arduno CLI repository"
 	echo "  build-env           Build environment for ESP32 and install required libraries"
+	echo "  build-client-env    Build environment for robot web client"
 	echo "  compile             Compile ESP32 binary"
 	echo "  upload              Compile and upload"
 	echo "  cli                 Arduino monitor, terminal"
@@ -142,6 +160,9 @@ case $COMMAND in
 		;;
 	build-env)
 		buildEnv
+		;;
+	build-client-env)
+		buildWebClientEnv
 		;;
 	compile)
 		compile
