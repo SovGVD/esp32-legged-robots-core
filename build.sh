@@ -15,7 +15,7 @@ ARDUINO_CLI="${ARDUINO_BIN} --no-color --config-file ${ARDUINO_CONFIG}"
 SRC="${CWD}/src/esp32-legged-robot"
 SRC_CONFIG_MODEL="${SRC}/config_model.h"
 
-WEB_CLIENT_DIR="${CWD}/src/web/"
+WEB_CLIENT_DIR="${CWD}/src/web"
 
 COMMAND="$1"
 PARAM1="$2"
