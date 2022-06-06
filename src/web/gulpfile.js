@@ -11,7 +11,7 @@ const inline = require('gulp-inline');
 const inlineImages = require('gulp-css-base64');
 const favicon = require('gulp-base64-favicon');
 
-const dataFolder = '../robot_dog_esp32/web/';
+const dataFolder = '../esp32-legged-robot/web/';
 
 gulp.task('clean', function() {
     del([ dataFolder + '*'], { force: true });
