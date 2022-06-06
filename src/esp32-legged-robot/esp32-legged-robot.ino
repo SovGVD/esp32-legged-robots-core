@@ -259,7 +259,7 @@ void servicesLoop() {
 
       updateCLI();
       
-      serviceLoopTime = micros() - serviceCurrentTime;  // this loop + service fast loop
+      serviceLoopTime = micros() - serviceCurrentTime;
       if (serviceLoopTime > SERVICE_LOOP_TIME) {
         Serial.print("WARNING! Increase SERVICE_LOOP_TIME: ");
         Serial.println(serviceLoopTime);
@@ -291,9 +291,8 @@ void setup()
 }
 
 /**
-   Main loop for all major things
-   Core 1
-*/
+ * Core 1
+ */
 void loop()
 {
 	if(mainLoopReady && serviceLoopReady) {
@@ -302,6 +301,9 @@ void loop()
 	}
 }
 
+/**
+ * Core 0
+ */
 void core0loop(void * pvParameters) {
 	if (mainLoopReady) {
 		servicesSetup();
