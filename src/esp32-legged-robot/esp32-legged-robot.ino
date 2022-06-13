@@ -3,7 +3,9 @@
 #include "libraries/geometry/geometry.h"
 #include "libraries/leg/leg.h"
 #include "libraries/transition/transition.h"
-#include "libraries/PID/AnglePID.h"
+#ifdef HORIZON_LEVEL
+	#include "libraries/PID/AnglePID.h"
+#endif
 #include "def/def.h"
 #include "def/cli.h"
 #include "def/subscription.h"
@@ -137,7 +139,9 @@ balance bodyBalance(
 LR_angle imuCorrection = {0.0, 0.0, 0.0};
 LR_angle imuTarget     = {0.0, 0.0, 0.0};
 
-AnglePID imuCorrectionPID(IMU_DATA, imuTarget, imuCorrection, PID_LEVEL_P, PID_LEVEL_I, PID_LEVEL_D, -0.2, 0.2);
+#ifdef HORIZON_LEVEL
+	AnglePID imuCorrectionPID(IMU_DATA, imuTarget, imuCorrection, PID_LEVEL_P, PID_LEVEL_I, PID_LEVEL_D, -0.2, 0.2);
+#endif
 
 HAL_body bodyUpdate(vector, imuCorrection, body, legs);
 
@@ -228,7 +232,9 @@ void mainLoop()
 		updatePower();  // TODO not so often!
 
 		updateIMU();
-		imuCorrectionPID.update();
+		#ifdef HORIZON_LEVEL
+			imuCorrectionPID.update();
+		#endif
 		updateGait();
 
 		updateHAL();

@@ -33,6 +33,9 @@
 #define LEGLH 2   // left  hind  leg
 #define LEGRH 3   // right hind  leg
 
+// Balance settings
+//#define HORIZON_LEVEL
+
 LR_point balanceOffset = {0, 0, 0};
 
 leg legs[LEG_NUM] = {
