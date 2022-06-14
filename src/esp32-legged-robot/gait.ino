@@ -47,7 +47,6 @@ void updateGait() {
     for (uint8_t i = 0; i < LEG_NUM; i++) {
       if (GAIT_CONFIG.sequence[currentGait].leg[i] == SWING) {
           gaitLeg.start(i, legs[i].foot, walkPlanner.getLegPosition(i));
-          break;
       }
     }
   }
