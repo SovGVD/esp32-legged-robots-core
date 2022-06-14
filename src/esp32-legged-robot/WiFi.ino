@@ -14,8 +14,8 @@ void WiFiEvent(WiFiEvent_t event)
 			WiFiIP = WiFi.softAPIP();
 			Serial.print("WiFi AP IP: ");
 			Serial.println(WiFiIP);
-			dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-			dnsServer.start(DNS_PORT, "*", WiFiIP);
+			//dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+			//dnsServer.start(DNS_PORT, "*", WiFiIP);
 			break;
 		default:
 			break;

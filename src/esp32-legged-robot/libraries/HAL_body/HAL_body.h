@@ -10,7 +10,7 @@
 class HAL_body
 {
 	public:
-		HAL_body(LR_moveVector &vector, LR_angle &correction, LR_figure &bodyObj, leg legs[LEG_NUM]);
+		HAL_body(LR_moveVector &vector, LR_angle &correction, LR_figure &bodyObj, leg (&legs)[LEG_NUM]);
 		void update();
 	private:
 		LR_moveVector *_vector;

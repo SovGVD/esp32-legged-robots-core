@@ -69,7 +69,7 @@
 
 #include "IK.h"
 
-IK::IK(LR_figure &bodyObj, leg legs[LEG_NUM])
+IK::IK(LR_figure &bodyObj, leg (&legs)[LEG_NUM])
 {
 	_body = &bodyObj;
 	for (uint8_t i = 0; i < LEG_NUM; i++) {

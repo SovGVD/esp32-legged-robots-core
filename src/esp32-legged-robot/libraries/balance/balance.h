@@ -10,7 +10,7 @@
 class balance
 {
 	public:
-		balance(LR_point &offset, LR_figure &bodyObj, leg legs[LEG_NUM]);
+		balance(LR_point &offset, LR_figure &bodyObj, leg (&legs)[LEG_NUM]);
 		LR_point getCenter();
 		void setBody(LR_point CoM);
 	private:

@@ -16,6 +16,10 @@
 #define LEG_NUM QUADRUPED_ROBOT
 #define LEG_DOF 3
 
+// ESP32 cores config
+#define SERVO_CORE   1
+#define DO_HAL_CORE  1
+
 // PID
 #define PID_LEVEL_P 0.01
 #define PID_LEVEL_I 0.008

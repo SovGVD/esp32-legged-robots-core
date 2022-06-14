@@ -4,7 +4,7 @@
 
 #include "gait.h"
 
-gait::gait(gaitConfig &config, leg legs[LEG_NUM])
+gait::gait(gaitConfig &config, leg (&legs)[LEG_NUM])
 {
 	_config = &config;
 	for (uint8_t i = 0; i < LEG_NUM; i++) {

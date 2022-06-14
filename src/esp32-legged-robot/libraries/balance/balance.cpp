@@ -6,7 +6,7 @@
 
 #include "balance.h"
 
-balance::balance(LR_point &offset, LR_figure &bodyObj, leg legs[LEG_NUM])
+balance::balance(LR_point &offset, LR_figure &bodyObj, leg (&legs)[LEG_NUM])
 {
 	_offset = &offset;	// this should be calculated? base on servos and legs positions and weight
 	_body   = &bodyObj;

@@ -64,7 +64,7 @@
 #define TITLE_OFF   "off"
 #define TITLE_STATE "state"
 
-#define WEB_SERVER_VERSION 1
+#define WEB_SERVER_VERSION "0.0.1"
 
 typedef struct {
   uint8_t minAngle; // minimal servo angle, deg

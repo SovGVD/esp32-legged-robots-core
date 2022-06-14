@@ -1,7 +1,6 @@
 void initHAL()
 {
   Serial.print("HAL ");
-  initServo();
   initLegs();
   Serial.println();
 }
@@ -15,7 +14,12 @@ void updateHAL() {
 }
 
 void doHAL() {
-  servoSet();
+	if (isHalDoReady) {
+		if (servoReady()) {
+			servoSet();
+		}
+		isHalDoReady = false;
+	}
 }
 
 void readLegsSensors() {

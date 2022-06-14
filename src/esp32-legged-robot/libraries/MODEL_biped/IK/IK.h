@@ -19,7 +19,7 @@ typedef struct {
 class IK
 {
 	public:
-		IK(LR_figure &bodyObj, leg legs[LEG_NUM]);
+		IK(LR_figure &bodyObj, leg (&legs)[LEG_NUM]);
 		iksolver solve(uint8_t legId);
 		double normalizeAngleRad(double angleRad);
 	private:

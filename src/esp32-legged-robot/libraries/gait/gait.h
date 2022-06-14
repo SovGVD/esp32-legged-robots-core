@@ -23,7 +23,7 @@ typedef struct gaitConfig_t {
 class gait
 {
 	public:
-		gait(gaitConfig &config, leg legs[LEG_NUM]);
+		gait(gaitConfig &config, leg (&legs)[LEG_NUM]);
 		void start(uint8_t legId, LR_point from, LR_point to);
 		double next(uint8_t legId);
 	private:

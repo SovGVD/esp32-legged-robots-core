@@ -8,7 +8,7 @@
 
 #include "planner.h"
 
-planner::planner(LR_moveVector &vector, LR_figure &bodyObj, leg legs[LEG_NUM])
+planner::planner(LR_moveVector &vector, LR_figure &bodyObj, leg (&legs)[LEG_NUM])
 {
 	_vector = &vector;
 	_body   = &bodyObj;
@@ -41,7 +41,6 @@ void planner::predictPosition()
 		_predictedLegFoot[i].y = _predictedBody.position.y + _legs[i]->defaultFoot.x * tmpSin + _legs[i]->defaultFoot.y * tmpCos;
 		_predictedLegFoot[i].z = _legs[i]->defaultFoot.z;
 	}
-
 }
 
 LR_figure planner::getBodyPosition()

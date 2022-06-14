@@ -37,6 +37,11 @@
 #define LEG_NUM BIPEDAL_ROBOT
 #define LEG_DOF 6
 
+// ESP32 cores config
+#define SERVO_CORE   0	// @TODO same as i2c
+#define DO_HAL_CORE  0
+
+
 // PID
 #define PID_LEVEL_P 0.01
 #define PID_LEVEL_I 0.008

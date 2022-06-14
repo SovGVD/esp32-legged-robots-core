@@ -12,7 +12,7 @@
 class planner
 {
 	public:
-		planner(LR_moveVector &vector, LR_figure &bodyObj, leg legs[LEG_NUM]);
+		planner(LR_moveVector &vector, LR_figure &bodyObj, leg (&legs)[LEG_NUM]);
 		void predictPosition();
 		LR_figure getBodyPosition();
 		LR_point getLegPosition(uint8_t legId);

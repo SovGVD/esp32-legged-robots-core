@@ -51,7 +51,7 @@ typedef struct {
 class IK
 {
 	public:
-		IK(LR_figure &bodyObj, leg legs[LEG_NUM]);
+		IK(LR_figure &bodyObj, leg (&legs)[LEG_NUM]);
 		//void set(LR_figure &bodyObj, leg &legObj);
 		iksolver solve(uint8_t legId);
 		//point solveByAngle();	// use to init position by initial angles

@@ -1,7 +1,7 @@
 #include "math.h" 
 #include "HAL_body.h"
 
-HAL_body::HAL_body(LR_moveVector &vector, LR_angle &correction, LR_figure &bodyObj, leg legs[LEG_NUM])
+HAL_body::HAL_body(LR_moveVector &vector, LR_angle &correction, LR_figure &bodyObj, leg (&legs)[LEG_NUM])
 {
 	_vector     = &vector;	// TODO that is wrong... we should set body pitch/roll somewhere else (e.g. in IMU process that still not in the code...)
 	_correction = &correction;
@@ -29,7 +29,7 @@ void HAL_body::update()
 	double sinYaw = sin(_body->orientation.yaw);
 	double cosYaw = cos(_body->orientation.yaw);
 
-	for (int i = 0; i < LEG_NUM; i++) {		
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		_legs[i]->body.x = _body->position.x 
 						 + _legs[i]->defaultBody.x * (cosYaw*cosPitch)
 						 + _legs[i]->defaultBody.y * (cosYaw*sinPitch*sinRoll - sinYaw*cosRoll)
@@ -45,5 +45,4 @@ void HAL_body::update()
 						 + _legs[i]->defaultBody.y * (cosPitch*sinRoll)
 						 + _legs[i]->defaultBody.z * (cosPitch*cosRoll);
 	}
-
 }

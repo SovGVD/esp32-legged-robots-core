@@ -112,27 +112,27 @@ LR_figure body = {
 
 
 IK ikLeg(
-  body, 
-  legs
+	body, 
+	legs
 );
 gait gaitLeg(
-  GAIT_CONFIG, 
-  legs
+	GAIT_CONFIG, 
+	legs
 );
 
 
 /* We need predict future position of legs/body */
 planner walkPlanner(
-  vector,
-  body,
-  legs
+	vector,
+	body,
+	legs
 );
 
 /* and balance it someway */
 balance bodyBalance(
-  balanceOffset,
-  body,
-  legs
+	balanceOffset,
+	body,
+	legs
 );
 
 // IMU+PID
@@ -158,8 +158,8 @@ AsyncWebSocket ws("/ws");
 uint8_t telemetryPackage[P_TELEMETRY_LEN];
 
 // DNS server
-const byte DNS_PORT = 53;
-DNSServer dnsServer;
+//const byte DNS_PORT = 53;
+//DNSServer dnsServer;
 
 #ifdef ESP32CAMERA
 	#define CAMERAENABLED
@@ -175,21 +175,18 @@ Stream *cliSerial;
 // Settings
 modelSettings settings;
 
-bool mainLoopReady = false;
+bool robotLoopReady   = false;
 bool serviceLoopReady = false;
+bool isHalDoReady     = false;
 
-void mainSetup()
+void robotSetup()
 {
-	if (!mainLoopReady) {
-		initSettings();
-		vTaskDelay(100);
-
+	if (!robotLoopReady) {
 		Wire.begin();
 		Wire.setClock(400000);
 		vTaskDelay(100);
-
-		initWiFi();
-		vTaskDelay(100);
+		
+		initServo();
 
 		initHAL();
 		vTaskDelay(100);
@@ -203,7 +200,7 @@ void mainSetup()
 		initPowerSensor();
 		vTaskDelay(100);
 
-		mainLoopReady = true;
+		robotLoopReady = true;
 		Serial.println("MainSetup complete");
 	}
 }
@@ -211,7 +208,13 @@ void mainSetup()
 void servicesSetup()
 {
 	if (!serviceLoopReady) {
+		initServo();
+		vTaskDelay(100);
+
 		initCLI();
+		vTaskDelay(100);
+		
+		initWiFi();
 		vTaskDelay(100);
 
 		initWebServer();
@@ -222,23 +225,30 @@ void servicesSetup()
 	}
 }
 
-void mainLoop()
+/**
+ * Everything related to robot-only code: i2c, servos, imu, etc
+ */
+void robotLoop()
 {
 	currentTime = micros();
 	if (currentTime - previousTime >= LOOP_TIME) {
 		previousTime = currentTime;
 
 		updateFailsafe();
-		updatePower();  // TODO not so often!
+		//updatePower();  // TODO not so often!
 
-		updateIMU();
+		//updateIMU();
 		#ifdef HORIZON_LEVEL
 			imuCorrectionPID.update();
 		#endif
-		updateGait();
-
-		updateHAL();
-		doHAL();
+		if (!isHalDoReady) {
+			updateGait();
+			updateHAL();
+			isHalDoReady = true;
+		}
+		#if DO_HAL_CORE == 0
+			doHAL();
+		#endif
 
 		FS_WS_count++;
 
@@ -250,27 +260,47 @@ void mainLoop()
 	}
 }
 
-
+/**
+ * WiFi, WebServer, Cli and other bells and whistles
+ */
 void servicesLoop() {
-    serviceCurrentTime = micros();
+	serviceCurrentTime = micros();
 
-    #ifdef CAMERAENABLED
-      if (clientOnline && mainCameraStream) {
-        mainCamera.cameraHandleStream();
-      }
-    #endif
+	#ifdef CAMERAENABLED
+		if (clientOnline && mainCameraStream) {
+			mainCamera.cameraHandleStream();
+		}
+	#endif
+	
+	/**
+	 * @TODO this to actually kind of wrong as first IF will slow down second IF and so on =(
+	 */
 
-    if (serviceCurrentTime - servicePreviousTime >= SERVICE_LOOP_TIME) {
-      servicePreviousTime = serviceCurrentTime;
+	if (serviceCurrentTime - serviceFastPreviousTime >= LOOP_TIME) {
+		serviceFastPreviousTime = serviceCurrentTime;
 
-      updateCLI();
-      
-      serviceLoopTime = micros() - serviceCurrentTime;
-      if (serviceLoopTime > SERVICE_LOOP_TIME) {
-        Serial.print("WARNING! Increase SERVICE_LOOP_TIME: ");
-        Serial.println(serviceLoopTime);
-      }
-    }
+		#if DO_HAL_CORE == 1
+			doHAL();
+		#endif
+
+		serviceFastLoopTime = micros() - serviceCurrentTime;
+		if (serviceFastLoopTime > LOOP_TIME) {
+			Serial.print("WARNING! Increase SERVICE_FAST_LOOP_TIME: ");
+			Serial.println(serviceFastLoopTime);
+		}
+	}
+
+	if (serviceCurrentTime - servicePreviousTime >= SERVICE_LOOP_TIME) {
+		servicePreviousTime = serviceCurrentTime;
+
+		updateCLI();
+
+		serviceLoopTime = micros() - serviceCurrentTime;
+		if (serviceLoopTime > SERVICE_LOOP_TIME) {
+			Serial.print("WARNING! Increase SERVICE_LOOP_TIME: ");
+			Serial.println(serviceLoopTime);
+		}
+	}
 }
 
 /**
@@ -282,8 +312,11 @@ void setup()
 {
 	Serial.begin(SERIAL_BAUD);
 	cliSerial = &Serial;
+	
+	initSettings();
+	vTaskDelay(100);
 
-	mainSetup();
+	servicesSetup();
 	vTaskDelay(10);
 
 	xTaskCreatePinnedToCore(
@@ -301,9 +334,9 @@ void setup()
  */
 void loop()
 {
-	if(mainLoopReady && serviceLoopReady) {
-		dnsServer.processNextRequest();
-		mainLoop();
+	if(robotLoopReady && serviceLoopReady) {
+		//dnsServer.processNextRequest();
+		servicesLoop();
 	}
 }
 
@@ -311,12 +344,14 @@ void loop()
  * Core 0
  */
 void core0loop(void * pvParameters) {
-	if (mainLoopReady) {
-		servicesSetup();
+	if (serviceLoopReady) {
+		robotSetup();
 	}
-	while(mainLoopReady && serviceLoopReady) {
-		servicesLoop();
-		vTaskDelay(10);
+
+	while(robotLoopReady && serviceLoopReady) {
+		robotLoop();
+		vTaskDelay(1);
 	}
+
 	vTaskDelay(100);
 }

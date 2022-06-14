@@ -31,7 +31,7 @@ class CaptiveRequestHandler : public AsyncWebHandler {
 void initWebServerConfig()
 {
 	// Web server version
-	webConfig = "const c={v:" + WEB_SERVER_VERSION;
+	webConfig = "const c={v:'" + String(WEB_SERVER_VERSION) + "'";
 
 	// IP address of robot
 	addStringToWebServerConfig("w", "ws://" + WiFiIP.toString() + "/ws");
