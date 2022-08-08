@@ -8,7 +8,7 @@ void initWiFi()
 void WiFiEvent(WiFiEvent_t event)
 {
 	switch(event) {
-		case ARDUINO_EVENT_WIFI_AP_START:
+		case SYSTEM_EVENT_AP_START:
 			WiFi.softAPsetHostname(wifiSsid);
 			WiFi.softAPConfig(apIP, apGateway, apSubnet);
 			WiFiIP = WiFi.softAPIP();

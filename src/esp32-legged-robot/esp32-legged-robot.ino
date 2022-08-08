@@ -235,10 +235,10 @@ void robotLoop()
 		previousTime = currentTime;
 
 		updateFailsafe();
-		//updatePower();  // TODO not so often!
+		updatePower();  // TODO not so often!
 
-		//updateIMU();
 		#ifdef HORIZON_LEVEL
+			updateIMU();
 			imuCorrectionPID.update();
 		#endif
 		if (!isHalDoReady) {
@@ -246,7 +246,7 @@ void robotLoop()
 			updateHAL();
 			isHalDoReady = true;
 		}
-		#if DO_HAL_CORE == 0
+		#if DO_HAL_CORE == 1
 			doHAL();
 		#endif
 
@@ -279,7 +279,7 @@ void servicesLoop() {
 	if (serviceCurrentTime - serviceFastPreviousTime >= LOOP_TIME) {
 		serviceFastPreviousTime = serviceCurrentTime;
 
-		#if DO_HAL_CORE == 1
+		#if DO_HAL_CORE == 0
 			doHAL();
 		#endif
 
@@ -316,7 +316,7 @@ void setup()
 	initSettings();
 	vTaskDelay(100);
 
-	servicesSetup();
+	robotSetup();
 	vTaskDelay(10);
 
 	xTaskCreatePinnedToCore(
@@ -336,7 +336,7 @@ void loop()
 {
 	if(robotLoopReady && serviceLoopReady) {
 		//dnsServer.processNextRequest();
-		servicesLoop();
+		robotLoop();
 	}
 }
 
@@ -344,12 +344,12 @@ void loop()
  * Core 0
  */
 void core0loop(void * pvParameters) {
-	if (serviceLoopReady) {
-		robotSetup();
+	if (robotLoopReady) {
+		servicesSetup();
 	}
 
 	while(robotLoopReady && serviceLoopReady) {
-		robotLoop();
+		servicesLoop();
 		vTaskDelay(1);
 	}
 

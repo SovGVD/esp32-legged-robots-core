@@ -9,6 +9,7 @@ ARDUINO_CONFIG="${ARDUINO_PATH}/arduino-ide-esp32-legged-robot-dog.yaml"
 ARDUINO_DATA="${ARDUINO_PATH}/.arduino"
 ARDUINO_DOWNLOADS="${ARDUINO_PATH}/.arduino/staging"
 ARDUINO_USER="${ARDUINO_PATH}/Arduino"
+ARDUINO_LIB="${ARDUINO_USER}/libraries"
 ARDUINO_BUILD="${ARDUINO_PATH}/.arduino/build"
 ARDUINO_CLI="${ARDUINO_BIN} --no-color --config-file ${ARDUINO_CONFIG}"
 
@@ -43,6 +44,9 @@ buildWebClientEnv()
 }
 
 buildEnv() {
+	if [ ! -f "$ARDUINO_BIN" ]; then
+		installArduinoCli
+	fi
 	# Create folders for Arduino
 	mkdir -p $ARDUINO_PATH
 	mkdir -p $ARDUINO_DATA
@@ -64,18 +68,34 @@ buildEnv() {
 	$ARDUINO_CLI config dump
 
 	# Install ESP32
-	$ARDUINO_CLI core update-index
-	$ARDUINO_CLI core install esp32:esp32@2.0.3
-	$ARDUINO_CLI core list
-	$ARDUINO_CLI board listall
+	if [ ! -d "$ARDUINO_DATA/packages/esp32/hardware/esp32/1.0.6" ]; then
+		$ARDUINO_CLI core update-index
+		$ARDUINO_CLI core install esp32:esp32@1.0.6
+		$ARDUINO_CLI core list
+		$ARDUINO_CLI board listall
+	fi
 
 	# Install libraries
-	# TODO specify versions for git
-	$ARDUINO_CLI lib install --git-url https://github.com/me-no-dev/ESPAsyncWebServer.git https://github.com/me-no-dev/AsyncTCP.git
-	$ARDUINO_CLI lib install ESP32_ISR_Servo@1.3.0
+	$ARDUINO_CLI lib install ESP32_ISR_Servo@1.1.0
 	$ARDUINO_CLI lib install MPU9250_WE@1.1.3
 	$ARDUINO_CLI lib install INA219_WE@1.3.1
 	$ARDUINO_CLI lib install "Adafruit PWM Servo Driver Library"@2.4.0
+
+	# Install other libraries
+	cd $ARDUINO_LIB
+	if [ ! -d "$ARDUINO_LIB/ESPAsyncWebServer" ]; then
+		git clone https://github.com/me-no-dev/ESPAsyncWebServer.git
+	fi
+	cd $ARDUINO_LIB/ESPAsyncWebServer
+	git checkout f71e3d427b5be9791a8a2c93cf8079792c3a9a26
+
+	cd $ARDUINO_LIB/
+	if [ ! -d "$ARDUINO_LIB/AsyncTCP" ]; then
+		git clone https://github.com/me-no-dev/AsyncTCP.git
+	fi
+	cd $ARDUINO_LIB/AsyncTCP
+	git checkout ca8ac5f919d02bea07b474531981ddbfd64de97c
+	cd $CWD
 }
 
 setModelAndBoard() {
