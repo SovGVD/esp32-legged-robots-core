@@ -115,9 +115,9 @@ iksolver IK::solve(uint8_t legId)
 
 
 	// TODO: what can I do with limits?
-	double Lx = legFoot.x - legBody.x; if (_legs[legId]->inverse.x) { lx = -lx; };
-	double Ly = legFoot.y - legBody.y; if (_legs[legId]->inverse.y) { ly = -ly; };
-	double Lz = legFoot.z - legBody.z; if (_legs[legId]->inverse.z) { lz = -lz; };
+	double Lx = legFoot.x - legBody.x; if (_legs[legId]->inverse.x) { Lx = -Lx; };
+	double Ly = legFoot.y - legBody.y; if (_legs[legId]->inverse.y) { Ly = -Ly; };
+	double Lz = legFoot.z - legBody.z; if (_legs[legId]->inverse.z) { Lz = -Lz; };
 
 
 	double sqLxz = sq(Lx) + sq(Lz);            // square of hypotenuse (points between leg.body and leg.foot in XZ-plane)
@@ -129,9 +129,9 @@ iksolver IK::solve(uint8_t legId)
 	double LegPlaneTmpAngle1 = ikAsin(Ly/Lxyz);
 	double LegPlaneTmpAngle2 = ikAcos((sqLxyz+sqL1-sqL2) / (2 * Lxyz * _legs[legId]->size.l1));
 
-	angle.alpha   = (Ly == 0 && Lx == 0) ? M_PI_2 : ikAtan2(Lx,abs(Ly)); if (Ly < 0) { angle.alpha = M_PI - angle.alpha };	// TODO simplier?
+	angle.alpha   = (Ly == 0 && Lx == 0) ? M_PI_2 : ikAtan2(Lx,abs(Ly)); if (Ly < 0) { angle.alpha = M_PI - angle.alpha; };	// TODO simplier?
 	angle.beta    = ikAsin(Lx/Lxz);
-	angle.gamma   = M_PI_2 - LegPlaneTmpAngle1 - LenPlaneTmpAngle2;
+	angle.gamma   = M_PI_2 - LegPlaneTmpAngle1 - LegPlaneTmpAngle2;
 	angle.delta   = ikAcos((sqL1 + sqL2 - sqLxyz) / (2 * _legs[legId]->size.l1 * _legs[legId]->size.l2));
 	angle.epsilon = (M_PI_2 - LegPlaneTmpAngle1)+(M_PI - angle.delta - LegPlaneTmpAngle2);
 	angle.zeta    = M_PI - angle.beta;	// backward to angle.beta
