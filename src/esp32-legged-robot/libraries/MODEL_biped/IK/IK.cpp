@@ -64,6 +64,20 @@
  *    +-------------------+
  * ////////////////////////////
  * 
+ *
+ *  Leg Plane
+ *     A         `-` - L1
+ *     ,.\       `=` - L2
+ *     ,.  \     `.` - Lxyz
+ *     , .   B (aka Delta)
+ *     ,  . //   LegPlaneTmpAngle1 - between `,` and `.`
+ *     ,  .//    LegPlaneTmpAngle2 - between `.` and `-`
+ *     D  C
+ *
+ * So Espilon is angle DCB, where
+ *  - ACD = 90 - LegPlaneTmpAngle1
+ *  - ABC = 180 - LegPlaneTmpAngle2 - Delta
+ *
  * Developed by Gleb Devyatkin (SovGVD) in 2022
  */
 
@@ -101,27 +115,26 @@ iksolver IK::solve(uint8_t legId)
 
 
 	// TODO: what can I do with limits?
-	double lx = legFoot.x - legBody.x; if (_legs[legId]->inverse.x) { lx = -lx; };
-	double ly = legFoot.y - legBody.y; if (_legs[legId]->inverse.y) { ly = -ly; };
-	double lz = legFoot.z - legBody.z; if (_legs[legId]->inverse.z) { lz = -lz; };
+	double Lx = legFoot.x - legBody.x; if (_legs[legId]->inverse.x) { lx = -lx; };
+	double Ly = legFoot.y - legBody.y; if (_legs[legId]->inverse.y) { ly = -ly; };
+	double Lz = legFoot.z - legBody.z; if (_legs[legId]->inverse.z) { lz = -lz; };
 
 
-	double a = sq(lx) + sq(lz);        // square of hypotenuse (points between leg.body and leg.foot in XZ-plane)
-	double sqrta = sqrt(a);
-	double b = sq(ly) + a;             // square of hypotenuse (points between leg.body and leg.foot in YLeg-plane)
-	double sqrtb = sqrt(b);            // square of hypotenuse (points between leg.body and leg.foot in YZ-plane)
-	double l2p2 = sq(_legs[legId]->size.l2);   // square of l2		TODO this is const actually
-	double l3p2 = sq(_legs[legId]->size.l3);   // square of l3		TODO this is const actually
+	double sqLxz = sq(Lx) + sq(Lz);            // square of hypotenuse (points between leg.body and leg.foot in XZ-plane)
+	double sqLxyz = sq(Ly) + sqLxz;            // square of hypotenuse (points between leg.body and leg.foot in 3D or leg plane)
+	double Lxz = sqrt(Lxz);
+	double Lxyz = sqrt(sqLxyz);                // square of hypotenuse (points between leg.body and leg.foot in 3D or leg plane)
+	double sqL1 = sq(_legs[legId]->size.l1);   // square of l1		TODO this is const actually
+	double sqL2 = sq(_legs[legId]->size.l2);   // square of l2		TODO this is const actually
+	double LegPlaneTmpAngle1 = ikAsin(Ly/Lxyz);
+	double LegPlaneTmpAngle2 = ikAcos((sqLxyz+sqL1-sqL2) / (2 * Lxyz * _legs[legId]->size.l1));
 
-
-	// XZ plane
-	angle.alpha = M_PI_2 - ikAsin(lx/sqrta);
-
-	// YLeg plane
-	angle.beta  = M_PI_2 - ikAsin(ly/sqrtb) - ikAcos( (b+l2p2-l3p2) / (2 * sqrtb * _legs[legId]->size.l2));
-
-	// YLeg plane
-	angle.gamma = ikAcos((l2p2 + l3p2 - b) / (2 * _legs[legId]->size.l2 * _legs[legId]->size.l3));
+	angle.alpha   = (Ly == 0 && Lx == 0) ? M_PI_2 : ikAtan2(Lx,abs(Ly)); if (Ly < 0) { angle.alpha = M_PI - angle.alpha };	// TODO simplier?
+	angle.beta    = ikAsin(Lx/Lxz);
+	angle.gamma   = M_PI_2 - LegPlaneTmpAngle1 - LenPlaneTmpAngle2;
+	angle.delta   = ikAcos((sqL1 + sqL2 - sqLxyz) / (2 * _legs[legId]->size.l1 * _legs[legId]->size.l2));
+	angle.epsilon = (M_PI_2 - LegPlaneTmpAngle1)+(M_PI - angle.delta - LegPlaneTmpAngle2);
+	angle.zeta    = M_PI - angle.beta;	// backward to angle.beta
 
 	s.isSolved = true;	// @TODO
 	s.angle = angle;
