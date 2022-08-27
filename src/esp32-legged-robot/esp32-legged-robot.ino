@@ -182,7 +182,7 @@ bool isHalDoReady     = false;
 void robotSetup()
 {
 	if (!robotLoopReady) {
-		Wire.begin();
+		Wire.begin(I2C_SDA, I2C_SCL);
 		Wire.setClock(400000);
 		vTaskDelay(100);
 		

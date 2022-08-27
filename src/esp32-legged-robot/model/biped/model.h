@@ -135,6 +135,9 @@ servoProfile servoMainProfile = {
 //#define ESP32CAMERA_JPEG_QUALITY 12
 //#define ESP32CAMERA_FPS          25
 
+#define I2C_SDA 3
+#define I2C_SCL 13
+
 #define PWM_CONTROLLER_ADDRESS   0x40
 #define PWM_CONTROLLER_TYPE      PCA9685
 
