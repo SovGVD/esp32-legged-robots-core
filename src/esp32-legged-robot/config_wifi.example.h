@@ -1,3 +1,2 @@
-// First credentials for Access point (AP) mode
-const char* wifiSsid[] = {"APssid", "ssid1", "ssid2"};
-const char* wifiPass[] = {"APpass", "123",   "456"};
+const char* wifiSsid = "SmallDogV1";
+const char* wifiPass = "1234567890";
