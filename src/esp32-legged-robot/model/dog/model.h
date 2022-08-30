@@ -161,5 +161,11 @@ servoProfile servoMainProfile = {
 #define POWER_SENSOR         INA219
 
 
+//Cores loop time
+#define LOOP_TIME 4400   // microseconds (10^-6 seconds)
+#define SERVICE_LOOP_TIME 100000
+#define SERVICE_FAST_LOOP_TIME 5000
+
+
 #include "../../libraries/MODEL_dog/IK/IK.h"
 #include "../../libraries/MODEL_dog/IK/IK.cpp"

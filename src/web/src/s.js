@@ -22,17 +22,35 @@ var telemetry = {
 	loopTime: 0,
 };
 
+var cli = {
+	obj: {
+		status: false,
+		lines: [],
+	},
+
+};
+
 var gui ={
 	updateInterval: null,
 	obj: {
 		status: null,
 		body_rotate: null,
+		enable_cli: null,
+		control: null,
+		cli: null,
 	},
 
 	init: function () {
 		document.addEventListener("visibilitychange", gui.onVisibilityChange);
 		gui.obj.status = G('status');
 		gui.obj.body_rotate = G('body_rotate');
+		gui.obj.enable_cli = G('enable_cli');
+		gui.obj.cli = G('cli');
+		gui.obj.control = G('control');
+		
+		gui.obj.enable_cli.addEventListener('change', () => {
+			gui.toggleCli(gui.obj.enable_cli.checked);
+		});
 
 		gui.updateInterval = setInterval(gui.update, 100);
 	},
@@ -59,6 +77,12 @@ var gui ={
 	updateStatus: function (){
 		gui.obj.status.innerHTML = gui.displayNumber(telemetry.voltage) + 'V | ' + gui.displayNumber(telemetry.current) + 'A | LoopTime: ' + telemetry.loopTime;
 	},
+	
+	toggleCli(isEnabled) {
+		gui.obj.cli.style.display = isEnabled ? 'block' : 'none';
+		gui.obj.control.style.display = isEnabled ? 'none' : 'block';
+		cli.obj.status = isEnabled;
+	},
 };
 
 let ws = {
@@ -67,6 +91,7 @@ let ws = {
 	error:             false,
 	updateInterval:    null,
 	telemetryInterval: null,
+	cliInterval:       null,
 	
 	init: function () {
 		clearInterval(ws.updateInterval);
@@ -84,6 +109,7 @@ let ws = {
 
 			ws.updateInterval    = setInterval(ws.update, 50);
 			ws.telemetryInterval = setInterval(ws.telemetryRequest, 1000);
+			ws.cliInterval       = setInterval(ws.cliRequest, 500);
 		} catch(e) {
 			clearInterval(ws.updateInterval);
 			ws.status = false;
@@ -103,6 +129,9 @@ let ws = {
 			case 84:
 				ws.telemetryResponse(binaryData);
 				break;
+			case 67:
+				ws.cliResponse(binaryData);
+				break;
 		}
 	},
 
@@ -114,7 +143,17 @@ let ws = {
 
 	telemetryResponse: function (binaryData) {
 		packet.telemetryParse(binaryData);
-	}
+	},
+
+	cliRequest: function (data) {
+		if (ws.status) {
+			ws.ws.send(packet.cli());
+		}
+	},
+
+	cliResponse: function (binaryData) {
+		packet.cliParse(binaryData);
+	},
 };
 
 let failsafe = {
@@ -166,7 +205,18 @@ let packet = {
 		telemetry.voltage  = packet._getUint16(binaryTelemetry, 4)/1000;
 		telemetry.current  = packet._getUint16(binaryTelemetry, 6)/1000;
 		telemetry.loopTime = packet._getUint16(binaryTelemetry, 8);
-	}
+	},
+
+	cli: function() {
+		packet.vMove[0] = 67;
+		packet.vMove[1] = 1;
+
+		return packet.pMove;
+	},
+
+	cliParse: function (binaryCli) {
+		console.log('DBG', binaryCli);
+	},
 }
 
 class onScreenGamepad {

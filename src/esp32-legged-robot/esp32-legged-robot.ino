@@ -38,6 +38,14 @@
 #include "libraries/gait/gait.cpp"
 #include "libraries/HAL_body/HAL_body.cpp"
 
+#include "libraries/cliStream/cliStream.h"
+#include "libraries/cliStream/cliStream.cpp"
+
+#ifdef IGNORE_BROWNOUT_CONDITION
+	#include "soc/soc.h"           // Disable brownour problems
+	#include "soc/rtc_cntl_reg.h"  // Disable brownour problems
+#endif
+
 /**
  * Hardware libraries
  */
@@ -68,6 +76,8 @@ TaskHandle_t core0tasks;
 #if PWM_CONTROLLER_TYPE == PCA9685
   Adafruit_PWMServoDriver pwm;
 #endif
+
+cliStream *cliSerial;
 
 unsigned long currentTime;
 unsigned long previousTime;
@@ -170,7 +180,7 @@ uint8_t telemetryPackage[P_TELEMETRY_LEN];
 #endif
 
 // CLI
-Stream *cliSerial;
+//Stream *cliSerial;
 
 // Settings
 modelSettings settings;
@@ -310,8 +320,14 @@ void servicesLoop() {
 
 void setup()
 {
+	#ifdef IGNORE_BROWNOUT_CONDITION
+		WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
+	#endif
 	Serial.begin(SERIAL_BAUD);
-	cliSerial = &Serial;
+	//cliSerial = &Serial;
+	//cliSerial = &cliIO;
+
+	cliSerial->setClient(wsclient);
 	
 	initSettings();
 	vTaskDelay(100);

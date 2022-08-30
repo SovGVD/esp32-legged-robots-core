@@ -1,5 +1,6 @@
 #define MODEL_SETTINGS_KEY 0xD060   // Some magic UNQIE key to verify EEPROM
 
+
 typedef struct {
 	double alpha;
 	double beta;

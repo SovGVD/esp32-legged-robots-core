@@ -23,6 +23,27 @@
 	#status {
 		font-family: monospace;
 	}
+	#cli {
+		flex: 1;
+		display: none;
+	}
+	.cli_group {
+		display: flex;
+		height: 100%;
+		flex-direction: column;
+	}
+	.cli_output {
+		overflow: scroll;
+		flex: 1;
+	}
+	.cli_input_container {
+		display: flex;
+		gap: 10px;
+	}
+	#cli_input {
+		width: 100%;
+		flex: 1;
+	}
 	#control {
 		flex: 1;
 	}
@@ -68,6 +89,16 @@
     </div>
     <div id="modes">
 		<input type="checkbox" id="body_rotate"><label for="body_rotate">Rotate test</label>
+		<input type="checkbox" id="enable_cli"><label for="enable_cli">CLI</label>
+	</div>
+	<div id="cli">
+		<div class="cli_group">
+			<div class="cli_output">
+			</div>
+			<div class="cli_input_container">
+				<input id="cli_input"></input><button>Send</button>
+			</div>
+		</div>
 	</div>
     <div id="control">
         <div class="joystick_group">

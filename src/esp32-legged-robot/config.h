@@ -2,11 +2,6 @@
  * Configuration file
  */
 
-//Cores loop time
-#define LOOP_TIME 4000   // microseconds (10^-6 seconds)
-#define SERVICE_LOOP_TIME 100000
-#define SERVICE_FAST_LOOP_TIME 5000
-
 //Fail safe
 #define FS_WS_THR 20  // cycles, 1 second = FS_WS_THR*LOOP_TIME, e.g. 1 000 * 1 000 = 1 000 000 = 1 second
 
