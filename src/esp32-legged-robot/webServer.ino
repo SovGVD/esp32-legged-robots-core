@@ -87,6 +87,9 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 				pTelemetry();
 				client->binary(telemetryPackage, P_TELEMETRY_LEN);
 				break;
+			case P_CLI:
+				pCli(data, len);
+				break;
 			#ifdef CAMERAENABLED
 			case P_START_VIDEO:
 				mainCameraStream = true;

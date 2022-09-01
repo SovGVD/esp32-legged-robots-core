@@ -46,6 +46,7 @@
 #define P_TELEMETRY    84  //       "T"
 #define P_START_VIDEO  86  //       "V" (capital V)
 #define P_STOP_VIDEO  118  //       "v" (small V)
+#define P_CLI          67  //       "C"
 
 /* Debug (SLOW!!!)*/
 //#define DEBUG_HAL_LEG

@@ -38,6 +38,8 @@ var gui ={
 		enable_cli: null,
 		control: null,
 		cli: null,
+		cli_input: null,
+		cli_input_submit: null,
 	},
 
 	init: function () {
@@ -45,11 +47,18 @@ var gui ={
 		gui.obj.status = G('status');
 		gui.obj.body_rotate = G('body_rotate');
 		gui.obj.enable_cli = G('enable_cli');
-		gui.obj.cli = G('cli');
 		gui.obj.control = G('control');
+		gui.obj.cli = G('cli');
+		gui.obj.cli_input = G('cli_input');
+		gui.obj.cli_input_submit = G('cli_input_submit');
 		
 		gui.obj.enable_cli.addEventListener('change', () => {
 			gui.toggleCli(gui.obj.enable_cli.checked);
+		});
+
+		gui.obj.cli_input_submit.addEventListener('click', () => {
+			ws.cliRequest(gui.obj.cli_input.value);
+			gui.obj.cli_input.value = '';
 		});
 
 		gui.updateInterval = setInterval(gui.update, 100);
@@ -109,7 +118,7 @@ let ws = {
 
 			ws.updateInterval    = setInterval(ws.update, 50);
 			ws.telemetryInterval = setInterval(ws.telemetryRequest, 1000);
-			ws.cliInterval       = setInterval(ws.cliRequest, 500);
+			//ws.cliInterval       = setInterval(ws.cliRequest, 500);
 		} catch(e) {
 			clearInterval(ws.updateInterval);
 			ws.status = false;
@@ -147,7 +156,7 @@ let ws = {
 
 	cliRequest: function (data) {
 		if (ws.status) {
-			ws.ws.send(packet.cli());
+			ws.ws.send(packet.cli(data));
 		}
 	},
 
@@ -207,15 +216,18 @@ let packet = {
 		telemetry.loopTime = packet._getUint16(binaryTelemetry, 8);
 	},
 
-	cli: function() {
+	cli: function(data) {
 		packet.vMove[0] = 67;
-		packet.vMove[1] = 1;
+		for (let idx = 0; idx < data.length; idx++) {
+			packet.vMove[idx+1] = data[idx];
+		}
+		packet.vMove[idx+1] = 1;
 
 		return packet.pMove;
 	},
 
 	cliParse: function (binaryCli) {
-		console.log('DBG', binaryCli);
+		console.log('DBG', binaryCli);	// @TODO
 	},
 }
 

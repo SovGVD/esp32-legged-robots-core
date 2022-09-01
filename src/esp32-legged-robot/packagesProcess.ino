@@ -32,6 +32,12 @@ void pTelemetry() {
   int16ToBytes(loopTime, 8);
 }
 
+void pCli(uint8_t* data, size_t len) {
+  for (size_t idx = 1; idx < len; idx++) {
+    cliSerial->input(data[idx]);
+  }
+}
+
 void int16ToBytes(int value, uint8_t _offset)
 {
   telemetryPackage[_offset]   = (value >> 8) & 0xFF;

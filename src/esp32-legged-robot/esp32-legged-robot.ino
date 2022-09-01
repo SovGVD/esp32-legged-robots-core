@@ -327,6 +327,7 @@ void setup()
 	//cliSerial = &Serial;
 	//cliSerial = &cliIO;
 
+	cliSerial->setStreamPrefix(P_CLI);
 	cliSerial->setClient(wsclient);
 	
 	initSettings();
