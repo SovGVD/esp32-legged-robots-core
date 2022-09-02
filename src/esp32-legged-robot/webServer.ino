@@ -76,6 +76,8 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 		wsclient = client;
 		client->text("Ok");
 		clientOnline = true;
+		cliSerial->setClientReady(client);
+		cliInitHelp();
 	} else if (clientOnline && type == WS_EVT_DATA) {
 		FS_WS_count = 0;  // zero FS counter
 
@@ -99,11 +101,14 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 				break;
 			#endif
 			default:
+				Serial.print("Unknown package ID: ");
+				Serial.println(data[0], DEC);
 				cliSerial->print("Unknown package ID: ");
 				cliSerial->println(data[0], DEC);
 		}
 
 	} else if(type == WS_EVT_DISCONNECT) {
+		cliSerial->setClientDisconnected();
 		clientOnline = false;
 	}
 }

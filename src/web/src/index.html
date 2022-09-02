@@ -32,9 +32,11 @@
 		height: 100%;
 		flex-direction: column;
 	}
-	.cli_output {
+	#cli_output {
 		overflow: scroll;
 		flex: 1;
+		white-space: pre;
+		font-family: monospace;
 	}
 	.cli_input_container {
 		display: flex;
@@ -93,7 +95,7 @@
 	</div>
 	<div id="cli">
 		<div class="cli_group">
-			<div class="cli_output">
+			<div id="cli_output">
 			</div>
 			<div class="cli_input_container">
 				<input id="cli_input"></input><button id="cli_input_submit">Send</button>

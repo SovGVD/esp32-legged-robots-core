@@ -77,8 +77,6 @@ TaskHandle_t core0tasks;
   Adafruit_PWMServoDriver pwm;
 #endif
 
-cliStream *cliSerial;
-
 unsigned long currentTime;
 unsigned long previousTime;
 unsigned long loopTime;
@@ -180,7 +178,8 @@ uint8_t telemetryPackage[P_TELEMETRY_LEN];
 #endif
 
 // CLI
-//Stream *cliSerial;
+cliStream *cliSerial;
+cliStream cliStreamObj;
 
 // Settings
 modelSettings settings;
@@ -324,11 +323,9 @@ void setup()
 		WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
 	#endif
 	Serial.begin(SERIAL_BAUD);
-	//cliSerial = &Serial;
-	//cliSerial = &cliIO;
-
-	cliSerial->setStreamPrefix(P_CLI);
-	cliSerial->setClient(wsclient);
+	cliStreamObj.setStreamPrefix(P_CLI);
+	cliStreamObj.setClient(wsclient);
+	cliSerial = &cliStreamObj;
 	
 	initSettings();
 	vTaskDelay(100);

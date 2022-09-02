@@ -25,9 +25,11 @@ var telemetry = {
 var cli = {
 	obj: {
 		status: false,
-		lines: [],
+		data: '',
 	},
-
+	refresh() {
+		gui.obj.cli_output.innerHTML = cli.obj.data;//.replace(new RegExp('\r?\n', 'g'), '<br />');
+	}
 };
 
 var gui ={
@@ -38,6 +40,7 @@ var gui ={
 		enable_cli: null,
 		control: null,
 		cli: null,
+		cli_output: null,
 		cli_input: null,
 		cli_input_submit: null,
 	},
@@ -49,6 +52,7 @@ var gui ={
 		gui.obj.enable_cli = G('enable_cli');
 		gui.obj.control = G('control');
 		gui.obj.cli = G('cli');
+		gui.obj.cli_output = G('cli_output');
 		gui.obj.cli_input = G('cli_input');
 		gui.obj.cli_input_submit = G('cli_input_submit');
 		
@@ -116,7 +120,7 @@ let ws = {
 				event.data.arrayBuffer().then(buffer => {ws.parseEvent(new Uint8Array(buffer))});
 			};
 
-			ws.updateInterval    = setInterval(ws.update, 50);
+			//ws.updateInterval    = setInterval(ws.update, 50);
 			ws.telemetryInterval = setInterval(ws.telemetryRequest, 1000);
 			//ws.cliInterval       = setInterval(ws.cliRequest, 500);
 		} catch(e) {
@@ -179,7 +183,7 @@ let failsafe = {
 
 let packet = {
 	init: function () {
-		packet.pMove = new ArrayBuffer(14);
+		packet.pMove = new ArrayBuffer(255);
 		packet.vMove = new Uint8Array(packet.pMove);
 	},
 	_norm1: function (value) {
@@ -219,15 +223,17 @@ let packet = {
 	cli: function(data) {
 		packet.vMove[0] = 67;
 		for (let idx = 0; idx < data.length; idx++) {
-			packet.vMove[idx+1] = data[idx];
+			packet.vMove[idx+1] = data.charCodeAt(idx);
 		}
-		packet.vMove[idx+1] = 1;
+		packet.vMove[data.length+1] = 10;	// new line
+		packet.vMove[data.length+2] = 0;	// end of package
 
 		return packet.pMove;
 	},
 
 	cliParse: function (binaryCli) {
-		console.log('DBG', binaryCli);	// @TODO
+		cli.obj.data += String.fromCharCode.apply(null, binaryCli).substr(1);
+		cli.refresh();
 	},
 }
 

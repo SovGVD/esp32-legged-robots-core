@@ -39,7 +39,7 @@ void settingsSaveTrim()
 		#if LEG_DOF == 6
 			settings.trim[i].delta   = legs[i].hal.trim.delta;
 			settings.trim[i].epsilon = legs[i].hal.trim.epsilon;
-			settings.trim[i].zeta    = legs[i].hal.trim.zeta;			
+			settings.trim[i].zeta    = legs[i].hal.trim.zeta;
 		#endif
 	}
 }
@@ -61,11 +61,11 @@ void cliHal()
 
 void cliDisplayState()
 {
-	Serial.print("HAL: ");
+	cliSerial->print("HAL: ");
 	if (isHALEnabled()) {
-		Serial.println(TITLE_ON);
+		cliSerial->println(TITLE_ON);
 	} else {
-		Serial.println(TITLE_OFF);
+		cliSerial->println(TITLE_OFF);
 	}
 }
 

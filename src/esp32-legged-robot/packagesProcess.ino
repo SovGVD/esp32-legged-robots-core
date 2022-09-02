@@ -34,6 +34,9 @@ void pTelemetry() {
 
 void pCli(uint8_t* data, size_t len) {
   for (size_t idx = 1; idx < len; idx++) {
+    if (data[idx] == 0) {
+      return;
+    }
     cliSerial->input(data[idx]);
   }
 }

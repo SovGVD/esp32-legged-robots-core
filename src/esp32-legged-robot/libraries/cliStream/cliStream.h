@@ -14,9 +14,12 @@ class cliStream: public Print
 		uint8_t _bufferLen = 0;
 		uint8_t _bufferPosition = 0;
 		char _streamPrefix;
+		bool _clientReady = false;
 	public:
 		void setClient(AsyncWebSocketClient * &wsClient);
 		void setStreamPrefix(char streamPrefix);
+		void setClientReady(AsyncWebSocketClient * &wsClient);
+		void setClientDisconnected();
 		size_t output(const uint8_t *buffer, size_t size);
 		uint8_t available(void);
 		uint8_t read(void);

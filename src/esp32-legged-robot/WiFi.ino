@@ -30,7 +30,7 @@ void updateWiFi()
 void WiFiInfo()
 {
 	cliSerial->print("IP:   ");
-	cliSerial->println(WiFiIP);
+	cliSerial->println(WiFiIP.toString());
 	cliSerial->print("SSID: ");
 	cliSerial->println(wifiSsid);
 	cliSerial->print("Pass: ");
