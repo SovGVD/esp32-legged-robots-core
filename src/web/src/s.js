@@ -120,9 +120,8 @@ let ws = {
 				event.data.arrayBuffer().then(buffer => {ws.parseEvent(new Uint8Array(buffer))});
 			};
 
-			//ws.updateInterval    = setInterval(ws.update, 50);
+			ws.updateInterval    = setInterval(ws.update, 50);
 			ws.telemetryInterval = setInterval(ws.telemetryRequest, 1000);
-			//ws.cliInterval       = setInterval(ws.cliRequest, 500);
 		} catch(e) {
 			clearInterval(ws.updateInterval);
 			ws.status = false;
