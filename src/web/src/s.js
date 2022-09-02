@@ -27,8 +27,16 @@ var cli = {
 		status: false,
 		data: '',
 	},
+
+	sendMsg() {
+		ws.cliRequest(gui.obj.cli_input.value);
+		gui.obj.cli_input.value = '';
+		gui.obj.cli_input.focus();
+	},
+
 	refresh() {
-		gui.obj.cli_output.innerHTML = cli.obj.data;//.replace(new RegExp('\r?\n', 'g'), '<br />');
+		gui.obj.cli_output.innerHTML = cli.obj.data;
+		gui.obj.cli_output.scrollTop = gui.obj.cli_output.scrollHeight;
 	}
 };
 
@@ -61,11 +69,15 @@ var gui ={
 		});
 
 		gui.obj.cli_input_submit.addEventListener('click', () => {
-			ws.cliRequest(gui.obj.cli_input.value);
-			gui.obj.cli_input.value = '';
+			cli.sendMsg();
+		});
+		gui.obj.cli_input.addEventListener('keyup', function(e) {
+			if (e.keyCode == 13) {
+				cli.sendMsg();
+			}
 		});
 
-		gui.updateInterval = setInterval(gui.update, 100);
+		gui.updateInterval = setInterval(gui.update, 500);
 	},
 
 	update: function () {
@@ -88,7 +100,12 @@ var gui ={
 	},
 
 	updateStatus: function (){
-		gui.obj.status.innerHTML = gui.displayNumber(telemetry.voltage) + 'V | ' + gui.displayNumber(telemetry.current) + 'A | LoopTime: ' + telemetry.loopTime;
+		if (ws.status) {
+			gui.obj.status.innerHTML = gui.displayNumber(telemetry.voltage) + 'V | ' + gui.displayNumber(telemetry.current) + 'A | LoopTime: ' + telemetry.loopTime;
+			return;
+		}
+
+		gui.obj.status.innerHTML = 'Offline';
 	},
 	
 	toggleCli(isEnabled) {
@@ -108,10 +125,17 @@ let ws = {
 	
 	init: function () {
 		clearInterval(ws.updateInterval);
+		clearInterval(ws.telemetryInterval);
 		try {
 			ws.ws = new WebSocket(c.w);
 			ws.ws.onopen = function() {
 				ws.status = true;
+			};
+			ws.ws.onclose = function () {
+				ws.status = false;
+				ws.error  = false;
+				// reconnect in 5sec
+				setTimeout(() => { ws.init(); }, 5000);
 			};
 			ws.ws.onerror = function() {
 				ws.status = false;
@@ -124,6 +148,7 @@ let ws = {
 			ws.telemetryInterval = setInterval(ws.telemetryRequest, 1000);
 		} catch(e) {
 			clearInterval(ws.updateInterval);
+			clearInterval(ws.telemetryInterval);
 			ws.status = false;
 			ws.error = true;
 			console.log(e);

@@ -1,22 +1,25 @@
 void settingsPrintTrim()
 {
-	Serial.println();
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
-		Serial.print(legs[i].id.title);
-		Serial.print(" leg trim {");
-		Serial.print(radToDeg(legs[i].hal.trim.alpha), CLI_DP);
-		Serial.print(", ");
-		Serial.print(radToDeg(legs[i].hal.trim.beta),  CLI_DP);
-		Serial.print(", ");
-		Serial.print(radToDeg(legs[i].hal.trim.gamma), CLI_DP);
 		#if LEG_DOF == 6
-			Serial.print(", ");
-			Serial.print(radToDeg(legs[i].hal.trim.delta), CLI_DP);
-			Serial.print(", ");
-			Serial.print(radToDeg(legs[i].hal.trim.epsilon),  CLI_DP);
-			Serial.print(", ");
-			Serial.print(radToDeg(legs[i].hal.trim.zeta), CLI_DP);
+			cliSerial->printf(
+				"%s leg trim {%.2f, %.2f, %.2f, %.2f, %.2f, %.2f}\n",
+				legs[i].id.title,
+				radToDeg(legs[i].hal.trim.alpha),
+				radToDeg(legs[i].hal.trim.beta),
+				radToDeg(legs[i].hal.trim.gamma),
+				radToDeg(legs[i].hal.trim.delta),
+				radToDeg(legs[i].hal.trim.epsilon),
+				radToDeg(legs[i].hal.trim.zeta)
+			);
+		#else
+			cliSerial->printf(
+				"%s leg trim {%.2f, %.2f, %.2f}\n",
+				legs[i].id.title,
+				radToDeg(legs[i].hal.trim.alpha),
+				radToDeg(legs[i].hal.trim.beta),
+				radToDeg(legs[i].hal.trim.gamma)
+			);
 		#endif
-		Serial.println("}");
 	}
 }

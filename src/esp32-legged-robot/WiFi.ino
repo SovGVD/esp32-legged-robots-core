@@ -29,10 +29,5 @@ void updateWiFi()
 
 void WiFiInfo()
 {
-	cliSerial->print("IP:   ");
-	cliSerial->println(WiFiIP.toString());
-	cliSerial->print("SSID: ");
-	cliSerial->println(wifiSsid);
-	cliSerial->print("Pass: ");
-	cliSerial->println(wifiPass);
+	cliSerial->printf("IP:   %d.%d.%d.%d\nSSID: %s\nPass: %s\n", WiFiIP[0], WiFiIP[1], WiFiIP[2], WiFiIP[3], wifiSsid, wifiPass);
 }

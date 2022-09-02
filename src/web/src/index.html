@@ -20,12 +20,22 @@
 		display: flex;
 		flex-direction: column;
 	}
+
 	#status {
 		font-family: monospace;
 	}
+
+	#modes {
+		text-align: right;
+	}
+	.mode_input {
+		margin-left: 1em;
+	}
+
 	#cli {
 		flex: 1;
 		display: none;
+		overflow: hidden;
 	}
 	.cli_group {
 		display: flex;
@@ -33,19 +43,25 @@
 		flex-direction: column;
 	}
 	#cli_output {
-		overflow: scroll;
-		flex: 1;
+		overflow: auto;
+		flex: 1 1 100%;
 		white-space: pre;
 		font-family: monospace;
 	}
 	.cli_input_container {
 		display: flex;
 		gap: 10px;
+		flex: 0 0 20px;
 	}
 	#cli_input {
 		width: 100%;
 		flex: 1;
 	}
+	.input-element {
+		font-size: 1em;
+		padding: 0.5em;
+	}
+
 	#control {
 		flex: 1;
 	}
@@ -56,7 +72,7 @@
 			flex-direction: column;
 		}
 	}
-	
+
 	@media screen and (orientation:landscape) {
 		.joystick_group {
 			display: flex;
@@ -90,15 +106,16 @@
         Status line
     </div>
     <div id="modes">
-		<input type="checkbox" id="body_rotate"><label for="body_rotate">Rotate test</label>
-		<input type="checkbox" id="enable_cli"><label for="enable_cli">CLI</label>
+		<input type="checkbox" id="body_rotate" class="mode_input"><label for="body_rotate">Rotate test</label>
+		<input type="checkbox" id="enable_cli" class="mode_input"><label for="enable_cli">CLI</label>
 	</div>
 	<div id="cli">
 		<div class="cli_group">
 			<div id="cli_output">
 			</div>
 			<div class="cli_input_container">
-				<input id="cli_input"></input><button id="cli_input_submit">Send</button>
+				<input id="cli_input" class="input-element" type="text" autocorrect="off" autocapitalize="none" autocomplete="off" spellcheck="false"></input>
+				<button id="cli_input_submit" class="input-element">Send</button>
 			</div>
 		</div>
 	</div>

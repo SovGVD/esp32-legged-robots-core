@@ -1,10 +1,11 @@
-#define CLI_COMMANDS 7
+#define CLI_COMMANDS 8
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
   { "help",      cliHelp,       "Show list of methods",              0 },
   { "i2cscan",   cliI2cScan,    "Scan available i2c devices",        0 },
   { "wifi",      WiFiInfo,      "WiFi AP information",               0 },
   { "trim",      cliSetTrim,    "Trim servos",                       3 },
+  { "show",      settingsPrint, "Display current settings",          0 },
   { "save",      settingsSave,  "Save setting to EEPROM",            0 },
   { "calib",     cliCalibrate,  "Calibrate [imu|servo|leg]",         1 },
   { "hal",       cliHal,        "[on|off|state] leg calculation",    1 }
