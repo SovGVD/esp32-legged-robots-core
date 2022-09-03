@@ -1,8 +1,7 @@
-#define CLI_COMMANDS 8
+#define CLI_COMMANDS 7
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
   { "help",      cliHelp,       "Show list of methods",              0 },
-  { "i2cscan",   cliI2cScan,    "Scan available i2c devices",        0 },
   { "wifi",      WiFiInfo,      "WiFi AP information",               0 },
   { "trim",      cliSetTrim,    "Trim servos",                       3 },
   { "show",      settingsPrint, "Display current settings",          0 },
@@ -20,9 +19,7 @@ void initCLI()
 
 void cliInitHelp()
 {
-  cliSerial->println();
-  cliSerial->println(" CLI: type `help` to see available commands.");
-  cliSerial->println();
+  cliSerial->print("CLI: type `help` to see available commands.");
 }
 
 bool CLI_get(char * CLI_BUFFER)

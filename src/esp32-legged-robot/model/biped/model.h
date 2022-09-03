@@ -135,8 +135,8 @@ servoProfile servoMainProfile = {
 //#define ESP32CAMERA_JPEG_QUALITY 12
 //#define ESP32CAMERA_FPS          25
 
-//#define I2C_SDA 3
-//#define I2C_SCL 13
+#define I2C_SDA 3
+#define I2C_SCL 13
 
 #define PWM_CONTROLLER_ADDRESS   0x40
 #define PWM_CONTROLLER_TYPE      PCA9685
@@ -144,15 +144,16 @@ servoProfile servoMainProfile = {
 #define IMU_ADDRESS              0x68
 #define IMU_TYPE                 MPU9250
 
+#define POWER_SENSOR_ADDRESS     0x41
 #define POWER_SENSOR             INA219
 
 
 #define IGNORE_BROWNOUT_CONDITION
 
 //Cores loop time
-#define LOOP_TIME 5000   // microseconds (10^-6 seconds)
+#define LOOP_TIME 6000   // microseconds (10^-6 seconds)
 #define SERVICE_LOOP_TIME 100000
-#define SERVICE_FAST_LOOP_TIME 5000
+#define SERVICE_FAST_LOOP_TIME 6000
 
 
 #include "../../libraries/MODEL_biped/IK/IK.h"

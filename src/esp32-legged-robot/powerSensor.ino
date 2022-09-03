@@ -22,7 +22,7 @@ void updatePower()
 void setupPowerSensor()
 {
   #if POWER_SENSOR == INA219
-    ina219 = INA219_WE();
+    ina219 = INA219_WE(POWER_SENSOR_ADDRESS);
 
     if (ina219.init()) {
       powerSensorReady = true;

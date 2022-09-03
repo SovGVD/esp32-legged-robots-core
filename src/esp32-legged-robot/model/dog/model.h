@@ -156,9 +156,12 @@ servoProfile servoMainProfile = {
  * Hardware
  */
 #define PWM_CONTROLLER_TYPE  ESP32PWM
+
 #define IMU_ADDRESS          0x68
 #define IMU_TYPE             MPU9250
+
 #define POWER_SENSOR         INA219
+#define POWER_SENSOR_ADDRESS 0x40
 
 
 //Cores loop time

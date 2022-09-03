@@ -1,1 +1,0 @@
-#define ROBOT_MODEL MODEL_DOG
