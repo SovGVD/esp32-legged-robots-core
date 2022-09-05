@@ -14,10 +14,10 @@ const cliCommand cliCommands[CLI_COMMANDS] = {
   { "help",      cliHelp,       "Show list of methods",              0, 0 },
   { "wifi",      WiFiInfo,      "WiFi AP information",               0, 0 },
   { "trim",      cliSetTrim,    "Trim servos",                       3, 0 },
-  { "pwm",       cliHalServo,   "Servo position in microsec(uS)",    3, 1 },
+  { "pwm",       cliHalServo,   "Servo position in microsec(uS)",    3, 0 },
   { "show",      settingsPrint, "Display current settings",          0, 0 },
   { "save",      settingsSave,  "Save setting to EEPROM",            0, 0 },
-  { "calib",     cliCalibrate,  "Calibrate [imu|servo|leg]",         1, 1 },
+  { "calib",     cliCalibrate,  "Calibrate [imu|servo|leg]",         1, 0 },
   { "hal",       cliHal,        "[on|off|state] leg calculation",    1, 0 }
 };
 
@@ -30,7 +30,7 @@ void initCLI()
 
 void cliInitHelp()
 {
-  cliSerial->print("CLI: type `help` to see available commands.");
+  cliSerial->print("\nCLI: type `help` to see available commands.\n");
 }
 
 bool CLI_get(char * CLI_BUFFER)
@@ -44,8 +44,8 @@ bool CLI_get(char * CLI_BUFFER)
         CLI_BUFFER[CLI_charsRead] = CLI_NULLCHAR;       //null terminate our command char array
         if (CLI_charsRead > 0)  {
           CLI_charsRead = 0;                           //charsRead is static, so have to reset
-          //cliSerial->print("> ");
-          //cliSerial->println(CLI_BUFFER);
+          cliSerial->print("> ");
+          cliSerial->println(CLI_BUFFER);
           return true;
         }
         break;

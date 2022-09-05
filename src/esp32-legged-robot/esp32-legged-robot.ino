@@ -91,6 +91,8 @@ unsigned long serviceFastLoopTime;
 
 bool HALEnabled = true;
 
+uint16_t servoPulse[LEG_NUM][LEG_DOF];
+
 // Gait
 uint16_t ticksPerGaitItem    = 0;
 uint16_t ticksToNextGaitItem = 0;
@@ -259,7 +261,7 @@ void robotLoop()
 			doHAL();
 		#endif
 
-		CLI_doCommand();
+		//CLI_doCommand();
 
 		FS_WS_count++;
 
@@ -328,7 +330,6 @@ void setup()
 	Serial.begin(SERIAL_BAUD);
 	cliStreamObj.setStreamPrefix(P_CLI);
 	cliStreamObj.setClient(wsclient);
-	cliStreamObj.setCoreId(xPortGetCoreID());
 	cliSerial = &cliStreamObj;
 	
 	initSettings();

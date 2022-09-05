@@ -34,6 +34,7 @@ void setServoToInit()
 			legs[i].angle.zeta     = M_PI_2;
 		#endif
 		setLegPWM(legs[i]);
+    doLeg(legs[i]);
 	}
 }
 
@@ -42,6 +43,13 @@ void servoSet()
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		setLegPWM(legs[i]);
 	}
+}
+
+void doMotors()
+{
+  for (uint8_t i = 0; i < LEG_NUM; i++) {
+    doLeg(legs[i]);
+  }
 }
 
 bool setAngleDeg(leg &_leg, int angleId, double deg)

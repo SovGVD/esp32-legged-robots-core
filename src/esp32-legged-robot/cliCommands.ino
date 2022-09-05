@@ -80,60 +80,15 @@ void cliHalServo()
 		return;
 	}
 
-	uint8_t legPin = 255;
-	bool legFound = false;
-
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		if (strcmp(legs[i].id.title, legTitle) == 0) {
-			legFound = true;
-			switch (angleId) {
-				case ALPHA:
-					legPin = legs[i].hal.pin.alpha;
-					break;
-				case BETA:
-					legPin = legs[i].hal.pin.beta;
-					break;
-				case GAMMA:
-					legPin = legs[i].hal.pin.gamma;
-					break;
-				#if LEG_DOF == 6
-					case DELTA:
-						legPin = legs[i].hal.pin.delta;
-						break;
-					case EPSILON:
-						legPin = legs[i].hal.pin.epsilon;
-						break;
-					case ZETA:
-						legPin = legs[i].hal.pin.zeta;
-						break;
-				#endif
-			}
+			servoPulse[i][angleId] = us;
+			return;
 		}
 	}
 
-	if (!legFound) {
-		cliSerial->println("Leg is not valid.");
-		printAvailableLegs();
-		return;
-	}
-
-	if (legPin == 255) {
-		cliSerial->println("Unkown pin.");
-		return;
-	}
-
-	if (isHALEnabled()) {
-		cliSerial->println("Disabling HAL");
-		disableHAL();
-		delay(1000);
-		cliSerial->println("HAL disabled");
-	}
-
-	cliSerial->printf("Pin: %u, pulse: %u - done\n", legPin, us);
-
-	setServoMicroseconds(legPin, us);
-
-	cliSerial->printf("Pin: %u, pulse: %u - done\n", legPin, us);
+	cliSerial->println("Leg is not valid.");
+	printAvailableLegs();
 }
 
 void cliSetTrim()

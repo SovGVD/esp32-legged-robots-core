@@ -112,17 +112,17 @@ leg legs[LEG_NUM] = {
  * This is for TowerPro MG90D (or maybe I have clone, who knows)
  */
 servoProfile servoMainProfile = {
-    20,   // minAngle
-    160,  // maxAngle
+    0,    // minAngle
+    180,  // maxAngle
 
-    780,  // degMin
-    890,  // deg30
-    1090, // deg50
-    1300, // deg70
+    590,  // degMin
+    870,  // deg30
+    1080, // deg50
+    1290, // deg70
     1500, // deg90 - middle
-    1700, // deg110
-    1900, // deg130
-    2110, // deg150
+    1710, // deg110
+    1890, // deg130
+    2100, // deg150
     2200  // degMax
 };
 
