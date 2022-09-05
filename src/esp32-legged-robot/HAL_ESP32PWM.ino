@@ -53,6 +53,13 @@ void runServoCalibrate(leg &_leg)
 	}
 }
 
+void setServoMicroseconds(uint8_t pin, uint16_t us)
+{
+	// @TODO find correct esp32pwmServos
+	//ESP32_ISR_Servos.setPulseWidth(...)
+	cliSerial->println("@TODO - sorry");
+}
+
 void disableServos()
 {
 	ESP32_ISR_Servos.disableAll();

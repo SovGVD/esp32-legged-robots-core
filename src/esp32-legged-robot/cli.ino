@@ -1,9 +1,10 @@
-#define CLI_COMMANDS 7
+#define CLI_COMMANDS 8
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
   { "help",      cliHelp,       "Show list of methods",              0 },
   { "wifi",      WiFiInfo,      "WiFi AP information",               0 },
   { "trim",      cliSetTrim,    "Trim servos",                       3 },
+  { "pwm",       cliHalServo,   "Servo position in microsec(uS)",    2 },
   { "show",      settingsPrint, "Display current settings",          0 },
   { "save",      settingsSave,  "Save setting to EEPROM",            0 },
   { "calib",     cliCalibrate,  "Calibrate [imu|servo|leg]",         1 },
@@ -65,6 +66,11 @@ float CLI_readFloat() {
 char * CLI_readWord() {
   char * word = strtok(NULL, CLI_delimiters);         //K&R string.h  pg. 250
   return word;
+}
+
+uint16_t CLI_readUInt16() {
+  char * numTextPtr = strtok(NULL, CLI_delimiters);
+  return (uint16_t)atol(numTextPtr);
 }
 
 void CLI_doCommand()

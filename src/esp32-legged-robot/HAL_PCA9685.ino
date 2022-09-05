@@ -44,6 +44,11 @@ void runServoCalibrate(leg &_leg)
 	#endif
 }
 
+void setServoMicroseconds(uint8_t pin, uint16_t us)
+{
+	pwm.writeMicroseconds(pin, us);
+}
+
 void disableServos()
 {
 	pwm.sleep();

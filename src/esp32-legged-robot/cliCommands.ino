@@ -63,6 +63,68 @@ int getAngleIdByAngleTitle(char* angleTitle)
 	return UNKNOWN_ANGLE;
 }
 
+void cliHalServo()
+{
+	char*    legTitle = CLI_readWord();
+	char*    legAngle = CLI_readWord();
+	uint16_t us       = CLI_readUInt16();
+
+	int angleId = getAngleIdByAngleTitle(legAngle);
+
+	if (angleId == UNKNOWN_ANGLE) {
+		cliSerial->printf("Unknown angle [%s]. \n", legAngle);
+		return;
+	}
+
+	uint8_t legPin = 255;
+	bool legFound = false;
+
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		if (strcmp(legs[i].id.title, legTitle) == 0) {
+			legFound = true;
+			switch (angleId) {
+				case ALPHA:
+					legPin = legs[i].hal.pin.alpha;
+					return;
+				case BETA:
+					legPin = legs[i].hal.pin.beta;
+					return;
+				case GAMMA:
+					legPin = legs[i].hal.pin.gamma;
+					return;
+				#if LEG_DOF == 6
+					case DELTA:
+						legPin = legs[i].hal.pin.delta;
+						return;
+					case EPSILON:
+						legPin = legs[i].hal.pin.epsilon;
+						return;
+					case ZETA:
+						legPin = legs[i].hal.pin.zeta;
+						return;
+				#endif
+			}
+		}
+	}
+	if (!legFound) {
+		cliSerial->println("Leg is not valid.");
+		printAvailableLegs();
+		return;
+	}
+
+	if (legPin == 255) {
+		cliSerial->println("Unkown pin.");
+		return;
+	}
+
+	if (isHALEnabled()) {
+		disableHAL();
+		delay(1000);
+	}
+
+	setServoMicroseconds(legPin, us);
+}
+
 void cliSetTrim()
 {
 	char*  legTitle     = CLI_readWord();
