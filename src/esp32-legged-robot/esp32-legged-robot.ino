@@ -259,6 +259,8 @@ void robotLoop()
 			doHAL();
 		#endif
 
+		CLI_doCommand();
+
 		FS_WS_count++;
 
 		loopTime = micros() - currentTime;
@@ -303,6 +305,7 @@ void servicesLoop() {
 		servicePreviousTime = serviceCurrentTime;
 
 		updateCLI();
+		CLI_doCommand();
 
 		serviceLoopTime = micros() - serviceCurrentTime;
 		if (serviceLoopTime > SERVICE_LOOP_TIME) {
@@ -325,6 +328,7 @@ void setup()
 	Serial.begin(SERIAL_BAUD);
 	cliStreamObj.setStreamPrefix(P_CLI);
 	cliStreamObj.setClient(wsclient);
+	cliStreamObj.setCoreId(xPortGetCoreID());
 	cliSerial = &cliStreamObj;
 	
 	initSettings();

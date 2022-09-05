@@ -147,13 +147,12 @@ servoProfile servoMainProfile = {
 #define POWER_SENSOR_ADDRESS     0x41
 #define POWER_SENSOR             INA219
 
-
 #define IGNORE_BROWNOUT_CONDITION
 
 //Cores loop time
-#define LOOP_TIME 6000   // microseconds (10^-6 seconds)
+#define LOOP_TIME 7000   // microseconds (10^-6 seconds)
 #define SERVICE_LOOP_TIME 100000
-#define SERVICE_FAST_LOOP_TIME 6000
+#define SERVICE_FAST_LOOP_TIME 7000
 
 
 #include "../../libraries/MODEL_biped/IK/IK.h"

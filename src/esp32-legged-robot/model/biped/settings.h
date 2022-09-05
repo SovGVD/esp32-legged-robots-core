@@ -1,4 +1,5 @@
 #define MODEL_SETTINGS_KEY 0xB1bE   // Some magic UNQIE key to verify EEPROM
+#define MAX_CPU_CORES      2
 
 typedef struct {
 	double alpha;

@@ -27,4 +27,5 @@ const typedef struct cliCommand_t {
   cliFunction func;
   char description[32];
   uint8_t params;	// number of parameters
+  uint8_t coreId;
 } cliCommand;

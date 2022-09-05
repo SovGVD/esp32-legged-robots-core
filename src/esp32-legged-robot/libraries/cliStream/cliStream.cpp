@@ -12,6 +12,14 @@ void cliStream::setStreamPrefix(char streamPrefix) {
 	_streamPrefix = streamPrefix;
 }
 
+void cliStream::setCoreId(uint8_t coreId) {
+	_coreId = coreId;
+}
+
+uint8_t cliStream::getCurrentCoreId() {
+	return xPortGetCoreID();
+}
+
 void cliStream::setClientReady(AsyncWebSocketClient * &wsClient) {
 	_clientReady = true;
 	_wsClient = wsClient;
@@ -33,14 +41,23 @@ size_t cliStream::output(const uint8_t *buffer, size_t size)
 		return 0;
 	}
 
-	_wsClientBuffer[0] = _streamPrefix;
+	uint8_t currentCoreId = getCurrentCoreId();
+	_wsClientBuffer[currentCoreId][0] = _streamPrefix;
 	for (size_t idx = 0; idx < size; idx++) {
-		_wsClientBuffer[idx+1] = buffer[idx];
+		_wsClientBuffer[currentCoreId][idx+1] = buffer[idx];
+	}
+	_wsClientBufferWait[currentCoreId] = true;
+
+	if (currentCoreId == _coreId) {
+		for (uint8_t coreIdx = 0; coreIdx < MAX_CPU_CORES; coreIdx ++) {
+			if (_wsClientBufferWait[coreIdx]) {
+				_wsClient->binary(_wsClientBuffer[coreIdx], size + 1);
+				_wsClientBufferWait[coreIdx] = false;
+			}
+		}
 	}
 
-	_wsClient->binary(_wsClientBuffer, size + 1);
-
-	return size;
+	return 1;
 }
 
 uint8_t cliStream::available()

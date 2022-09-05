@@ -9,15 +9,19 @@ class cliStream: public Print
 {
 	private:
 		AsyncWebSocketClient *_wsClient;
-		uint8_t _wsClientBuffer[CLI_STREAM_BUFFER_SIZE+1];
+		uint8_t _coreId;
+		uint8_t _wsClientBuffer[MAX_CPU_CORES][CLI_STREAM_BUFFER_SIZE+1];
+		bool    _wsClientBufferWait[MAX_CPU_CORES];
 		uint8_t _buffer[CLI_STREAM_BUFFER_SIZE];
 		uint8_t _bufferLen = 0;
 		uint8_t _bufferPosition = 0;
-		char _streamPrefix;
-		bool _clientReady = false;
+		char    _streamPrefix;
+		bool    _clientReady = false;
 	public:
 		void setClient(AsyncWebSocketClient * &wsClient);
 		void setStreamPrefix(char streamPrefix);
+		void setCoreId(uint8_t coreId);
+		uint8_t getCurrentCoreId();
 		void setClientReady(AsyncWebSocketClient * &wsClient);
 		void setClientDisconnected();
 		size_t output(const uint8_t *buffer, size_t size);

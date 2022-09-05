@@ -1,14 +1,24 @@
 #define CLI_COMMANDS 8
+#define CLI_MAIN_SET 0
+#define CLI_MODEL_SET 100
+
+/**
+ * @TODO could it be just pointer to cliCommand?
+ */
+bool    CLI_commandReady  = false;
+uint8_t CLI_commandSet    = 0;
+uint8_t CLI_commandCoreId = 0;
+uint8_t CLI_commandIdx    = 0;
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
-  { "help",      cliHelp,       "Show list of methods",              0 },
-  { "wifi",      WiFiInfo,      "WiFi AP information",               0 },
-  { "trim",      cliSetTrim,    "Trim servos",                       3 },
-  { "pwm",       cliHalServo,   "Servo position in microsec(uS)",    2 },
-  { "show",      settingsPrint, "Display current settings",          0 },
-  { "save",      settingsSave,  "Save setting to EEPROM",            0 },
-  { "calib",     cliCalibrate,  "Calibrate [imu|servo|leg]",         1 },
-  { "hal",       cliHal,        "[on|off|state] leg calculation",    1 }
+  { "help",      cliHelp,       "Show list of methods",              0, 0 },
+  { "wifi",      WiFiInfo,      "WiFi AP information",               0, 0 },
+  { "trim",      cliSetTrim,    "Trim servos",                       3, 0 },
+  { "pwm",       cliHalServo,   "Servo position in microsec(uS)",    3, 1 },
+  { "show",      settingsPrint, "Display current settings",          0, 0 },
+  { "save",      settingsSave,  "Save setting to EEPROM",            0, 0 },
+  { "calib",     cliCalibrate,  "Calibrate [imu|servo|leg]",         1, 1 },
+  { "hal",       cliHal,        "[on|off|state] leg calculation",    1, 0 }
 };
 
 #include "model/cli.h"
@@ -34,8 +44,8 @@ bool CLI_get(char * CLI_BUFFER)
         CLI_BUFFER[CLI_charsRead] = CLI_NULLCHAR;       //null terminate our command char array
         if (CLI_charsRead > 0)  {
           CLI_charsRead = 0;                           //charsRead is static, so have to reset
-          cliSerial->print("> ");
-          cliSerial->println(CLI_BUFFER);
+          //cliSerial->print("> ");
+          //cliSerial->println(CLI_BUFFER);
           return true;
         }
         break;
@@ -73,7 +83,7 @@ uint16_t CLI_readUInt16() {
   return (uint16_t)atol(numTextPtr);
 }
 
-void CLI_doCommand()
+void CLI_prepareCommand()
 {
   char * commandName = strtok(CLI_BUFFER, CLI_delimiters);
   /**
@@ -86,8 +96,12 @@ void CLI_doCommand()
         CLI_params = 0;
         return;
       }
-      CLI_params = 0;
-      cliCommands[i].func();
+
+      CLI_commandSet    = CLI_MAIN_SET;
+      CLI_commandCoreId = cliCommands[i].coreId;
+      CLI_commandIdx    = i;
+      CLI_params        = 0;
+      CLI_commandReady  = true;
       return;
     }
   }
@@ -103,8 +117,12 @@ void CLI_doCommand()
         CLI_params = 0;
         return;
       }
-      CLI_params = 0;
-      modelCliCommands[i].func();
+
+      CLI_commandSet    = CLI_MODEL_SET;
+      CLI_commandCoreId = modelCliCommands[i].coreId;
+      CLI_commandIdx    = i;
+      CLI_params        = 0;
+      CLI_commandReady  = true;
       return;
     }
   }
@@ -116,8 +134,29 @@ void CLI_doCommand()
 void updateCLI()
 {
 	if (CLI_get(CLI_BUFFER)){
-	  CLI_doCommand();
+	  CLI_prepareCommand();
 	}
+}
+
+void CLI_doCommand()
+{
+  if (!CLI_commandReady) {
+    return;
+  }
+
+  if (xPortGetCoreID() != CLI_commandCoreId) {
+    return;
+  }
+
+  CLI_commandReady = false;
+
+  if (CLI_commandSet == CLI_MODEL_SET) {
+     modelCliCommands[CLI_commandIdx].func();
+
+     return;
+  }
+
+  cliCommands[CLI_commandIdx].func();
 }
 
 void printAvailableLegs()

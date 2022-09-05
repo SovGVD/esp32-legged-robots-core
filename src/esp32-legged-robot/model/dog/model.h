@@ -163,7 +163,6 @@ servoProfile servoMainProfile = {
 #define POWER_SENSOR         INA219
 #define POWER_SENSOR_ADDRESS 0x40
 
-
 //Cores loop time
 #define LOOP_TIME 4400   // microseconds (10^-6 seconds)
 #define SERVICE_LOOP_TIME 100000

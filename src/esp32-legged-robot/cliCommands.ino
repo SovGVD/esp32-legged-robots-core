@@ -63,6 +63,10 @@ int getAngleIdByAngleTitle(char* angleTitle)
 	return UNKNOWN_ANGLE;
 }
 
+/**
+ * @TODO cliSerial cant work like that on different cores =(
+ * 
+ */
 void cliHalServo()
 {
 	char*    legTitle = CLI_readWord();
@@ -85,27 +89,28 @@ void cliHalServo()
 			switch (angleId) {
 				case ALPHA:
 					legPin = legs[i].hal.pin.alpha;
-					return;
+					break;
 				case BETA:
 					legPin = legs[i].hal.pin.beta;
-					return;
+					break;
 				case GAMMA:
 					legPin = legs[i].hal.pin.gamma;
-					return;
+					break;
 				#if LEG_DOF == 6
 					case DELTA:
 						legPin = legs[i].hal.pin.delta;
-						return;
+						break;
 					case EPSILON:
 						legPin = legs[i].hal.pin.epsilon;
-						return;
+						break;
 					case ZETA:
 						legPin = legs[i].hal.pin.zeta;
-						return;
+						break;
 				#endif
 			}
 		}
 	}
+
 	if (!legFound) {
 		cliSerial->println("Leg is not valid.");
 		printAvailableLegs();
@@ -118,11 +123,17 @@ void cliHalServo()
 	}
 
 	if (isHALEnabled()) {
+		cliSerial->println("Disabling HAL");
 		disableHAL();
 		delay(1000);
+		cliSerial->println("HAL disabled");
 	}
 
+	cliSerial->printf("Pin: %u, pulse: %u - done\n", legPin, us);
+
 	setServoMicroseconds(legPin, us);
+
+	cliSerial->printf("Pin: %u, pulse: %u - done\n", legPin, us);
 }
 
 void cliSetTrim()
