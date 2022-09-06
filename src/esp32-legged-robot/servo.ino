@@ -18,23 +18,21 @@ void initServo()
 }
 
 /**
- * @TODO this is for robot dog!!!
- * Set servo to init position
- *  it is 90, 45, 90
+ * Set servo to init robot calibration position
  */
-void setServoToInit()
+void setMotorsToCalibratePosition()
 {
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
-		legs[i].angle.alpha = M_PI_2;	// @TODO use model config
-		legs[i].angle.beta  = M_PI_4;
-		legs[i].angle.gamma = M_PI_2;
+		legs[i].angle.alpha = legs[i].calibrate.alpha;
+		legs[i].angle.beta  = legs[i].calibrate.beta;
+		legs[i].angle.gamma = legs[i].calibrate.gamma;
 		#if LEG_DOF == 6
-			legs[i].angle.delta    = M_PI_2;	// @TODO use model config
-			legs[i].angle.epsilon  = M_PI_4;
-			legs[i].angle.zeta     = M_PI_2;
+			legs[i].angle.delta    = legs[i].calibrate.delta;
+			legs[i].angle.epsilon  = legs[i].calibrate.epsilon;
+			legs[i].angle.zeta     = legs[i].calibrate.zeta;
 		#endif
 		setLegPWM(legs[i]);
-    doLeg(legs[i]);
+		doLeg(legs[i]);
 	}
 }
 
@@ -50,64 +48,6 @@ void doMotors()
   for (uint8_t i = 0; i < LEG_NUM; i++) {
     doLeg(legs[i]);
   }
-}
-
-bool setAngleDeg(leg &_leg, int angleId, double deg)
-{
-	// TODO limits?
-	double rad = degToRad(deg);
-	switch (angleId) {
-		case ALPHA:
-			_leg.angle.alpha = rad;
-			break;
-		case BETA:
-			_leg.angle.beta  = rad;
-			break;
-		case GAMMA:
-			_leg.angle.gamma = rad;
-			break;
-		#if LEG_DOF == 6
-			case DELTA:
-				_leg.angle.delta = rad;
-				break;
-			case EPSILON:
-				_leg.angle.epsilon  = rad;
-				break;
-			case ZETA:
-				_leg.angle.zeta = rad;
-				break;
-		#endif
-	}
-
-	return true;
-}
-
-double getAngleDeg(leg &_leg, int angleId)
-{
-	switch (angleId) {
-		case ALPHA:
-			return radToDeg(_leg.angle.alpha);
-			break;
-		case BETA:
-			return radToDeg(_leg.angle.beta);
-			break;
-		case GAMMA:
-			return radToDeg(_leg.angle.gamma);
-			break;
-		#if LEG_DOF == 6
-			case DELTA:
-				return radToDeg(_leg.angle.delta);
-				break;
-			case EPSILON:
-				return radToDeg(_leg.angle.epsilon);
-				break;
-			case ZETA:
-				return radToDeg(_leg.angle.zeta);
-				break;
-		#endif
-	}
-
-	return 0.0;
 }
 
 bool servoReady()

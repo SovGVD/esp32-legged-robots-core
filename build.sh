@@ -123,7 +123,7 @@ compile() {
 	echo "#define ROBOT_MODEL ${MODEL}" > $SRC_CONFIG_MODEL
 	$ARDUINO_CLI cache clean
 	$ARDUINO_CLI compile --fqbn $BOARD $SRC -v --build-path $ARDUINO_BUILD
-	rm $SRC_CONFIG_MODEL
+	#rm $SRC_CONFIG_MODEL
 }
 
 upload() {

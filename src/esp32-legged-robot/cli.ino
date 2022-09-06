@@ -11,13 +11,13 @@ uint8_t CLI_commandCoreId = 0;
 uint8_t CLI_commandIdx    = 0;
 
 const cliCommand cliCommands[CLI_COMMANDS] = {
-  { "help",      cliHelp,       "Show list of methods",              0, 0 },
+  { "help",      cliHelp,       "Show list of commands",             0, 0 },
   { "wifi",      WiFiInfo,      "WiFi AP information",               0, 0 },
   { "trim",      cliSetTrim,    "Trim servos",                       3, 0 },
   { "pwm",       cliHalServo,   "Servo position in microsec(uS)",    3, 0 },
   { "show",      settingsPrint, "Display current settings",          0, 0 },
   { "save",      settingsSave,  "Save setting to EEPROM",            0, 0 },
-  { "calib",     cliCalibrate,  "Calibrate [imu|servo|leg]",         1, 0 },
+  { "calib",     cliCalibrate,  "Calibrate [imu|leg]",               1, 0 },
   { "hal",       cliHal,        "[on|off|state] leg calculation",    1, 0 }
 };
 

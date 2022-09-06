@@ -9,7 +9,7 @@ void cliHelp()
 }
 
 /**
- * @TODO cliRunServoCalibrate and/or setServoToInit should disable HAL
+ * @TODO cliRunServoCalibrate and/or setMotorsToCalibratePosition should disable HAL
  */
 void cliCalibrate()
 {
@@ -18,23 +18,12 @@ void cliCalibrate()
 		calibrateIMU();
 		return;
 	}
-	if (strcmp(mode, TITLE_SERVO) == 0) {
-		cliRunServoCalibrate();	// all servos 90deg
-		return;
-	}
 	if (strcmp(mode, TITLE_LEG) == 0) {
-		setServoToInit();	// all servos to init robot position
+		setMotorsToCalibratePosition();	// all servos to init robot position
 		return;
 	}
 	
 	Serial.println("Unknown calibration hardware");
-}
-
-void cliSetServoToInit() {
-  disableHAL();
-  delay(1000); // that it terrible, but we need to wait to make sure HAL disabled
-
-  setServoToInit();
 }
 
 int getAngleIdByAngleTitle(char* angleTitle)

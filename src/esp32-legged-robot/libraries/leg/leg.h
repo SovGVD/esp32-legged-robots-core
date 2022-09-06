@@ -84,6 +84,7 @@ typedef struct {
 	const LR_legSize   size;
 	const LR_legAngle  min;	// setup limits of angles
 	const LR_legAngle  max;	// setup limits of angles
+	const LR_legAngle  calibrate;	// calibrate position
 	LR_legHal          hal;
 	LR_point           body;
 	LR_point           foot;

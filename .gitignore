@@ -4,3 +4,4 @@ src/web/package-lock.json
 src/esp32-legged-robot/web/index.html.gz
 arduino-cli-ide
 src/esp32-legged-robot/config_model.h
+.vscode

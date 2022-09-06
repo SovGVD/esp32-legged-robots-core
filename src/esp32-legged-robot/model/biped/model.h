@@ -72,6 +72,7 @@ leg legs[LEG_NUM] = {
     {  LEG_SIZE_L1,   LEG_SIZE_L2,  LEG_SIZE_L3 },                                        // LEG SIZES (that we need):
     {    0,    0,    0,    0,    0,    0 },                                               // MIN ANGLES FOR EACH JOINT: @TODO this is not in use
     { M_PI, M_PI, M_PI, M_PI, M_PI, M_PI },                                               // MAX ANGLES FOR EACH JOINT: @TODO this is not in use
+    { M_PI_2, M_PI_2, M_PI_4, M_PI_2, M_PI_4, M_PI_2 },
     {
       { M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2 },                                 // hardware middle
       {      0,      1,      2,      3,      4,      5 },                                 // 6 servo channels
@@ -80,7 +81,7 @@ leg legs[LEG_NUM] = {
     },
     {  -LEG_BODY_X,  LEG_BODY_Y,   LEG_BODY_Z },                                          // initial LEG POSITION ON BODY, same as LEG POSITION ON BODY, not sure why I need it
     { -LEG_POINT_X, LEG_POINT_Y, -LEG_POINT_Z },                                          // initial LEG JOING CLOSED TO THE GROUND, same as above, but at least it make sense
-    { M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2 },                                   // leg angles, will be override by HAL update
+    { M_PI_2, M_PI_2, M_PI_4, M_PI_2, M_PI_4, M_PI_2 },                                   // leg angles, will be override by HAL update
     { true, true, false, false, true, true, false, false, false },                        // inverse leg calculations (depends on servo, is servo use gear and leg position): x, y, z and 6 angles
     { true, 0, 0 }                                                                        // FOOT SENSOR: is on ground state, pin, threshold for sensor
   },
@@ -92,6 +93,7 @@ leg legs[LEG_NUM] = {
     { LEG_SIZE_L1, LEG_SIZE_L2,  LEG_SIZE_L3 },
     {    0,    0,    0,    0,    0,    0 },
     { M_PI, M_PI, M_PI, M_PI, M_PI, M_PI },
+    { M_PI_2, M_PI_2, M_PI_4, M_PI_2, M_PI_4, M_PI_2 },
     {
       { M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2 },
       {     15,     14,     13,     12,     11,     10 },
@@ -100,7 +102,7 @@ leg legs[LEG_NUM] = {
     },
     {  LEG_BODY_X,  LEG_BODY_Y,   LEG_BODY_Z },
     { LEG_POINT_X, LEG_POINT_Y, -LEG_POINT_Z },
-    { M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2 },
+    { M_PI_2, M_PI_2, M_PI_4, M_PI_2, M_PI_4, M_PI_2 },
     { false, true, false, true, false, false, true, true, true },
     { true, 0, 0 }
   }
