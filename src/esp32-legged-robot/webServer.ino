@@ -77,6 +77,9 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 		client->text("Ok");
 		clientOnline = true;
 		cliSerial->setClientReady(client);
+		#ifdef CAMERAENABLED
+			mainCamera.setClientReady(client);
+		#endif
 		cliInitHelp();
 	} else if (clientOnline && type == WS_EVT_DATA) {
 		FS_WS_count = 0;  // zero FS counter
@@ -109,6 +112,10 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 
 	} else if(type == WS_EVT_DISCONNECT) {
 		cliSerial->setClientDisconnected();
+		#ifdef CAMERAENABLED
+			mainCamera.setClientDisconnected();
+		#endif
+
 		clientOnline = false;
 	}
 }

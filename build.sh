@@ -83,6 +83,12 @@ buildEnv() {
 
 	# Install other libraries
 	cd $ARDUINO_LIB
+	if [ ! -d "$ARDUINO_LIB/esp32camera" ]; then
+		git clone https://github.com/SovGVD/esp32camera.git
+	fi
+	cd $ARDUINO_LIB/esp32camera
+	git checkout 193ea76a1047cc83b34a8e366241fca0f08e4022
+
 	if [ ! -d "$ARDUINO_LIB/ESPAsyncWebServer" ]; then
 		git clone https://github.com/me-no-dev/ESPAsyncWebServer.git
 	fi

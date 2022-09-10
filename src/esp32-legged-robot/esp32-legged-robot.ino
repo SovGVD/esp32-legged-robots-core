@@ -173,10 +173,9 @@ uint8_t telemetryPackage[P_TELEMETRY_LEN];
 
 #ifdef ESP32CAMERA
 	#define CAMERAENABLED
-	#include "libraries/camera/esp32camera.h"
-	#include "libraries/camera/esp32camera.cpp"
-	esp32camera mainCamera(wsclient, ESP32CAMERA_FRAMESIZE, ESP32CAMERA_FPS, ESP32CAMERA_JPEG_QUALITY);
-	bool mainCameraStream = false
+	#include <esp32camera.h>
+	esp32camera mainCamera;//(wsclient, ESP32CAMERA_FRAMESIZE, ESP32CAMERA_FPS, ESP32CAMERA_JPEG_QUALITY);
+	bool mainCameraStream = false;
 #endif
 
 // CLI
@@ -231,6 +230,14 @@ void servicesSetup()
 		initWebServer();
 		vTaskDelay(100);
 
+		#ifdef ESP32CAMERA
+			mainCamera.setup(
+				ESP32CAMERA_FRAMESIZE,
+				ESP32CAMERA_FPS,
+				ESP32CAMERA_JPEG_QUALITY
+			);
+		#endif
+
 		Serial.println("ServicesSetup complete");
 		serviceLoopReady = true;
 	}
@@ -281,7 +288,7 @@ void servicesLoop() {
 
 	#ifdef CAMERAENABLED
 		if (clientOnline && mainCameraStream) {
-			mainCamera.cameraHandleStream();
+			mainCamera.processFrame();
 		}
 	#endif
 	
