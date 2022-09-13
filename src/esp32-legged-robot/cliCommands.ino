@@ -56,7 +56,7 @@ int getAngleIdByAngleTitle(char* angleTitle)
  * @TODO cliSerial cant work like that on different cores =(
  * 
  */
-void cliHalServo()
+void cliPwmServo()
 {
 	char*    legTitle = CLI_readWord();
 	char*    legAngle = CLI_readWord();
@@ -72,6 +72,54 @@ void cliHalServo()
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		if (strcmp(legs[i].id.title, legTitle) == 0) {
 			servoPulse[i][angleId] = us;
+			return;
+		}
+	}
+
+	cliSerial->println("Leg is not valid.");
+	printAvailableLegs();
+}
+
+void cliAngleServo()
+{
+	char*  legTitle = CLI_readWord();
+	char*  legAngle = CLI_readWord();
+	double angle    = degToRad(CLI_readFloat());
+
+	int angleId = getAngleIdByAngleTitle(legAngle);
+
+	if (angleId == UNKNOWN_ANGLE) {
+		cliSerial->printf("Unknown angle [%s]. \n", legAngle);
+		return;
+	}
+
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		if (strcmp(legs[i].id.title, legTitle) == 0) {
+			switch (angleId) {
+				case ALPHA:
+					legs[i].angle.alpha = angle;
+					break;
+				case BETA:
+					legs[i].angle.beta  = angle;
+					break;
+				case GAMMA:
+					legs[i].angle.gamma = angle;
+					break;
+				#if LEG_DOF == 6
+					case DELTA:
+						legs[i].angle.delta   = angle;
+						break;
+					case EPSILON:
+						legs[i].angle.epsilon = angle;
+						break;
+					case ZETA:
+						legs[i].angle.zeta    = angle;
+						break;
+				#endif
+			}
+			setLegPWM(legs[i]);
+			doLeg(legs[i]);
+
 			return;
 		}
 	}

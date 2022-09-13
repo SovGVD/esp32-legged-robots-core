@@ -1,4 +1,4 @@
-#define CLI_COMMANDS 8
+#define CLI_COMMANDS 9
 #define CLI_MAIN_SET 0
 #define CLI_MODEL_SET 100
 
@@ -14,7 +14,8 @@ const cliCommand cliCommands[CLI_COMMANDS] = {
   { "help",      cliHelp,       "Show list of commands",             0, 0 },
   { "wifi",      WiFiInfo,      "WiFi AP information",               0, 0 },
   { "trim",      cliSetTrim,    "Trim servos",                       3, 0 },
-  { "pwm",       cliHalServo,   "Servo position in microsec(uS)",    3, 0 },
+  { "pwm",       cliPwmServo,   "Servo position in microsec(uS)",    3, 0 },
+  { "angle",     cliAngleServo, "Servo position in degrees",         3, 0 },
   { "show",      settingsPrint, "Display current settings",          0, 0 },
   { "save",      settingsSave,  "Save setting to EEPROM",            0, 0 },
   { "calib",     cliCalibrate,  "Calibrate [imu|leg]",               1, 0 },
