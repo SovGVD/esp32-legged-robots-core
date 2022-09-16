@@ -118,7 +118,6 @@ void cliAngleServo()
 				#endif
 			}
 			setLegPWM(legs[i]);
-			doLeg(legs[i]);
 
 			return;
 		}

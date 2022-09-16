@@ -32,7 +32,6 @@ void setMotorsToCalibratePosition()
 			legs[i].angle.zeta     = legs[i].calibrate.zeta;
 		#endif
 		setLegPWM(legs[i]);
-		doLeg(legs[i]);
 	}
 }
 
