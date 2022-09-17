@@ -6,6 +6,10 @@
   #include "biped/model.h"
 #endif
 
+#if ROBOT_MODEL == MODEL_TANK
+  #include "tank/model.h"
+#endif
+
 #ifndef I2C_SDA
 	#define I2C_SDA 21
 #endif

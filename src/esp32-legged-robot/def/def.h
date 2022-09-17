@@ -16,12 +16,14 @@
  */
 #define MODEL_DOG   100
 #define MODEL_BIPED 101
+#define MODEL_TANK  102
 
 /**
  * Number of legs
  */
 #define BIPEDAL_ROBOT   2
 #define QUADRUPED_ROBOT 4
+#define TANK_ROBOT      2
 
 /**
  * Axis

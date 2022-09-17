@@ -2,13 +2,17 @@ LR_legAngle modelSettingsLoadTrimLeg(modelSettingsAngleTrim t)
 {
 	#ifndef LEG_DOF
 		#error "LEG DOF required"
-	#elif LEG_DOF == 3
+	#elif LEG_DOF == 1
+		return {
+			t.alpha
+		};
+	#elif LEG_DOF > 1
 		return {
 			t.alpha,
 			t.beta,
 			t.gamma
 		};
-	#elif LEG_DOF == 6
+	#elif LEG_DOF > 3
 		return {
 			t.alpha,
 			t.beta,
@@ -34,9 +38,11 @@ void settingsSaveTrim()
 	int value = 0;
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		settings.trim[i].alpha = legs[i].hal.trim.alpha;
-		settings.trim[i].beta  = legs[i].hal.trim.beta;
-		settings.trim[i].gamma = legs[i].hal.trim.gamma;
-		#if LEG_DOF == 6
+		#if LEG_DOF > 1
+			settings.trim[i].beta  = legs[i].hal.trim.beta;
+			settings.trim[i].gamma = legs[i].hal.trim.gamma;
+		#endif
+		#if LEG_DOF > 3
 			settings.trim[i].delta   = legs[i].hal.trim.delta;
 			settings.trim[i].epsilon = legs[i].hal.trim.epsilon;
 			settings.trim[i].zeta    = legs[i].hal.trim.zeta;

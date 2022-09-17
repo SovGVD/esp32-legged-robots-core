@@ -1,8 +1,8 @@
 void initHAL()
 {
-  Serial.print("HAL ");
-  initLegs();
-  Serial.println();
+	Serial.print("HAL ");
+	initLegs();
+	Serial.println();
 }
 
 void initLegs() {
@@ -10,7 +10,7 @@ void initLegs() {
 }
 
 void updateHAL() {
-  updateLegs();
+	updateLegs();
 }
 
 void doHAL() {
@@ -47,10 +47,11 @@ void updateLegs() {
 void setLegPWM(leg &_leg)
 {
 	servoPulse[_leg.id.id][ALPHA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha)));
-	servoPulse[_leg.id.id][BETA]  = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta)));
-	servoPulse[_leg.id.id][GAMMA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma)));
-
-	#if LEG_DOF == 6
+	#if LED_DOF > 1
+		servoPulse[_leg.id.id][BETA]  = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta)));
+		servoPulse[_leg.id.id][GAMMA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma)));
+	#endif
+	#if LEG_DOF > 3
 		servoPulse[_leg.id.id][DELTA]   = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.delta,   _leg.hal.mid.delta,   _leg.hal.trim.delta,   _leg.hal.ratio.delta,   _leg.inverse.delta)));
 		servoPulse[_leg.id.id][EPSILON] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.epsilon, _leg.hal.mid.epsilon, _leg.hal.trim.epsilon, _leg.hal.ratio.epsilon, _leg.inverse.epsilon)));
 		servoPulse[_leg.id.id][ZETA]    = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.zeta,    _leg.hal.mid.zeta,    _leg.hal.trim.zeta,    _leg.hal.ratio.zeta,    _leg.inverse.zeta)));
@@ -60,10 +61,11 @@ void setLegPWM(leg &_leg)
 void runServoCalibrate(leg &_leg)
 {
 	servoPulse[_leg.id.id][ALPHA] = servoMainProfile.deg90;
-	servoPulse[_leg.id.id][BETA]  = servoMainProfile.deg90;
-	servoPulse[_leg.id.id][GAMMA] = servoMainProfile.deg90;
-
-	#if LEG_DOF == 6
+	#if LEG_DOF > 1
+		servoPulse[_leg.id.id][BETA]  = servoMainProfile.deg90;
+		servoPulse[_leg.id.id][GAMMA] = servoMainProfile.deg90;
+	#endif
+	#if LEG_DOF > 3
 		servoPulse[_leg.id.id][DELTA]   = servoMainProfile.deg90;
 		servoPulse[_leg.id.id][EPSILON] = servoMainProfile.deg90;
 		servoPulse[_leg.id.id][ZETA]    = servoMainProfile.deg90;

@@ -5,7 +5,7 @@ bool isServoReady = false;
 
 void initServo()
 {
-	if (xPortGetCoreID() != SERVO_CORE) {
+	if (xPortGetCoreID() != MOTOR_CORE) {
 		return;
 	}
 
@@ -24,9 +24,11 @@ void setMotorsToCalibratePosition()
 {
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		legs[i].angle.alpha = legs[i].calibrate.alpha;
-		legs[i].angle.beta  = legs[i].calibrate.beta;
-		legs[i].angle.gamma = legs[i].calibrate.gamma;
-		#if LEG_DOF == 6
+		#if LEG_DOF > 1
+			legs[i].angle.beta  = legs[i].calibrate.beta;
+			legs[i].angle.gamma = legs[i].calibrate.gamma;
+		#endif
+		#if LEG_DOF > 3
 			legs[i].angle.delta    = legs[i].calibrate.delta;
 			legs[i].angle.epsilon  = legs[i].calibrate.epsilon;
 			legs[i].angle.zeta     = legs[i].calibrate.zeta;

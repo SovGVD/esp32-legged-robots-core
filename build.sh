@@ -114,6 +114,10 @@ setModelAndBoard() {
 			MODEL="MODEL_BIPED"
 			BOARD="esp32:esp32:esp32cam"
 			;;
+		robot-tank)
+			MODEL="MODEL_TANK"
+			BOARD="esp32:esp32:esp32doit-devkit-v1"
+			;;
 		*)
 			compileHelp
 			exit 0
@@ -178,6 +182,7 @@ compileHelp() {
 	echo "Available Commands:"
 	echo "  robot-dog   quadruped dog-like robot"
 	echo "  robot-biped bipedal robot"
+	echo "  robot-tank  tank-like robot"
 }
 
 case $COMMAND in

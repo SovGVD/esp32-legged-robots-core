@@ -17,7 +17,7 @@
 #define LEG_DOF 3
 
 // ESP32 cores config
-#define SERVO_CORE   1
+#define MOTOR_CORE   1
 #define DO_HAL_CORE  1
 
 // PID

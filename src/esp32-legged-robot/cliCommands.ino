@@ -31,13 +31,15 @@ int getAngleIdByAngleTitle(char* angleTitle)
 	if (strcmp(angleTitle, TITLE_ALPHA) == 0) {
 		return ALPHA;
 	}
-	if (strcmp(angleTitle, TITLE_BETA) == 0) {
-		return BETA;
-	}
-	if (strcmp(angleTitle, TITLE_GAMMA) == 0) {
-		return GAMMA;
-	}
-	#if LEG_DOF == 6
+	#if LEG_DOF > 1
+		if (strcmp(angleTitle, TITLE_BETA) == 0) {
+			return BETA;
+		}
+		if (strcmp(angleTitle, TITLE_GAMMA) == 0) {
+			return GAMMA;
+		}
+	#endif
+	#if LEG_DOF > 3
 		if (strcmp(angleTitle, TITLE_DELTA) == 0) {
 			return DELTA;
 		}
@@ -99,13 +101,15 @@ void cliAngleServo()
 				case ALPHA:
 					legs[i].angle.alpha = angle;
 					break;
-				case BETA:
-					legs[i].angle.beta  = angle;
-					break;
-				case GAMMA:
-					legs[i].angle.gamma = angle;
-					break;
-				#if LEG_DOF == 6
+				#if LEG_DOF > 1
+					case BETA:
+						legs[i].angle.beta  = angle;
+						break;
+					case GAMMA:
+						legs[i].angle.gamma = angle;
+						break;
+				#endif
+				#if LEG_DOF > 3
 					case DELTA:
 						legs[i].angle.delta   = angle;
 						break;
@@ -147,13 +151,15 @@ void cliSetTrim()
 				case ALPHA:
 					legs[i].hal.trim.alpha = trimValueRad;
 					return;
-				case BETA:
-					legs[i].hal.trim.beta  = trimValueRad;
-					return;
-				case GAMMA:
-					legs[i].hal.trim.gamma = trimValueRad;
-					return;
-				#if LEG_DOF == 6
+				#if LEG_DOF > 1
+					case BETA:
+						legs[i].hal.trim.beta  = trimValueRad;
+						return;
+					case GAMMA:
+						legs[i].hal.trim.gamma = trimValueRad;
+						return;
+				#endif
+				#if LEG_DOF > 3
 					case DELTA:
 						legs[i].hal.trim.delta   = trimValueRad;
 						return;

@@ -5,7 +5,7 @@ void cliDebug()
     cliDebugAngle();
     return;
   }
-  
+
   cliSerial->printf("Unknown debug option [%s]\n", option);
 }
 
@@ -15,7 +15,7 @@ void cliDebugAngle()
   for (uint8_t i = 0; i < LEG_NUM; i++) {
     #if LEG_DOF == 6
       cliSerial->printf(
-        "%s leg angle {%.2f, %.2f, %.2f, %.2f, %.2f, %.2f}\n",
+        "[%s] angle {%.2f, %.2f, %.2f, %.2f, %.2f, %.2f}\n",
         legs[i].id.title,
         radToDeg(legs[i].angle.alpha),
         radToDeg(legs[i].angle.beta),
@@ -24,13 +24,19 @@ void cliDebugAngle()
         radToDeg(legs[i].angle.epsilon),
         radToDeg(legs[i].angle.zeta)
       );
-    #else
+    #elif LEG_DOF == 3
       cliSerial->printf(
-        "%s leg angle {%.2f, %.2f, %.2f}\n",
+        "[%s] angle {%.2f, %.2f, %.2f}\n",
         legs[i].id.title,
         radToDeg(legs[i].angle.alpha),
         radToDeg(legs[i].angle.beta),
         radToDeg(legs[i].angle.gamma)
+      );
+    #elif LEG_DOF == 1
+      cliSerial->printf(
+        "[%s] angle {%.2f}\n",
+        legs[i].id.title,
+        radToDeg(legs[i].angle.alpha)
       );
     #endif
   }

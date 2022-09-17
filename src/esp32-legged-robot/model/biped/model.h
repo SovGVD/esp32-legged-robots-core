@@ -38,7 +38,7 @@
 #define LEG_DOF 6
 
 // ESP32 cores config
-#define SERVO_CORE   1	// @TODO same as i2c
+#define MOTOR_CORE   1	// @TODO same as i2c
 #define DO_HAL_CORE  1
 
 

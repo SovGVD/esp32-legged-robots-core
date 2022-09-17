@@ -13,7 +13,6 @@
 #include "config_model.h"
 #include "model/model.h"
 #include "config_wifi.h"
-#include "libraries/gait/gait.h"
 #include "model/gait.h"
 #include "model/settings.h"
 #include "libraries/planner/planner.h"
@@ -122,15 +121,14 @@ LR_figure body = {
 
 LR_point bodyBalanceOffset = {0, 0, 0};
 
-
 IK ikLeg(
-	body, 
-  bodyBalanceOffset,
+	body,
+	bodyBalanceOffset,
 	legs
 );
 
 gait gaitLeg(
-	GAIT_CONFIG, 
+	GAIT_CONFIG,
 	legs
 );
 
@@ -198,7 +196,7 @@ void robotSetup()
 		Wire.begin(I2C_SDA, I2C_SCL);
 		Wire.setClock(400000);
 		vTaskDelay(100);
-		
+
 		initServo();
 
 		initHAL();
@@ -341,7 +339,7 @@ void setup()
 	cliStreamObj.setStreamPrefix(P_CLI);
 	cliStreamObj.setClient(wsclient);
 	cliSerial = &cliStreamObj;
-	
+
 	initSettings();
 	vTaskDelay(100);
 

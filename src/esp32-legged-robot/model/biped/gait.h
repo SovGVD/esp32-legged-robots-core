@@ -1,6 +1,7 @@
 /**
  * Bipedal robot gait config
  */
+#include "../../libraries/gait/gait.h"
 
 gaitConfig GAIT_CONFIG = {
   {
@@ -12,5 +13,5 @@ gaitConfig GAIT_CONFIG = {
   40,         // above the ground on swing, 20mm
   1000000,    // swing duration, microseconds
   2000000,    // sequence items duration, microseconds
-  {0.3, 0.7}, // transition progress steps @see transition.h
+  {0.3, 0.7}  // transition progress steps @see transition.h
 };

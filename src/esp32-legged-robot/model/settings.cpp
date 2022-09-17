@@ -5,3 +5,7 @@
 #if ROBOT_MODEL == MODEL_BIPED
   #include "biped/settings.cpp"
 #endif
+
+#if ROBOT_MODEL == MODEL_TANK
+  #include "tank/settings.cpp"
+#endif

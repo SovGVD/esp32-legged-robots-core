@@ -1,8 +1,9 @@
 
 /**
- * Specific for robot config
+ * Quadruped robot gait config
  */
-// Gait
+#include "../../libraries/gait/gait.h"
+
 gaitConfig GAIT_CONFIG = {
   {
     { SWING,  STANCE, STANCE, SWING  },
@@ -13,5 +14,5 @@ gaitConfig GAIT_CONFIG = {
   30,         // above the ground on swing, 25mm
   100000,     // swing duration, microseconds
   200000,     // sequence items duration, microseconds
-  {0.4, 0,4}, // transition progress steps @see transition.h
+  {0.4, 0.4}  // transition progress steps @see transition.h
 };
