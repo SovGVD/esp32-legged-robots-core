@@ -22,20 +22,16 @@ void updateGait() {
 
   bodyUpdate.update();
 
-  for (uint8_t i = 0; i < LEG_NUM; i++) {
-    gaitProgress[i] = gaitLeg.next(i);
-  }
+  gaitLeg.next();
 
-
-  // TODO we need predict next position of robot to begin move of CoM at 0.8 progress of current and until 0.2 progress of future gait
-  //bodyBalance.setBody(bodyBalance.getCenter());
+  //@TODO This is too hard!!! Apply some smooth transaction based on minmal `beforeSwing` progress or something
+  //bodyBalanceOffset = bodyBalance.getOffset(gaitLeg.getState());
 
   if (ticksToNextGaitItem <= 0) {
     ticksToNextGaitItem = ticksPerGaitItem;
     currentGait++;
     if (currentGait >= GAIT_CONFIG.sequenceLength) currentGait = 0;
 
-    // set future position - this needs to be done on 0.8 progress for CoM and balance transition, that is also should include body linear transition
     walkPlanner.predictPosition();
 
     // body linear transition (TODO, include balance here)

@@ -1,6 +1,9 @@
 #ifndef gait_h
 #define gait_h
 
+#include "../leg/leg.h"
+#include "../transition/transition.h"
+
 /* Gait actions */
 #define IGNORE 0 // Leg ignored
 #define STANCE 1 // Leg on ground
@@ -21,12 +24,32 @@ typedef struct gaitConfig_t {
 	double             transitionProgressStep[2]; // @see transition.h
 } gaitConfig;
 
+typedef struct gaitTick_t
+{
+	uint16_t tickCurrent;	// this is from `tickMax` to 0, tickCurrent = tickMax -> 0% of progress, tickCurrent = 0 -> 100%
+	uint16_t tickMax;
+	double   tickProgress;	// 0.0-1.0 (0 to 100%)
+	bool     isInProgress;	// tickCurrent != 0
+	bool     isDone;
+} gaitTick;
+
+
+typedef struct gaitState_t
+{
+	gaitTick progress;		// gait progress
+	gaitTick beforeSwing;	// progress before SWING action
+	gaitTick swing;			// progress of SWING action
+	gaitTick afterSwing;	// progress after SWING action
+} gaitState;
+
+
 class gait
 {
 	public:
 		gait(gaitConfig &config, leg (&legs)[LEG_NUM]);
 		void start(uint8_t legId, LR_point from, LR_point to);
-		double next(uint8_t legId);
+		void next();
+		gaitState* getState();
 	private:
 		gaitConfig *_config;
 		leg        *_legs[LEG_NUM];
@@ -34,9 +57,8 @@ class gait
 		transition           _transition[LEG_NUM];
 		transitionParameters _transitionParams;
 		
-		double   progress[LEG_NUM];
-		uint16_t ticksToStop[LEG_NUM];
-		uint16_t ticksMax[LEG_NUM];
-		uint8_t  _currentGait[LEG_NUM];
+		bool shouldProcess(gaitTick &progress);
+		void markedAsFinished(uint8_t i);
+		gaitState _progress[LEG_NUM];
 };
 #endif

@@ -7,6 +7,7 @@
 #ifndef IK_h
 #define IK_h
 
+#include "math.h"
 #include "../leg/leg.h"
 
 typedef struct {

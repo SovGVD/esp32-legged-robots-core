@@ -80,7 +80,8 @@ leg legs[LEG_NUM] = {
     {  -LEG_BODY_X,  LEG_BODY_Y,   LEG_BODY_Z },                                          // initial LEG POSITION ON BODY, same as LEG POSITION ON BODY, not sure why I need it
     { -LEG_POINT_X, LEG_POINT_Y, -LEG_POINT_Z },                                          // initial LEG JOING CLOSED TO THE GROUND, same as above, but at least it make sense
     { M_PI_2, M_PI_2, M_PI_4, M_PI_2, M_PI_4, M_PI_2 },                                   // leg angles, will be override by HAL update
-    { true, true, true, false, true, false, true, false, false },                         // inverse leg calculations (depends on servo, is servo use gear and leg position): x, y, z and 6 angles
+    { true, true, false, false, true, false, true, false, false },                        // inverse leg calculations (depends on servo, is servo use gear and leg position): x, y, z and 6 angles
+    // not sure about alpha and zeta angles
     { true, 0, 0 }                                                                        // FOOT SENSOR: is on ground state, pin, threshold for sensor
   },
   // right leg
@@ -101,7 +102,7 @@ leg legs[LEG_NUM] = {
     {  LEG_BODY_X,  LEG_BODY_Y,   LEG_BODY_Z },
     { LEG_POINT_X, LEG_POINT_Y, -LEG_POINT_Z },
     { M_PI_2, M_PI_2, M_PI_4, M_PI_2, M_PI_4, M_PI_2 },
-    { true, true, true, false, false, true, false, true, true },
+    { false, true, false, true, false, true, false, true, true },
     { true, 0, 0 }
   }
 };
