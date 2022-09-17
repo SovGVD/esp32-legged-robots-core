@@ -18,6 +18,7 @@ typedef struct gaitConfig_t {
 	double             offTheGround;   // in mm
 	double             swingDuration;  // duration of swing in microseconds (1sec = 1000 millisec, 1sec = 1000000microsec)
 	double             duration;       // duration of gaitSequence item, in microseconds, should be equal or longer than swingDuration
+	double             transitionProgressStep[2]; // @see transition.h
 } gaitConfig;
 
 class gait
@@ -31,7 +32,7 @@ class gait
 		leg        *_legs[LEG_NUM];
 		
 		transition           _transition[LEG_NUM];
-		transitionParameters tParams;
+		transitionParameters _transitionParams;
 		
 		double   progress[LEG_NUM];
 		uint16_t ticksToStop[LEG_NUM];

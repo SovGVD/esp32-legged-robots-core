@@ -121,10 +121,15 @@ LR_figure body = {
 };
 
 
+LR_point bodyBalanceOffset = {0, 0, 0};
+
+
 IK ikLeg(
 	body, 
+  bodyBalanceOffset,
 	legs
 );
+
 gait gaitLeg(
 	GAIT_CONFIG, 
 	legs
@@ -140,7 +145,7 @@ planner walkPlanner(
 
 /* and balance it someway */
 balance bodyBalance(
-	balanceOffset,
+	bodyBalanceOffset,
 	body,
 	legs
 );

@@ -35,18 +35,18 @@ LR_figure transition::swing(double progress)
 	f.position.x = progress*dPx + _param.initialValue.position.x;
 	f.position.y = progress*dPy + _param.initialValue.position.y;
 	
-	if (progress <= TRANSITION_PROGRESS_STEP1) {
-		stepProgress = progress/TRANSITION_PROGRESS_STEP1;
+	if (progress <= _param.transitionProgressStep[0]) {
+		stepProgress = progress/_param.transitionProgressStep[0];
 		dPz = P_z1 - _param.initialValue.position.z;
 		z = _param.initialValue.position.z;
 
-	} else if (progress <= TRANSITION_PROGRESS_STEP2) {
-		stepProgress = (progress - TRANSITION_PROGRESS_STEP1)/(TRANSITION_PROGRESS_STEP2 - TRANSITION_PROGRESS_STEP1);
+	} else if (progress <= _param.transitionProgressStep[1]) {
+		stepProgress = (progress - _param.transitionProgressStep[0])/(_param.transitionProgressStep[1] - _param.transitionProgressStep[0]);
 		dPz = P_z2 - P_z1;
 		z   = P_z1;
 
 	} else {
-		stepProgress = (progress - TRANSITION_PROGRESS_STEP2)/(1 - TRANSITION_PROGRESS_STEP2);
+		stepProgress = (progress - _param.transitionProgressStep[1])/(1 - _param.transitionProgressStep[1]);
 		dPz = _param.targetValue.position.z - P_z2;
 		z   = P_z2;
 

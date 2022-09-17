@@ -76,13 +76,11 @@
 #ifndef transition_h
 #define transition_h
 
-#define TRANSITION_PROGRESS_STEP1 0.4
-#define TRANSITION_PROGRESS_STEP2 0.4
-
 typedef struct {
 	LR_figure initialValue;
 	LR_figure targetValue;
 	double offTheGround;
+	double transitionProgressStep[2];
 } transitionParameters;
 
 class transition

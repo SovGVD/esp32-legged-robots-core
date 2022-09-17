@@ -81,11 +81,12 @@
  * Developed by Gleb Devyatkin (SovGVD) in 2022
  */
 
-#include "IK.h"
+#include "../../IK/IK.h"
 
-IK::IK(LR_figure &bodyObj, leg (&legs)[LEG_NUM])
+IK::IK(LR_figure &bodyObj, LR_point &bodyBalanceOffset, leg (&legs)[LEG_NUM])
 {
-	_body = &bodyObj;
+	_body       = &bodyObj;
+	_bodyOffset = &bodyBalanceOffset;
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		_legs[i] = &legs[i];
 	}
@@ -108,9 +109,9 @@ iksolver IK::solve(uint8_t legId)
 		};
 
 	LR_point legBody = {
-			(_legs[legId]->body.x - _body->position.x) * tmpCos - (_legs[legId]->body.y - _body->position.y) * tmpSin,
-			(_legs[legId]->body.x - _body->position.x) * tmpSin + (_legs[legId]->body.y - _body->position.y) * tmpCos,
-			_legs[legId]->body.z
+			(_legs[legId]->body.x + _bodyOffset->x - _body->position.x) * tmpCos - (_legs[legId]->body.y + _bodyOffset->y - _body->position.y) * tmpSin,
+			(_legs[legId]->body.x + _bodyOffset->x - _body->position.x) * tmpSin + (_legs[legId]->body.y + _bodyOffset->y - _body->position.y) * tmpCos,
+			_legs[legId]->body.z + _bodyOffset->z
 		};
 
 
@@ -129,7 +130,7 @@ iksolver IK::solve(uint8_t legId)
 	double LegPlaneTmpAngle1 = ikAsin(Ly/Lxyz);
 	double LegPlaneTmpAngle2 = ikAcos((sqLxyz+sqL1-sqL2) / (2 * Lxyz * _legs[legId]->size.l1));
 
-	angle.alpha   = (Ly == 0 && Lx == 0) ? M_PI_2 : ikAtan2(Lx,abs(Ly)); if (Ly < 0) { angle.alpha = M_PI - angle.alpha; };	// TODO simplier?
+	angle.alpha   = (Ly == 0 && Lx == 0) ? M_PI_2 : ikAtan2(Lx,abs(Ly)); if (Ly < 0) { angle.alpha = M_PI - angle.alpha; };	// @TODO this is going crazy, should be based on input yaw probably
 	angle.beta    = ikAsin(Lx/Lxz) + M_PI_2;
 	angle.gamma   = M_PI_2 + LegPlaneTmpAngle1 + LegPlaneTmpAngle2;
 	angle.delta   = ikAcos((sqL1 + sqL2 - sqLxyz) / (2 * _legs[legId]->size.l1 * _legs[legId]->size.l2));

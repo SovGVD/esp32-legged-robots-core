@@ -35,15 +35,16 @@ void gait::start(uint8_t legId, LR_point from, LR_point to) {
 	ticksToStop[legId] = _config->swingDuration/_config->loopTime;
 	ticksMax[legId]    = ticksToStop[legId];
 	
-	tParams = {
+	_transitionParams = {
 		{from, {0,0,0}},
 		{to,   {0,0,0}},
-		_config->offTheGround
+		_config->offTheGround,
+		{_config->transitionProgressStep[0], _config->transitionProgressStep[1]}
 	};
 	// TODO add something to compare `point`
 	if (from.x == to.x && from.y == to.y && from.z == to.z) {
 		// don't move if from and to equal
 		ticksToStop[legId] = 0;
 	}
-	_transition[legId].set(tParams);
+	_transition[legId].set(_transitionParams);
 }

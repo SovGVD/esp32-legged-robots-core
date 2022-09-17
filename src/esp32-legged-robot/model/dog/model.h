@@ -40,8 +40,6 @@
 // Balance settings
 //#define HORIZON_LEVEL
 
-LR_point balanceOffset = {0, 0, 0};
-
 leg legs[LEG_NUM] = {
   // LEFT FRONT
   {
@@ -172,6 +170,5 @@ servoProfile servoMainProfile = {
 #define SERVICE_LOOP_TIME 100000
 #define SERVICE_FAST_LOOP_TIME 5000
 
-
-#include "../../libraries/MODEL_dog/IK/IK.h"
+#include "../../libraries/IK/IK.h"
 #include "../../libraries/MODEL_dog/IK/IK.cpp"

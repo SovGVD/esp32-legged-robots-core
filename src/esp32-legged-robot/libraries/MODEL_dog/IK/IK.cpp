@@ -2,6 +2,39 @@
  * Inverse Kinematics for quadruped (four legs) robot
  * Boston Dynamics Spot style
  * 
+ * All axis aligned with MPU9250
+ *
+ *
+ *               |   Z-> Y
+ *               |   |
+ *    --------0-+   v X
+ *            | ...l1
+ *        0---0
+ *
+ *
+ *      beta.                 alpha.
+ *           .                      .
+ *            .  |   ^ Z             .|         ^ Z
+ *             0 |   |          ^  0--0         |
+ *     ------ / -+   X-> Y      .  |  +---  X <-Y
+ *           / ...l2            d  |
+ * gamma...0                    .  0
+ *          \                   .  |
+ *           \ ...l3            v  |
+ *
+ *
+ *
+ *          0---0 (legLH)       0---0 (legLF)
+ *              |               |
+ *           +--0---------------0--+
+ *           |                     |
+ *           |                     |
+ *           |                     |
+ *           +--0---------------0--*
+ *              |               |
+ *          0---0 (legRH)       0---0 (legRF)
+ *
+ *
  * This IK is simple because leg is in one plane.
  * 
  *                _
@@ -32,21 +65,16 @@
  * Developed by Gleb Devyatkin (SovGVD) in 2022
  */
 
-#include "IK.h"
+#include "../../IK/IK.h"
 
-IK::IK(LR_figure &bodyObj, leg (&legs)[LEG_NUM])
+IK::IK(LR_figure &bodyObj, LR_point &bodyBalanceOffset, leg (&legs)[LEG_NUM])
 {
 	_body = &bodyObj;
+	_bodyOffset = &bodyBalanceOffset;
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		_legs[i] = &legs[i];
 	}
 }
-
-//void IK::set(leg &legObj, LR_figure &bodyObj)
-//{
-//	_leg  = &legObj;
-//	_body = &bodyObj;
-//}
 
 iksolver IK::solve(uint8_t legId)
 {
@@ -99,11 +127,6 @@ iksolver IK::solve(uint8_t legId)
 
 	return s;
 }
-
-/*point solveByAngle()
-{
-	// TODO
-}*/
 
 double IK::normalizeAngleRad(double angleRad)
 {

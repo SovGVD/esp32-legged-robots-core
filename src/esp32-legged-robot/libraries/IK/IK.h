@@ -1,15 +1,13 @@
 /**
- * Inverse Kinematics for bipedad (two legs) robot with 6DOF leg
+ * Inverse Kinematics
  *
  * Developed by Gleb Devyatkin (SovGVD) in 2022
  */
- 
- /**
-  * All axis aligned with MPU9250
 
-  */
 #ifndef IK_h
 #define IK_h
+
+#include "../leg/leg.h"
 
 typedef struct {
 	bool isSolved;
@@ -19,11 +17,12 @@ typedef struct {
 class IK
 {
 	public:
-		IK(LR_figure &bodyObj, leg (&legs)[LEG_NUM]);
+		IK(LR_figure &bodyObj, LR_point &bodyBalanceOffset, leg (&legs)[LEG_NUM]);
 		iksolver solve(uint8_t legId);
 		double normalizeAngleRad(double angleRad);
 	private:
 		LR_figure *_body;
+		LR_point  *_bodyOffset;
 		leg       *_legs[LEG_NUM];
 		double    ikAtan2(double x, double y);
 		double    ikAcos(double angleRad);
