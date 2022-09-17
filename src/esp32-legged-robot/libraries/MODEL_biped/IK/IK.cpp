@@ -122,7 +122,7 @@ iksolver IK::solve(uint8_t legId)
 
 	double sqLxz = sq(Lx) + sq(Lz);            // square of hypotenuse (points between leg.body and leg.foot in XZ-plane)
 	double sqLxyz = sq(Ly) + sqLxz;            // square of hypotenuse (points between leg.body and leg.foot in 3D or leg plane)
-	double Lxz = sqrt(Lxz);
+	double Lxz = sqrt(sqLxz);
 	double Lxyz = sqrt(sqLxyz);                // square of hypotenuse (points between leg.body and leg.foot in 3D or leg plane)
 	double sqL1 = sq(_legs[legId]->size.l1);   // square of l1		TODO this is const actually
 	double sqL2 = sq(_legs[legId]->size.l2);   // square of l2		TODO this is const actually
@@ -130,8 +130,8 @@ iksolver IK::solve(uint8_t legId)
 	double LegPlaneTmpAngle2 = ikAcos((sqLxyz+sqL1-sqL2) / (2 * Lxyz * _legs[legId]->size.l1));
 
 	angle.alpha   = (Ly == 0 && Lx == 0) ? M_PI_2 : ikAtan2(Lx,abs(Ly)); if (Ly < 0) { angle.alpha = M_PI - angle.alpha; };	// TODO simplier?
-	angle.beta    = ikAsin(Lx/Lxz);
-	angle.gamma   = M_PI_2 - LegPlaneTmpAngle1 - LegPlaneTmpAngle2;
+	angle.beta    = ikAsin(Lx/Lxz) + M_PI_2;
+	angle.gamma   = M_PI_2 + LegPlaneTmpAngle1 + LegPlaneTmpAngle2;
 	angle.delta   = ikAcos((sqL1 + sqL2 - sqLxyz) / (2 * _legs[legId]->size.l1 * _legs[legId]->size.l2));
 	angle.epsilon = (M_PI_2 - LegPlaneTmpAngle1)+(M_PI - angle.delta - LegPlaneTmpAngle2);
 	angle.zeta    = M_PI - angle.beta;	// backward to angle.beta

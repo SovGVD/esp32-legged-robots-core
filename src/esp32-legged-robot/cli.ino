@@ -1,4 +1,4 @@
-#define CLI_COMMANDS 9
+#define CLI_COMMANDS 10
 #define CLI_MAIN_SET 0
 #define CLI_MODEL_SET 100
 
@@ -19,6 +19,7 @@ const cliCommand cliCommands[CLI_COMMANDS] = {
   { "show",      settingsPrint, "Display current settings",          0, 0 },
   { "save",      settingsSave,  "Save setting to EEPROM",            0, 0 },
   { "calib",     cliCalibrate,  "Calibrate [imu|leg]",               1, 0 },
+  { "debug",     cliDebug,      "Show debug information [angle]",    1, 0 },
   { "hal",       cliHal,        "[on|off|state] leg calculation",    1, 0 }
 };
 
