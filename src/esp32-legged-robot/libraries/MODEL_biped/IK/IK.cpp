@@ -83,8 +83,9 @@
 
 #include "../../IK/IK.h"
 
-IK::IK(LR_figure &bodyObj, LR_point &bodyBalanceOffset, leg (&legs)[LEG_NUM])
+IK::IK(LR_moveVector &vector, LR_figure &bodyObj, LR_point &bodyBalanceOffset, leg (&legs)[LEG_NUM])
 {
+	_vector     = &vector;
 	_body       = &bodyObj;
 	_bodyOffset = &bodyBalanceOffset;
 	for (uint8_t i = 0; i < LEG_NUM; i++) {

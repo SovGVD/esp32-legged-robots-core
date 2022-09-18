@@ -32,11 +32,12 @@ void cliDebugAngle()
         radToDeg(legs[i].angle.beta),
         radToDeg(legs[i].angle.gamma)
       );
-    #elif LEG_DOF == 1
+    #elif LEG_DOF == 2
       cliSerial->printf(
-        "[%s] angle {%.2f}\n",
+        "[%s] angle {%.2f, %.2f}\n",
         legs[i].id.title,
-        radToDeg(legs[i].angle.alpha)
+        radToDeg(legs[i].angle.alpha),
+        radToDeg(legs[i].angle.beta)
       );
     #endif
   }

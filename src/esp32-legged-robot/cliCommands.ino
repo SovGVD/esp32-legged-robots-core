@@ -31,10 +31,10 @@ int getAngleIdByAngleTitle(char* angleTitle)
 	if (strcmp(angleTitle, TITLE_ALPHA) == 0) {
 		return ALPHA;
 	}
-	#if LEG_DOF > 1
-		if (strcmp(angleTitle, TITLE_BETA) == 0) {
-			return BETA;
-		}
+	if (strcmp(angleTitle, TITLE_BETA) == 0) {
+		return BETA;
+	}
+	#if LEG_DOF > 2
 		if (strcmp(angleTitle, TITLE_GAMMA) == 0) {
 			return GAMMA;
 		}
@@ -101,10 +101,10 @@ void cliAngleServo()
 				case ALPHA:
 					legs[i].angle.alpha = angle;
 					break;
-				#if LEG_DOF > 1
-					case BETA:
-						legs[i].angle.beta  = angle;
-						break;
+				case BETA:
+					legs[i].angle.beta  = angle;
+					break;
+				#if LEG_DOF > 2
 					case GAMMA:
 						legs[i].angle.gamma = angle;
 						break;
@@ -151,10 +151,10 @@ void cliSetTrim()
 				case ALPHA:
 					legs[i].hal.trim.alpha = trimValueRad;
 					return;
-				#if LEG_DOF > 1
-					case BETA:
-						legs[i].hal.trim.beta  = trimValueRad;
-						return;
+				case BETA:
+					legs[i].hal.trim.beta  = trimValueRad;
+					return;
+				#if LEG_DOF > 2
 					case GAMMA:
 						legs[i].hal.trim.gamma = trimValueRad;
 						return;

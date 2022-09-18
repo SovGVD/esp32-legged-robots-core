@@ -122,6 +122,7 @@ LR_figure body = {
 LR_point bodyBalanceOffset = {0, 0, 0};
 
 IK ikLeg(
+	vector,
 	body,
 	bodyBalanceOffset,
 	legs

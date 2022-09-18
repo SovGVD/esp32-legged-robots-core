@@ -24,8 +24,8 @@ void setMotorsToCalibratePosition()
 {
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		legs[i].angle.alpha = legs[i].calibrate.alpha;
-		#if LEG_DOF > 1
-			legs[i].angle.beta  = legs[i].calibrate.beta;
+		legs[i].angle.beta  = legs[i].calibrate.beta;
+		#if LEG_DOF > 2
 			legs[i].angle.gamma = legs[i].calibrate.gamma;
 		#endif
 		#if LEG_DOF > 3
@@ -97,5 +97,5 @@ uint16_t angleToPulse(double angleRad) {
   }
 
 
-  return 1500;  // TODO actualy we should fail here...
+  return servoMainProfile.deg90;  // TODO actualy we should fail here...
 }

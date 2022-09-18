@@ -1,5 +1,4 @@
 void initFailsafe () {
-  
 }
 
 void updateFailsafe() {
@@ -7,7 +6,7 @@ void updateFailsafe() {
     setFailsafe();
     return;
   }
-  
+
   FS_FAIL = false;
 }
 
@@ -17,6 +16,6 @@ void setFailsafe() {
   vector.move.z     = 0;
   vector.rotate.yaw = 0;
 
-  FS_WS_count = FS_WS_THR;  
+  FS_WS_count = FS_WS_THR;
   FS_FAIL     = true;
 }

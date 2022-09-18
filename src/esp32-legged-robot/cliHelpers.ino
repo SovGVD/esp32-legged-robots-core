@@ -20,11 +20,12 @@ void settingsPrintTrim()
 				radToDeg(legs[i].hal.trim.beta),
 				radToDeg(legs[i].hal.trim.gamma)
 			);
-		#elif LEG_DOF == 1
+		#elif LEG_DOF == 2
 			cliSerial->printf(
-				"[%s] trim {%.2f}\n",
+				"[%s] trim {%.2f, %.2f}\n",
 				legs[i].id.title,
-				radToDeg(legs[i].hal.trim.alpha)
+				radToDeg(legs[i].hal.trim.alpha),
+				radToDeg(legs[i].hal.trim.beta)
 			);
 		#endif
 	}

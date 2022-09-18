@@ -76,6 +76,7 @@ leg legs[LEG_NUM] = {
       {      0,      1,      2,      3,      4,      5 },                                 // 6 servo channels
       {      0,      0,      0,      0,      0,      0 },                                 // servo middle trim (this will be override anyway with setup trim... why do I need it???)
       {      1,      1,      1,      1,      1,      1 }                                  // gear ratio, first and last one is 16 groves on servo and 24 groves on leg
+      // @TODO WOW... i did not setup gear ratio correcly =(((
     },
     {  -LEG_BODY_X,  LEG_BODY_Y,   LEG_BODY_Z },                                          // initial LEG POSITION ON BODY, same as LEG POSITION ON BODY, not sure why I need it
     { -LEG_POINT_X, LEG_POINT_Y, -LEG_POINT_Z },                                          // initial LEG JOING CLOSED TO THE GROUND, same as above, but at least it make sense

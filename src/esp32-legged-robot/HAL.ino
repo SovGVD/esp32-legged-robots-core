@@ -47,8 +47,8 @@ void updateLegs() {
 void setLegPWM(leg &_leg)
 {
 	servoPulse[_leg.id.id][ALPHA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha)));
-	#if LED_DOF > 1
-		servoPulse[_leg.id.id][BETA]  = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta)));
+	servoPulse[_leg.id.id][BETA]  = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta)));
+	#if LED_DOF > 2
 		servoPulse[_leg.id.id][GAMMA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma)));
 	#endif
 	#if LEG_DOF > 3
@@ -61,8 +61,8 @@ void setLegPWM(leg &_leg)
 void runServoCalibrate(leg &_leg)
 {
 	servoPulse[_leg.id.id][ALPHA] = servoMainProfile.deg90;
-	#if LEG_DOF > 1
-		servoPulse[_leg.id.id][BETA]  = servoMainProfile.deg90;
+	servoPulse[_leg.id.id][BETA]  = servoMainProfile.deg90;
+	#if LEG_DOF > 2
 		servoPulse[_leg.id.id][GAMMA] = servoMainProfile.deg90;
 	#endif
 	#if LEG_DOF > 3
@@ -78,8 +78,8 @@ double limitServoAngle(double angle)
   //      also this is nothing about real mechanical limits, so need TODO
   
   // default servo can handle angles from 0 to 180 (PI) degrees only
-  if (angle < 0) angle = 0;
-  if (angle > PI) angle = PI;
+  if (angle < 0.0) angle = 0.0;
+  if (angle > M_PI) angle = M_PI;
 
   return angle;
 }

@@ -11,8 +11,8 @@ void initServoHAL() {
 void doLeg(leg &_leg)
 {
 	pwm.writeMicroseconds(_leg.hal.pin.alpha, servoPulse[_leg.id.id][ALPHA]);
-	#if LEG_DOF > 1
-		pwm.writeMicroseconds(_leg.hal.pin.beta,  servoPulse[_leg.id.id][BETA]);
+	pwm.writeMicroseconds(_leg.hal.pin.beta,  servoPulse[_leg.id.id][BETA]);
+	#if LEG_DOF > 2
 		pwm.writeMicroseconds(_leg.hal.pin.gamma, servoPulse[_leg.id.id][GAMMA]);
 	#endif
 	#if LEG_DOF > 3

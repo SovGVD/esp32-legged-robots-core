@@ -10,6 +10,7 @@
 #define SD1306   102
 #define ESP32PWM 103
 #define INA219   104
+#define DCMOTOR  105
 
 /**
  * Robot models
@@ -19,7 +20,7 @@
 #define MODEL_TANK  102
 
 /**
- * Number of legs
+ * Number of legs/tracks
  */
 #define BIPEDAL_ROBOT   2
 #define QUADRUPED_ROBOT 4
