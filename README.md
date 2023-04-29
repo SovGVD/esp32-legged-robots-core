@@ -3,10 +3,10 @@ Universal code for any kind of legged robots (not only legged now) and mobile fr
 
 ## Supported legged robots
 
- - [ ] biped - 2 legs, 6 DOF, PCA9685 (WIP, mecanical issues, required redesign to continue)
- - [x] quadruped - 4 legs, 3 DOF, ESP32PWM
- - [ ] hexapod - 6 legs, 3 DOF, PCA9685 (WIP, nothing tested)
- - [x] tank - 2 tracks, DC motor driver e.g. MX1508 (unstable speed due to using gaits that is make no sense for tank)
+ - [ ] biped - ESP32CAM, 2 legs, 6 DOF, PCA9685 (WIP, mecanical issues, required redesign to continue)
+ - [x] quadruped - ESP32, 4 legs, 3 DOF, ESP32PWM
+ - [ ] hexapod - ESP32CAM, 6 legs, 3 DOF, PCA9685 (WIP, nothing tested)
+ - [x] tank - ESP32, 2 tracks, DC motor driver e.g. MX1508 (unstable speed due to using gaits that is make no sense for tank)
 
 ## Supported boards and sensors
 
