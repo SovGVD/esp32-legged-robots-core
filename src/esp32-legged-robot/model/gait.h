@@ -9,3 +9,7 @@
 #if ROBOT_MODEL == MODEL_TANK
   #include "tank/gait.h"
 #endif
+
+#if ROBOT_MODEL == MODEL_HEXAPOD
+  #include "hexapod/gait.h"
+#endif

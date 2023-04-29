@@ -15,9 +15,10 @@
 /**
  * Robot models
  */
-#define MODEL_DOG   100
-#define MODEL_BIPED 101
-#define MODEL_TANK  102
+#define MODEL_DOG     100
+#define MODEL_BIPED   101
+#define MODEL_TANK    102
+#define MODEL_HEXAPOD 103
 
 /**
  * Number of legs/tracks
@@ -25,6 +26,7 @@
 #define BIPEDAL_ROBOT   2
 #define QUADRUPED_ROBOT 4
 #define TANK_ROBOT      2
+#define HEXAPOD_ROBOT   6
 
 /**
  * Axis

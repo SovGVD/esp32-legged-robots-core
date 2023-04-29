@@ -119,6 +119,10 @@ setModelAndBoard() {
 			MODEL="MODEL_TANK"
 			BOARD="esp32:esp32:esp32doit-devkit-v1"
 			;;
+		robot-hexapod)
+			MODEL="MODEL_HEXAPOD"
+			BOARD="esp32:esp32:esp32cam"
+			;;
 		*)
 			compileHelp
 			exit 0
@@ -181,9 +185,10 @@ compileHelp() {
 	echo "  ./build.sh compile robot-dog"
 	echo ""
 	echo "Available Commands:"
-	echo "  robot-dog   quadruped dog-like robot"
-	echo "  robot-biped bipedal robot"
-	echo "  robot-tank  tank-like robot"
+	echo "  robot-dog      quadruped dog-like robot"
+	echo "  robot-biped    bipedal robot"
+	echo "  robot-tank     tank-like robot"
+	echo "  robot-hexapod  hexapod robot"
 }
 
 case $COMMAND in

@@ -9,3 +9,7 @@
 #if ROBOT_MODEL == MODEL_TANK
   #include "tank/cli.cpp"
 #endif
+
+#if ROBOT_MODEL == MODEL_HEXAPOD
+  #include "hexapod/cli.cpp"
+#endif
