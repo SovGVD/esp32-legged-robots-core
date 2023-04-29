@@ -89,13 +89,14 @@ buildEnv() {
 	cd $ARDUINO_LIB/esp32camera
 	git checkout 193ea76a1047cc83b34a8e366241fca0f08e4022
 
+	cd $ARDUINO_LIB
 	if [ ! -d "$ARDUINO_LIB/ESPAsyncWebServer" ]; then
 		git clone https://github.com/me-no-dev/ESPAsyncWebServer.git
 	fi
 	cd $ARDUINO_LIB/ESPAsyncWebServer
 	git checkout f71e3d427b5be9791a8a2c93cf8079792c3a9a26
 
-	cd $ARDUINO_LIB/
+	cd $ARDUINO_LIB
 	if [ ! -d "$ARDUINO_LIB/AsyncTCP" ]; then
 		git clone https://github.com/me-no-dev/AsyncTCP.git
 	fi
