@@ -54,18 +54,21 @@ buildEnv() {
 	mkdir -p $ARDUINO_USER
 	mkdir -p $ARDUINO_BUILD
 
-	# Copy empty config file
-	cp -r .arduino-ide-default.yaml $ARDUINO_CONFIG
-
 	echo "Build environment in: $CWD"
 	echo "Arduino path: $ARDUINO_PATH"
 
 	$ARDUINO_CLI config set board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+	echo "config: esp packages"
 	$ARDUINO_CLI config set directories.data $ARDUINO_DATA
+	echo "config: dir data"
 	$ARDUINO_CLI config set directories.downloads $ARDUINO_DOWNLOADS
+	echo "config: dir downloads"
 	$ARDUINO_CLI config set directories.user $ARDUINO_USER
+	echo "config: dir use"
 	$ARDUINO_CLI config set library.enable_unsafe_install true
+	echo "config: set unsafe"
 	$ARDUINO_CLI config dump
+	echo "Config steps done"
 
 	# Install ESP32
 	if [ ! -d "$ARDUINO_DATA/packages/esp32/hardware/esp32/1.0.6" ]; then
@@ -73,13 +76,18 @@ buildEnv() {
 		$ARDUINO_CLI core install esp32:esp32@1.0.6
 		$ARDUINO_CLI core list
 		$ARDUINO_CLI board listall
+		echo "ESP32 core done"
 	fi
 
 	# Install libraries
 	$ARDUINO_CLI lib install ESP32_ISR_Servo@1.1.0
+	echo "ESP32_IRS installed"
 	$ARDUINO_CLI lib install MPU9250_WE@1.1.3
+	echo "MPI9250 installed"
 	$ARDUINO_CLI lib install INA219_WE@1.3.1
+	echo "INA219 installed"
 	$ARDUINO_CLI lib install "Adafruit PWM Servo Driver Library"@2.4.0
+	echo "PWM installed"
 
 	# Install other libraries
 	cd $ARDUINO_LIB
@@ -88,6 +96,7 @@ buildEnv() {
 	fi
 	cd $ARDUINO_LIB/esp32camera
 	git checkout 193ea76a1047cc83b34a8e366241fca0f08e4022
+	echo "ESP32cam installed"
 
 	cd $ARDUINO_LIB
 	if [ ! -d "$ARDUINO_LIB/ESPAsyncWebServer" ]; then
@@ -95,6 +104,7 @@ buildEnv() {
 	fi
 	cd $ARDUINO_LIB/ESPAsyncWebServer
 	git checkout f71e3d427b5be9791a8a2c93cf8079792c3a9a26
+	echo "ESP async server installed"
 
 	cd $ARDUINO_LIB
 	if [ ! -d "$ARDUINO_LIB/AsyncTCP" ]; then
@@ -102,6 +112,8 @@ buildEnv() {
 	fi
 	cd $ARDUINO_LIB/AsyncTCP
 	git checkout ca8ac5f919d02bea07b474531981ddbfd64de97c
+	echo "Async TCP installed"
+
 	cd $CWD
 }
 
