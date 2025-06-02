@@ -26,7 +26,7 @@ installArduinoCli()
 {
 	# Create folders for Arduino CLI
 	mkdir -p $ARDUINO_BIN_DIR
-	curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=$ARDUINO_BIN_DIR sh
+	curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=$ARDUINO_BIN_DIR sh -s 1.2.0
 }
 
 buildWebClientEnv()
