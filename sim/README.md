@@ -19,7 +19,7 @@ python examples/build_model.py       # regenerate models/dog.xml after editing p
 | Part | Source | Notes |
 |---|---|---|
 | Geometry: hips at (±39.5, ±70.5, 0) mm, L2 = 51.9, L3 = 50, neutral foot (±56, ±70.5, −80) | `model/dog/model.h`, checked against the STLs | The parts confirm all of these, including the "not sure" hip Y (see below) |
-| Hip pitch axis 9.1 mm below the roll axis (`hip_pitch_drop`) | STLs (shoulder bracket) | **Not in the firmware IK**, which assumes 0. Set it to 0 in `legsim/params.py` for the firmware's ideal geometry |
+| Hip pitch axis level with the roll axis (`hip_pitch_drop` = 0) | STLs + photos (shoulder bracket) | Same as the firmware IK. The knob stays in `legsim/params.py` to try a misaligned build |
 | 3 joints per leg: alpha = hip roll, beta = hip pitch, gamma = knee | firmware IK | Joint angles map 1:1 to firmware leg angles (see below) |
 | Masses: torso 280 g, shoulder 20 g (incl. hip-pitch servo), upper leg 3.5 g, lower leg 16.1 g (incl. knee servo); total 438 g | STL volumes + datasheets | Centres of mass and inertias come from the placed STL parts and servo/battery boxes. A scale reading would only be a check |
 | MG90D servo: 0.21 N·m stall, 0.10 s/60°, ~4° proportional band, 0.5° deadband, 50 Hz pulse latching, torque-speed line, rotor inertia, gear friction | datasheet + estimates | Hip roll gets the 2:1 gear: twice the torque, half the speed |
@@ -43,7 +43,7 @@ geometry. Each STL's origin turned out to sit on a joint axis:
 | `leg_bottom` | knee servo pocket with the shaft ~50 mm from the foot ring, L3 |
 | `legs_holder_part1/2` | roll bearings (12 mm) at x = ±39.5 on the roll axis; alpha servo gear at x = ±11 (28.5 mm centre distance, 2:1 with the shoulder sector) |
 | `body` | 86.6 mm long; its ends meet the inner holder plates, which puts the hip pitch axis at y = ±70.4, so the "not sure" 70.5 is right |
-| `shoulder_part2` | the bracket holds the hip-pitch servo inside a C around the roll axis; its shaft is ~9 mm below the roll axis |
+| `shoulder_part2` | the U bracket lies in the plane of its gear sector and holds the hip-pitch servo centred on the roll axis, shaft pointing outward, so the pitch axis is level with the roll axis |
 
 Estimated, not visible in the parts: where the hip-pitch servo sits in the
 bracket (±1.5 mm), how leg_top / knee servo / leg_bottom stack sideways, and
@@ -153,12 +153,10 @@ needs `mjpython`, which conflicts with pygame's window.
 
 * Masses are estimates from STL volumes (20 % infill); inertias come from
   the meshes as shells, which suits printed parts.
-* **Hip pitch drop:** the firmware IK puts the hip pitch axis on the roll axis
-  (L1 = 0), but the printed bracket holds it ~9 mm lower. The sim models the
-  drop, so with the same pulses it stands ~9 mm taller than the IK expects and
-  the feet sit ~2 mm further out. Sideways (L1) the leg plane is within ~2 mm
-  of the roll axis, so 0 is fine there. Worth confirming with a ruler, and if
-  it holds, adding to the IK as a fixed offset along the leg.
+* **Hip geometry:** the hip pitch axis is level with the roll axis and the
+  leg plane is within ~2 mm of it sideways, so the firmware IK's L1 = 0 holds.
+  `hip_pitch_drop` can model a pitch axis below the roll axis if a build
+  differs (the sim then stands that much taller than the IK expects).
 * Servo voltage is assumed ~5 V (datasheet 4.8 V values).
 * With the firmware gait the drift is still there: ~13 mm/s backward when
   trotting nearly in place and ~35-45 mm/s backward while strafing at full

@@ -18,9 +18,13 @@ the sim link it belongs to, with the link axes parallel to the body axes
 (X right, Y forward, Z up) at the zero pose. Other legs are mirrored (left)
 and/or turned around (hind) from it; see `leg_transform`.
 
-Estimates (not visible in the parts): the hip-pitch servo shaft position in
-the shoulder bracket (HIP_PITCH_DROP below the roll axis, SHAFT_FROM_GEAR
-along it), and the stacking of leg_top, the knee servo and leg_bottom.
+The shoulder bracket (shoulder_part2) lies in the same plane as its gear
+sector (shoulder_part1): the hip-pitch servo sits in the U with its shaft
+pointing sideways out of the open side, centred across the U, so the hip
+pitch axis is level with the roll axis (Gleb, 2026-11-02).
+
+Estimates (not visible in the parts): the hip-pitch shaft position along the
+roll axis (SHAFT_FROM_GEAR), and the stacking of leg_top, the knee servo and leg_bottom.
 """
 
 import numpy as np
@@ -42,9 +46,11 @@ SERVO_MASS = 13.4                       # MG90D, g
 SERVO_HALF = (11.4, 6.1, 11.35)         # MG90 body half sizes: length, width, height (mm)
 SERVO_SHAFT_FROM_END = 5.9              # shaft centre from one end of the body, mm
 
-# Shoulder bracket (shoulder_part2) frame: z along the roll axis, y radial.
+# Shoulder bracket (shoulder_part2) frame: z along the roll axis, -y = servo shaft direction
+# (the U base is at y ~ +16), servo centred at x = 0.
 SHAFT_FROM_GEAR = 10.9                  # hip pitch shaft, mm along the roll axis from the gear end [est]
-HIP_PITCH_DROP = 9.1                    # hip pitch shaft below the roll axis, mm [est]
+HIP_PITCH_DROP = 0.0                    # hip pitch shaft below the roll axis, mm: level (centred in the U)
+BRACKET_BASE = 15.4                     # inner face of the U base, mm from the roll axis [stl]
 
 BODY_Z = -7.6                           # middle frame origin below the roll axes, mm (lowered after photos) [est]
 
@@ -101,9 +107,14 @@ def shoulder_parts(visual_drop):
     firmware geometry with the pitch axis on the roll axis, 0 when it models the drop).
     """
     t = np.array([0, SHAFT_FROM_GEAR, visual_drop])
-    r2 = _rot([(1, 0, 0), (0, 0, -1), (0, 1, 0)])     # bracket: radial (y) down, z along the roll axis
-    r1 = _rot([(0, 0, -1), (-1, 0, 0), (0, 1, 0)])    # gear sector: teeth (y) toward the alpha servo
-    servo_c = np.array([0, SHAFT_FROM_GEAR - 5 - SERVO_HALF[0], -HIP_PITCH_DROP + visual_drop])
+    # bracket and gear sector share one frame: the sector's plate is screwed flat onto the
+    # bracket's gear-end upright. Bracket -y (servo shaft) points outward, sector teeth
+    # (its y) point toward the alpha servo, z along the roll axis.
+    r1 = _rot([(0, 0, -1), (-1, 0, 0), (0, 1, 0)])
+    r2 = r1
+    # servo bottom on the U base, shaft outward along +X
+    servo_x = -BRACKET_BASE + SERVO_HALF[2]
+    servo_c = np.array([servo_x, SHAFT_FROM_GEAR - 5 - SERVO_HALF[0], -HIP_PITCH_DROP + visual_drop])
     return [
         ("mesh", "shoulder_part2", r2, t),
         ("mesh", "shoulder_part1", r1, t),

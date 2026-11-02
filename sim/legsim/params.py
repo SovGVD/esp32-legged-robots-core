@@ -52,10 +52,10 @@ class Geometry:
     l1: float = 0.0             # hip offset; 0 in the firmware IK
     l2: float = 51.9            # upper leg (hip pitch axis to knee axis)
     l3: float = 50.0            # lower leg (knee axis to foot point)
-    # Hip pitch axis below the roll axis, along the leg (the shoulder bracket holds the
-    # hip-pitch servo ~9 mm under the roll bearings). The firmware IK assumes 0, so the
-    # sim deliberately differs from it here; set 0 to get the firmware's ideal geometry [stl, est]
-    hip_pitch_drop: float = 9.1
+    # Hip pitch axis below the roll axis, along the leg. The bracket holds the hip-pitch
+    # servo centred on the roll axis, so 0, like the firmware IK; kept as a knob for
+    # testing a misaligned build [stl, photos]
+    hip_pitch_drop: float = 0.0
     # Collision shapes; the visuals are the STL meshes (assembly.py) [stl]
     torso_size: tuple = (94.0, 171.0, 31.4)   # legs holders: 94 wide, outer plates 171 apart, z -22..9.4
     torso_z_offset: float = -6.3              # torso box centre relative to the roll axes

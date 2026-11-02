@@ -10,6 +10,8 @@ P = DogParams()
 GEO = P.geometry
 IDEAL = DogParams().geometry          # the firmware's geometry: pitch axis on the roll axis
 IDEAL.hip_pitch_drop = 0.0
+DROPPED = DogParams().geometry        # a build with the pitch axis below the roll axis
+DROPPED.hip_pitch_drop = 9.1
 
 
 @pytest.mark.parametrize("leg", P.legs, ids=lambda l: l.name)
@@ -45,7 +47,8 @@ def test_mjcf_matches_fk():
 
 @pytest.mark.parametrize("leg", P.legs, ids=lambda l: l.name)
 def test_hip_pitch_drop_offsets_feet(leg):
-    """With the STL geometry the foot lands hip_pitch_drop further along the leg's down direction."""
+    """With a hip pitch drop the foot lands hip_pitch_drop further along the leg's down direction."""
+    GEO = DROPPED
     foot = default_foot(GEO, leg)
     a = firmware_ik(GEO, leg, foot)
     got = forward_kinematics(GEO, leg, leg_angles_to_q(*a)) + hip_position(GEO, leg)
