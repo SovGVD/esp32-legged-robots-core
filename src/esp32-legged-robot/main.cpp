@@ -91,11 +91,7 @@ static void servicesSetup()
 		vTaskDelay(100);
 
 		#ifdef ESP32CAMERA
-			mainCamera.setup(
-				ESP32CAMERA_FRAMESIZE,
-				ESP32CAMERA_FPS,
-				ESP32CAMERA_JPEG_QUALITY
-			);
+			initCameraStream();
 		#endif
 
 		Serial.println("ServicesSetup complete");

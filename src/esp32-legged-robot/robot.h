@@ -133,6 +133,9 @@ void WiFiInfo();
 void initWebServer();
 void updateWebServer();
 void pMove(uint8_t *data, size_t len);
+#ifdef ESP32CAMERA
+void initCameraStream();   // web_server.cpp, needs the esp32camera library
+#endif
 void int16ToBytes(int value, uint8_t _offset);
 void pTelemetry();
 void pCli(uint8_t *data, size_t len);
