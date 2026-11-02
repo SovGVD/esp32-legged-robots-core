@@ -82,3 +82,15 @@ void lrLegPulses(const leg &l, uint8_t dof, const servoProfile &profile, uint16_
 		pulses[j] = lrAngleToPulse(profile, lrLimitServoAngle(lrHalAngle(angle[j], mid[j], trim[j], ratio[j], inv[j])));
 	}
 }
+
+uint8_t lrLegPin(const leg &l, uint8_t joint)
+{
+	switch (joint) {
+		case 0:  return l.hal.pin.alpha;
+		case 1:  return l.hal.pin.beta;
+		case 2:  return l.hal.pin.gamma;
+		case 3:  return l.hal.pin.delta;
+		case 4:  return l.hal.pin.epsilon;
+		default: return l.hal.pin.zeta;
+	}
+}

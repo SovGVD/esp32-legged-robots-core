@@ -10,66 +10,70 @@
  */
 #ifdef PWM_CONTROLLER_ADDRESS_2
 	#define PCA9685_BOARDS 2
-	static Adafruit_PWMServoDriver pwmBoards[PCA9685_BOARDS] = {
-		Adafruit_PWMServoDriver(PWM_CONTROLLER_ADDRESS, Wire),
-		Adafruit_PWMServoDriver(PWM_CONTROLLER_ADDRESS_2, Wire)
-	};
 #else
 	#define PCA9685_BOARDS 1
-	static Adafruit_PWMServoDriver pwmBoards[PCA9685_BOARDS] = {
-		Adafruit_PWMServoDriver(PWM_CONTROLLER_ADDRESS, Wire)
-	};
 #endif
 
-static void writeChannel(uint8_t channel, uint16_t us)
-{
-	uint8_t board = channel / 16;
-	if (board >= PCA9685_BOARDS) {
-		return;   // reported by checkServoPins() at boot
-	}
-	pwmBoards[board].writeMicroseconds(channel % 16, us);
-}
+class Pca9685ServoBus : public ServoBus {
+	public:
+		const char *name() const override { return "PCA9685 "; }
 
-void initServoHAL() {
-	Serial.printf("PCA9685 x%u ", PCA9685_BOARDS);
-	for (uint8_t i = 0; i < PCA9685_BOARDS; i++) {
-		pwmBoards[i].begin();
-		pwmBoards[i].setOscillatorFrequency(27000000);  // The int.osc. is closer to 27MHz
-		pwmBoards[i].setPWMFreq(SERVO_FREQ);  // This is the maximum PWM frequency of servo
-	}
-	enableServos();
-}
+		bool begin(const uint8_t *channels, uint8_t count) override
+		{
+			Serial.printf("x%u ", PCA9685_BOARDS);
+			_count = count;
+			for (uint8_t i = 0; i < count; i++) {
+				_channels[i] = channels[i];
+			}
+			for (uint8_t i = 0; i < PCA9685_BOARDS; i++) {
+				_boards[i].begin();
+				_boards[i].setOscillatorFrequency(27000000);  // The int.osc. is closer to 27MHz
+				_boards[i].setPWMFreq(SERVO_FREQ);
+			}
+			setEnabled(true);
+			return true;
+		}
 
-void doLeg(leg &_leg)
-{
-	writeChannel(_leg.hal.pin.alpha, servoPulse[_leg.id.id][ALPHA]);
-	writeChannel(_leg.hal.pin.beta,  servoPulse[_leg.id.id][BETA]);
-	#if LEG_DOF > 2
-		writeChannel(_leg.hal.pin.gamma, servoPulse[_leg.id.id][GAMMA]);
-	#endif
-	#if LEG_DOF > 3
-		writeChannel(_leg.hal.pin.delta,   servoPulse[_leg.id.id][DELTA]);
-		writeChannel(_leg.hal.pin.epsilon, servoPulse[_leg.id.id][EPSILON]);
-		writeChannel(_leg.hal.pin.zeta,    servoPulse[_leg.id.id][ZETA]);
-	#endif
-}
+		void write(uint8_t index, uint16_t us) override
+		{
+			if (index >= _count) {
+				return;
+			}
+			uint8_t channel = _channels[index];
+			uint8_t board   = channel / 16;
+			if (board >= PCA9685_BOARDS) {
+				return;   // reported by the pin check at boot
+			}
+			_boards[board].writeMicroseconds(channel % 16, us);
+		}
 
-void disableServos()
-{
-	for (uint8_t i = 0; i < PCA9685_BOARDS; i++) {
-		pwmBoards[i].sleep();
-	}
-}
+		void setEnabled(bool enabled) override
+		{
+			for (uint8_t i = 0; i < PCA9685_BOARDS; i++) {
+				if (enabled) {
+					_boards[i].wakeup();
+				} else {
+					_boards[i].sleep();
+				}
+			}
+		}
 
-void enableServos()
-{
-	for (uint8_t i = 0; i < PCA9685_BOARDS; i++) {
-		pwmBoards[i].wakeup();
-	}
-}
+		uint8_t channelLimit() const override { return PCA9685_BOARDS * 16; }
 
-uint8_t servoChannelLimit()
+	private:
+		Adafruit_PWMServoDriver _boards[PCA9685_BOARDS] = {
+			Adafruit_PWMServoDriver(PWM_CONTROLLER_ADDRESS, Wire),
+			#ifdef PWM_CONTROLLER_ADDRESS_2
+				Adafruit_PWMServoDriver(PWM_CONTROLLER_ADDRESS_2, Wire),
+			#endif
+		};
+		uint8_t _channels[LEG_NUM * LEG_DOF] = {};
+		uint8_t _count = 0;
+};
+
+ServoBus &servoBus()
 {
-	return PCA9685_BOARDS * 16;
+	static Pca9685ServoBus bus;
+	return bus;
 }
 #endif

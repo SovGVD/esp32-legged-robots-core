@@ -11,7 +11,8 @@
 
 
 #define PCA9685  100
-#define MPU9650  101
+#define MPU9250  101
+#define MPU9650  MPU9250   // old misspelling
 #define SD1306   102
 #define ESP32PWM 103
 #define INA219   104

@@ -36,83 +36,74 @@
 	#error "Not enough LEDC channels for all servos, use PCA9685 instead"
 #endif
 
-uint8_t esp32pwmPins[ESP32PWM_SERVO_COUNT];
-bool    esp32pwmEnabled = true;
+class LedcServoBus : public ServoBus {
+	public:
+		const char *name() const override { return "ESP32 LEDC " ; }
 
-static uint32_t esp32pwmPulseToDuty(uint16_t us)
+		bool begin(const uint8_t *channels, uint8_t count) override
+		{
+			Serial.printf("%uHz/%ubit ", ESP32PWM_SERVO_FREQ, ESP32PWM_SERVO_RESOLUTION);
+			bool ok = true;
+			_count = count;
+			for (uint8_t i = 0; i < count; i++) {
+				_pins[i] = channels[i];
+				if (!ledcAttach(_pins[i], ESP32PWM_SERVO_FREQ, ESP32PWM_SERVO_RESOLUTION)) {
+					Serial.printf("LEDC attach failed for pin %u\n", _pins[i]);
+					ok = false;
+					continue;
+				}
+				ledcWrite(_pins[i], 0);   // no pulses until the first position is known
+			}
+			return ok;
+		}
+
+		void write(uint8_t index, uint16_t us) override
+		{
+			if (index >= _count) {
+				return;
+			}
+			if (!_enabled || us == 0) {
+				ledcWrite(_pins[index], 0);
+				return;
+			}
+			if (us < SERVO_MIN) us = SERVO_MIN;
+			if (us > SERVO_MAX) us = SERVO_MAX;
+			ledcWrite(_pins[index], ((uint32_t)us << ESP32PWM_SERVO_RESOLUTION) / ESP32PWM_SERVO_PERIOD_US);
+		}
+
+		// Disabled: stop sending pulses, servos go limp. Pulses come back on the next write.
+		void setEnabled(bool enabled) override
+		{
+			_enabled = enabled;
+			if (!enabled) {
+				for (uint8_t i = 0; i < _count; i++) {
+					ledcWrite(_pins[i], 0);
+				}
+			}
+		}
+
+		uint8_t channelLimit() const override { return 40; }   // GPIO numbers
+
+		const char *checkChannel(uint8_t pin) const override
+		{
+			switch (pin) {
+				case 0: case 2: case 5: case 12: case 15:
+					return "strapping pin, the board may fail to boot";
+				case 34: case 35: case 36: case 37: case 38: case 39:
+					return "input only pin";
+			}
+			return nullptr;
+		}
+
+	private:
+		uint8_t _pins[ESP32PWM_SERVO_COUNT] = {};
+		uint8_t _count   = 0;
+		bool    _enabled = true;
+};
+
+ServoBus &servoBus()
 {
-	return ((uint32_t)us << ESP32PWM_SERVO_RESOLUTION) / ESP32PWM_SERVO_PERIOD_US;
-}
-
-static void esp32pwmAttach(uint8_t idx, uint8_t pin)
-{
-	esp32pwmPins[idx] = pin;
-	if (!ledcAttach(pin, ESP32PWM_SERVO_FREQ, ESP32PWM_SERVO_RESOLUTION)) {
-		Serial.printf("LEDC attach failed for pin %u\n", pin);
-		return;
-	}
-	ledcWrite(pin, 0);   // no pulses until the first position is known
-}
-
-static void esp32pwmWrite(uint8_t idx, uint16_t us)
-{
-	if (!esp32pwmEnabled || us == 0) {
-		ledcWrite(esp32pwmPins[idx], 0);
-		return;
-	}
-	if (us < SERVO_MIN) us = SERVO_MIN;
-	if (us > SERVO_MAX) us = SERVO_MAX;
-	ledcWrite(esp32pwmPins[idx], esp32pwmPulseToDuty(us));
-}
-
-void initServoHAL() {
-	Serial.printf("ESP32 LEDC servo PWM %uHz/%ubit ", ESP32PWM_SERVO_FREQ, ESP32PWM_SERVO_RESOLUTION);
-
-	for (uint8_t i = 0; i < LEG_NUM; i++) {
-		esp32pwmAttach(i*LEG_DOF+0, legs[i].hal.pin.alpha);
-		esp32pwmAttach(i*LEG_DOF+1, legs[i].hal.pin.beta);
-		#if LEG_DOF > 2
-			esp32pwmAttach(i*LEG_DOF+2, legs[i].hal.pin.gamma);
-		#endif
-		#if LEG_DOF > 3
-			esp32pwmAttach(i*LEG_DOF+3, legs[i].hal.pin.delta);
-			esp32pwmAttach(i*LEG_DOF+4, legs[i].hal.pin.epsilon);
-			esp32pwmAttach(i*LEG_DOF+5, legs[i].hal.pin.zeta);
-		#endif
-	}
-}
-
-void doLeg(leg &_leg)
-{
-	uint8_t l = _leg.id.id*LEG_DOF;
-	esp32pwmWrite(l+0, servoPulse[_leg.id.id][ALPHA]);
-	esp32pwmWrite(l+1, servoPulse[_leg.id.id][BETA]);
-	#if LEG_DOF > 2
-		esp32pwmWrite(l+2, servoPulse[_leg.id.id][GAMMA]);
-	#endif
-	#if LEG_DOF > 3
-		esp32pwmWrite(l+3, servoPulse[_leg.id.id][DELTA]);
-		esp32pwmWrite(l+4, servoPulse[_leg.id.id][EPSILON]);
-		esp32pwmWrite(l+5, servoPulse[_leg.id.id][ZETA]);
-	#endif
-}
-
-/**
- * Stop sending pulses, servos go limp.
- */
-void disableServos()
-{
-	esp32pwmEnabled = false;
-	for (uint8_t i = 0; i < ESP32PWM_SERVO_COUNT; i++) {
-		ledcWrite(esp32pwmPins[i], 0);
-	}
-}
-
-/**
- * Pulses are restored on the next doMotors() call.
- */
-void enableServos()
-{
-	esp32pwmEnabled = true;
+	static LedcServoBus bus;
+	return bus;
 }
 #endif

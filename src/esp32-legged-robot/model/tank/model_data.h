@@ -67,6 +67,16 @@ servoProfile servoMainProfile = {
     255  // degMax
 };
 
+// Differential drive: the move command goes straight to the tracks
+extern const DiffDriveParams TANK_DRIVE_PARAMS;
+const DiffDriveParams TANK_DRIVE_PARAMS = {
+	3.0,   // maxAccel: 0 to full speed in 1/3 s
+	0.05,  // deadband
+	0,     // minDuty: raise to the duty where the motors just start turning
+	255    // maxDuty, 8 bit PWM
+};
+
+// Not used by the tank (no gait), kept so the shared motion code compiles
 // Tracks are driven directly from the move command, no gait
 const GaitParams GAIT_PARAMS = {
 	false,    // enabled

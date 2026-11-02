@@ -5,13 +5,6 @@
  */
 #include "robot.h"
 
-// tracks have no servos to range check
-#if PWM_CONTROLLER_TYPE == DCMOTOR
-	#define MOTION_SERVO_PROFILE nullptr
-#else
-	#define MOTION_SERVO_PROFILE (&servoMainProfile)
-#endif
-
 static MotionController motion;
 static const GaitParams * volatile pendingGait = nullptr;   // set from the CLI (core 0)
 
@@ -21,10 +14,57 @@ static const GaitParams * volatile pendingGait = nullptr;   // set from the CLI 
 	static LR_angle imuTarget = {0.0, 0.0, 0.0};
 #endif
 
+#if PWM_CONTROLLER_TYPE == DCMOTOR
+/**
+ * Tracks: no gait or IK, the move command is mixed straight into track
+ * speeds and written as H-bridge duties (servoPulse holds duties here).
+ */
+static DiffDrive drive;
+
+static void writeTrack(uint8_t id, const DiffDriveDuty &d)
+{
+	servoPulse[id][ALPHA] = d.in1;
+	servoPulse[id][BETA]  = d.in2;
+}
+
+void initMotion()
+{
+	Serial.println("Init differential drive");
+	drive.begin(TANK_DRIVE_PARAMS);
+	writeTrack(TRACKL, drive.leftDuty());
+	writeTrack(TRACKR, drive.rightDuty());
+}
+
+void requestGait(const GaitParams &params)
+{
+	(void)params;
+}
+
+const LR_figure &motionBody()
+{
+	static const LR_figure origin = {};
+	return origin;
+}
+
+void updateMotion()
+{
+	if (!isHALEnabled()) {
+		drive.stop();
+	} else {
+		LR_moveVector cmd = getMoveCommand();
+		// forward is -1 on the web client
+		drive.update(LOOP_DT, -cmd.move.y, -cmd.rotate.yaw);
+	}
+	writeTrack(TRACKL, drive.leftDuty());
+	writeTrack(TRACKR, drive.rightDuty());
+}
+
+#else
+
 void initMotion()
 {
 	Serial.println("Init gait");
-	motion.begin(GAIT_PARAMS, legs, LEG_NUM, MODEL_IK, LEG_DOF, MOTION_SERVO_PROFILE);
+	motion.begin(GAIT_PARAMS, legs, LEG_NUM, MODEL_IK, LEG_DOF, &servoMainProfile);
 }
 
 void requestGait(const GaitParams &params)
@@ -57,3 +97,5 @@ void updateMotion()
 
 	motion.update(LOOP_DT, getMoveCommand(), imuCorrection);
 }
+
+#endif

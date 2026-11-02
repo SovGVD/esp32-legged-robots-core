@@ -35,6 +35,9 @@ extern leg               legs[LEG_NUM];
 extern servoProfile      servoMainProfile;
 extern const GaitParams  GAIT_PARAMS;
 extern LegIK            &MODEL_IK;
+#if PWM_CONTROLLER_TYPE == DCMOTOR
+extern const DiffDriveParams TANK_DRIVE_PARAMS;
+#endif
 extern const cliCommand *modelCliCommands;
 extern const uint8_t     modelCliCommandsCount;
 void modelSettingsPrint();
@@ -81,18 +84,17 @@ void doMotors();
 bool servoReady();
 uint16_t angleToPulse(float angleRad);
 
-// implemented by the selected PWM_CONTROLLER_TYPE backend
-void initServoHAL();
-void doLeg(leg &_leg);
 void disableServos();
 void enableServos();
-#if PWM_CONTROLLER_TYPE == PCA9685
-uint8_t servoChannelLimit();   // channels across all PCA9685 boards
-#endif
+
+// the bus of the selected PWM_CONTROLLER_TYPE (hal_esp32pwm/hal_pca9685/hal_dcmotor.cpp)
+ServoBus &servoBus();
 
 /**
  * Sensors (sensors.cpp)
  */
+Imu         &imu();           // IMU_TYPE, or NoImu
+PowerSensor &powerSensor();   // POWER_SENSOR, or NoPowerSensor
 void initIMU();
 void updateIMU();
 void calibrateIMU();

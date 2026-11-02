@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include "leg.h"
+#include "hardware.h"
 
 /**
  * Servo calibration: measured pulse widths at fixed servo angles, linear

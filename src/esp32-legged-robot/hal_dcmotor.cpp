@@ -9,28 +9,61 @@
 	#error "Not supported or never tested"
 #endif
 
-void initServoHAL() {
-	Serial.println("ESP32 ledc");
-	for (uint8_t i = 0; i < LEG_NUM; i++) {
-		// Arduino-ESP32 3.x LEDC API: channels are allocated automatically per pin
-		ledcAttach(legs[i].hal.pin.alpha, ESP32_DCMOTOR_FREQ, ESP32_DCMOTOR_BIT);
-		ledcAttach(legs[i].hal.pin.beta,  ESP32_DCMOTOR_FREQ, ESP32_DCMOTOR_BIT);
-	}
-}
+/**
+ * DC motors on a two-input H-bridge (L298N, DRV8833, ...). Each output is one
+ * bridge input driven by LEDC; values are duties 0..255 from the
+ * differential drive.
+ */
+class DcMotorBus : public ServoBus {
+	public:
+		const char *name() const override { return "DC motor LEDC "; }
 
-void doLeg(leg &_leg)
-{
-	ledcWrite(_leg.hal.pin.alpha, servoPulse[_leg.id.id][ALPHA]);
-	ledcWrite(_leg.hal.pin.beta,  servoPulse[_leg.id.id][BETA]);
-}
+		bool begin(const uint8_t *channels, uint8_t count) override
+		{
+			bool ok = true;
+			_count = count;
+			for (uint8_t i = 0; i < count; i++) {
+				_pins[i] = channels[i];
+				if (!ledcAttach(_pins[i], ESP32_DCMOTOR_FREQ, ESP32_DCMOTOR_BIT)) {
+					Serial.printf("LEDC attach failed for pin %u\n", _pins[i]);
+					ok = false;
+					continue;
+				}
+				ledcWrite(_pins[i], 0);
+			}
+			return ok;
+		}
 
-void disableServos()
-{
-	// @TODO
-}
+		void write(uint8_t index, uint16_t duty) override
+		{
+			if (index >= _count) {
+				return;
+			}
+			ledcWrite(_pins[index], _enabled ? duty : 0);
+		}
 
-void enableServos()
+		// Disabled: both inputs low, the motors coast
+		void setEnabled(bool enabled) override
+		{
+			_enabled = enabled;
+			if (!enabled) {
+				for (uint8_t i = 0; i < _count; i++) {
+					ledcWrite(_pins[i], 0);
+				}
+			}
+		}
+
+		uint8_t channelLimit() const override { return 40; }
+
+	private:
+		uint8_t _pins[LEG_NUM * LEG_DOF] = {};
+		uint8_t _count   = 0;
+		bool    _enabled = true;
+};
+
+ServoBus &servoBus()
 {
-	// @TODO
+	static DcMotorBus bus;
+	return bus;
 }
 #endif
