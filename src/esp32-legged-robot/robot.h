@@ -50,6 +50,7 @@ extern uint16_t      servoPulse[LEG_NUM][LEG_DOF];
 extern bool          isHalDoReady;
 extern unsigned long loopTime;
 extern modelSettings settings;
+uint32_t motionOverrunCount();   // motion ticks missed because a tick ran longer than LOOP_TIME
 
 /**
  * Motion (motion.cpp): gait, body kinematics, IK
