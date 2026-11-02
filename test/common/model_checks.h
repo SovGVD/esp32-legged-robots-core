@@ -62,6 +62,24 @@ void test_default_gait_stays_reachable()
 	TEST_ASSERT_EQUAL_MESSAGE(0, motion.servoRangeCount(), "servo range hit");
 }
 
+void test_sit_down_stays_reachable()
+{
+	// battery critical: the body is lowered by SIT_HEIGHT (negative) while standing
+	MotionController motion;
+	motion.begin(GAIT_PARAMS, legs, LEG_NUM, modelIK, LEG_DOF, &servoMainProfile);
+	LR_angle none = {};
+	motion.setHeightOffset(SIT_HEIGHT, 20.0f);
+	for (int t = 0; t < (int)(5.0f / DT); t++) {
+		motion.update(DT, cmd(0, 0, 0), none);
+	}
+	TEST_ASSERT_TRUE(motion.heightSettled());
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, SIT_HEIGHT, motion.heightOffset());
+	TEST_ASSERT_LESS_THAN(-10.0f, SIT_HEIGHT);
+	TEST_ASSERT_EQUAL_MESSAGE(0, motion.unreachableCount(), "foot target out of reach");
+	TEST_ASSERT_EQUAL_MESSAGE(0, motion.jointLimitCount(), "joint limit hit");
+	TEST_ASSERT_EQUAL_MESSAGE(0, motion.servoRangeCount(), "servo range hit");
+}
+
 void test_servo_angle_round_trip()
 {
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
@@ -95,6 +113,7 @@ static int runModelChecks()
 	UNITY_BEGIN();
 	RUN_TEST(test_neutral_stance_is_solved_and_in_range);
 	RUN_TEST(test_default_gait_stays_reachable);
+	RUN_TEST(test_sit_down_stays_reachable);
 	RUN_TEST(test_servo_angle_round_trip);
 	RUN_TEST(test_clamped_pose_maps_to_profile_limit);
 	return UNITY_END();

@@ -4,7 +4,7 @@
  */
 import type { Server as HttpServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { P_CLI, P_MOVE, P_TELEMETRY, decodeAxis } from '../src/protocol.ts';
+import { P_CLI, P_MOVE, P_TELEMETRY, TS, decodeAxis } from '../src/protocol.ts';
 
 const FAILSAFE_MS = 500;
 
@@ -13,11 +13,15 @@ function cliPackage(text: string): Buffer {
 }
 
 function telemetryPackage(voltage: number, current: number, loopTime: number): Buffer {
-  const b = Buffer.alloc(14);
+  const b = Buffer.alloc(22);
   b[0] = P_TELEMETRY;
+  b[1] = 2; // version
+  b.writeUInt16BE(TS.hal | TS.imu | TS.power | (1 << 7), 2); // battery ok
   b.writeUInt16BE(Math.round(voltage * 1000), 4);
   b.writeInt16BE(Math.round(current * 1000), 6);
   b.writeUInt16BE(loopTime, 8);
+  b.writeInt16BE(Math.round((Math.random() - 0.5) * 200), 10);
+  b.writeInt16BE(Math.round((Math.random() - 0.5) * 200), 12);
   return b;
 }
 

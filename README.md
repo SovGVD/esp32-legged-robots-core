@@ -95,6 +95,19 @@ using it on a robot, check the IMU mounting with `level state`: raise the left s
 raise the nose and the roll must change (the firmware's pitch is the sideways lean, as on the web client); fix
 it with `IMU_SWAP_ROLL_PITCH`, `IMU_PITCH_SIGN` and `IMU_ROLL_SIGN`. `calib imu` offsets are saved in NVS.
 
+**Battery protection.** The INA219 voltage is read at 10 Hz and filtered (servo current makes it sag every
+step). Below `BATTERY_PARAMS.lowVoltage` for 3 s the robot warns (CLI, web page); below `criticalVoltage` it
+ignores the controller, finishes the step, lowers the body by `SIT_HEIGHT` and turns the servos off, so it rests
+low instead of dropping when the battery cuts out. Critical is latched until restart. Both are in each model's
+`model_data.h`; the defaults are for a 2S LiPo (6.8 V / 6.4 V), change them for your pack. Without a power
+sensor reading (e.g. USB powered on the bench) nothing happens.
+
+**Telemetry.** The web page asks for telemetry every second (protocol in `src/web/src/protocol.ts`, version 2):
+voltage, current, loop time, status bits (HAL, failsafe, gait and whether it is stepping, leveling, IMU and
+power sensor found, battery state, resting, missed motion ticks), IMU tilt, missed tick count and the IK
+counters (feet out of reach / joint limit / servo range clamps). The header shows them, e.g.
+`walk · stepping · level · tilt 0.4° -1.2° · IK 0/3/0`.
+
 **Tank.** No gait: the move command is mixed into left/right track speeds, slew limited (`TANK_DRIVE_PARAMS` in
 `model/tank/model_data.h`: acceleration, deadband, minimum duty that starts the motors) and written as H-bridge
 duties.

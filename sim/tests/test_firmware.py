@@ -206,3 +206,20 @@ def test_leveling_on_flat_ground_stays_small(fw, dog):
         fw.set_leveling(False)
     assert tilt < 8.0, tilt
     assert moved[1] > 300, moved
+
+
+def test_battery_sit_down_is_calm(fw, dog):
+    """Battery critical: the body is lowered by SIT_HEIGHT while standing; it stays level and in place."""
+    fw.drive(dog, STOP, 0.5)
+    z0 = dog.body_position_mm()[2]
+    p0 = dog.body_position_mm()[:2].copy()
+    fw.set_height_offset(fw.sit_height())
+    tilt = 0.0
+    for _ in range(int(3.0 / fw.loop_dt)):
+        fw.drive(dog, STOP)
+        tilt = max(tilt, tilt_deg(dog))
+    dz = dog.body_position_mm()[2] - z0
+    assert fw.unsolved == 0
+    assert abs(dz - fw.sit_height()) < 5.0, (dz, fw.sit_height())
+    assert tilt < 2.0, tilt
+    assert np.linalg.norm(dog.body_position_mm()[:2] - p0) < 5.0

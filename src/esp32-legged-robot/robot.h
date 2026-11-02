@@ -39,7 +39,9 @@ extern LegIK            &MODEL_IK;
 extern const DiffDriveParams TANK_DRIVE_PARAMS;
 #else
 extern const LevelerParams   LEVEL_PARAMS;
+extern const float           SIT_HEIGHT;
 #endif
+extern const BatteryParams   BATTERY_PARAMS;
 extern const cliCommand *modelCliCommands;
 extern const uint8_t     modelCliCommandsCount;
 void modelSettingsPrint();
@@ -95,6 +97,22 @@ ServoBus &servoBus();
 /**
  * Sensors (sensors.cpp)
  */
+// Motion state for telemetry (motion.cpp)
+struct MotionStatus {
+	bool     gaitActive;
+	bool     staticGait;
+	bool     sitting;
+	uint32_t unreachable;
+	uint32_t jointLimit;
+	uint32_t servoRange;
+};
+MotionStatus motionStatus();
+
+// Battery protection (battery.cpp)
+void         initBattery();
+void         updateBattery(float dt);
+BatteryState batteryState();
+
 // IMU leveling (motion.cpp), on with HORIZON_LEVEL or `level on`
 void     setLeveling(bool on);
 bool     levelingEnabled();
