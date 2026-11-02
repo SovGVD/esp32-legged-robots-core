@@ -83,4 +83,14 @@ const GaitParams GAIT_PARAMS = {
 	1, 0.5, { 0, 0, 0, 0, 0, 0 }, 0, 0, 0, 0, 0, 0, false
 };
 
+// Battery protection (motion.cpp): warn below lowVoltage, below
+// criticalVoltage stop, sit down by SIT_HEIGHT and turn the servos off.
+// Defaults are for a 2S LiPo (3.4 / 3.2 V per cell); change for your pack.
+const BatteryParams BATTERY_PARAMS = {
+	6.8,   // lowVoltage, V
+	6.4,   // criticalVoltage, V
+	2.0,   // filter, s (servo current makes the voltage sag every step)
+	3.0    // holdTime, s
+};
+
 #endif

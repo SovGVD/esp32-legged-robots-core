@@ -68,6 +68,7 @@ static void robotSetup()
 		vTaskDelay(100);
 
 		initPowerSensor();
+		initBattery();
 		vTaskDelay(100);
 
 		robotLoopReady = true;
@@ -107,7 +108,15 @@ static void robotStep()
 	unsigned long currentTime = micros();
 
 	updateFailsafe();
-	updatePower();  // TODO not so often!
+
+	// power sensor and battery at 10 Hz, not every tick (I2C time)
+	static uint32_t powerTicks = 0;
+	const uint32_t  powerEvery = 100000 / LOOP_TIME;
+	if (++powerTicks >= powerEvery) {
+		powerTicks = 0;
+		updatePower();
+		updateBattery(powerEvery * LOOP_DT);
+	}
 
 	if (!isHalDoReady) {
 		updateMotion();

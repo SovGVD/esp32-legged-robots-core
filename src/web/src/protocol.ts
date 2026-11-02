@@ -15,7 +15,9 @@
  *
  * Robot -> client
  *   text "Ok"      sent once after connecting
- *   'T' telemetry  [0x54, -, statuses:u16, voltage*1000:u16, current*1000:i16, loopTime(us):u16, ...]
+ *   'T' telemetry  [0x54, version:u8, statuses:u16, voltage*1000:u16, current*1000:i16, loopTime(us):u16,
+ *                  version 2 adds: pitch*100:i16, roll*100:i16 (deg), missedTicks:u16,
+ *                  ikReach:u16, ikJointLimit:u16, ikServoRange:u16]  22 bytes
  *   'C' cli        [0x43, ...utf8 output]
  */
 
@@ -46,11 +48,37 @@ export interface MoveVector {
   rotate: Rotation;
 }
 
+/** Telemetry status bits (TS_* in the firmware's def.h). */
+export const TS = {
+  hal: 0x0001,
+  failsafe: 0x0002,
+  gaitActive: 0x0004,
+  gaitStatic: 0x0008,
+  leveling: 0x0010,
+  imu: 0x0020,
+  power: 0x0040,
+  sitting: 0x0200,
+  overrun: 0x0400,
+} as const;
+const TS_BATTERY_SHIFT = 7;
+
+export type BatteryState = 'unknown' | 'ok' | 'low' | 'critical';
+const batteryStates: BatteryState[] = ['unknown', 'ok', 'low', 'critical'];
+
+export function batteryState(statuses: number): BatteryState {
+  return batteryStates[(statuses >> TS_BATTERY_SHIFT) & 3];
+}
+
 export interface Telemetry {
   statuses: number;
   voltage: number;
   current: number;
   loopTime: number;
+  /** version 2 firmware only */
+  pitch?: number;
+  roll?: number;
+  missedTicks?: number;
+  ik?: { reach: number; jointLimit: number; servoRange: number };
 }
 
 export type Incoming =
@@ -117,12 +145,19 @@ export function encodeCli(command: string): Uint8Array {
 export function decodeTelemetry(data: Uint8Array): Telemetry | null {
   if (data.length < 10) return null;
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  return {
+  const t: Telemetry = {
     statuses: view.getUint16(2),
     voltage: view.getUint16(4) / 1000,
     current: view.getInt16(6) / 1000,
     loopTime: view.getUint16(8),
   };
+  if (data[1] >= 2 && data.length >= 22) {
+    t.pitch = view.getInt16(10) / 100;
+    t.roll = view.getInt16(12) / 100;
+    t.missedTicks = view.getUint16(14);
+    t.ik = { reach: view.getUint16(16), jointLimit: view.getUint16(18), servoRange: view.getUint16(20) };
+  }
+  return t;
 }
 
 export function decode(data: Uint8Array): Incoming | null {

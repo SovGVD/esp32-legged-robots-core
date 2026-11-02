@@ -51,13 +51,26 @@
 #define AP_MODE 0
 
 /* Packages code */
-#define P_TELEMETRY_LEN 14
+#define P_TELEMETRY_LEN 22
+#define P_TELEMETRY_VERSION 2
 
 #define P_MOVE         77  // ASCII "M"
 #define P_TELEMETRY    84  //       "T"
 #define P_START_VIDEO  86  //       "V" (capital V)
 #define P_STOP_VIDEO  118  //       "v" (small V)
 #define P_CLI          67  //       "C"
+
+/* Telemetry status bits */
+#define TS_HAL          0x0001  // leg calculation on (`hal on`)
+#define TS_FAILSAFE     0x0002  // no commands from the client, stopped
+#define TS_GAIT_ACTIVE  0x0004  // stepping
+#define TS_GAIT_STATIC  0x0008  // statically stable gait (walk), else trot
+#define TS_LEVELING     0x0010  // IMU leveling on
+#define TS_IMU          0x0020  // IMU found
+#define TS_POWER        0x0040  // power sensor found
+#define TS_BATTERY_SHIFT 7      // 2 bits: BatteryState (0 unknown, 1 ok, 2 low, 3 critical)
+#define TS_SITTING      0x0200  // battery critical: sat down / servos off
+#define TS_OVERRUN      0x0400  // the motion loop missed a tick in the last second
 
 /* Debug (SLOW!!!)*/
 //#define DEBUG_HAL_LEG

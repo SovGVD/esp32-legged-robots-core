@@ -9,17 +9,25 @@ void MotionController::begin(const GaitParams &params, leg *legs, uint8_t legCou
 	_dof      = dof;
 	_profile  = profile;
 	_unreachable = _jointLimit = _servoRange = 0;
+	_height = _heightTarget = 0;
 	_gait.begin(params, legs, legCount);
 }
 
 uint8_t MotionController::update(float dt, const LR_moveVector &command, const LR_angle &correction)
 {
 	_gait.update(dt, command);
-	_bodyKinematics.update(_legs, _legCount, _gait.body(), correction, command);
+
+	float step = _heightRate * dt;
+	float d    = _heightTarget - _height;
+	_height    = (d > step) ? _height + step : (d < -step) ? _height - step : _heightTarget;
+	_body = _gait.body();
+	_body.position.z += _height;
+
+	_bodyKinematics.update(_legs, _legCount, _body, correction, command);
 
 	uint8_t unsolved = 0;
 	for (uint8_t i = 0; i < _legCount; i++) {
-		iksolver solution = _ik->solve(_legs[i], _gait.body(), command);
+		iksolver solution = _ik->solve(_legs[i], _body, command);
 		// Out of reach: keep the last valid angles instead of a pose bent by
 		// the solver's clamping
 		if (!solution.isSolved) {

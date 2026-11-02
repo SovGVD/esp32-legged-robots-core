@@ -196,6 +196,18 @@ RC_API void rc_tilt_reset()
 	tilt.reset();
 }
 
+/** Body height offset (mm, negative = lower), approached at rate mm/s: the battery sit-down. */
+RC_API void rc_set_height_offset(float mm, float rate)
+{
+	motion.setHeightOffset(mm, rate);
+}
+
+/** The model's sit-down depth (SIT_HEIGHT, mm). */
+RC_API float rc_sit_height()
+{
+	return SIT_HEIGHT;
+}
+
 /** IMU leveling on (1) or off (0); kept across rc_init(). */
 RC_API void rc_set_leveling(int on)
 {

@@ -58,9 +58,18 @@ const LR_figure &motionBody()
 	return origin;
 }
 
+MotionStatus motionStatus()
+{
+	MotionStatus st = {};
+	st.gaitActive = drive.left() != 0 || drive.right() != 0;
+	st.sitting    = batteryState() == BATTERY_CRITICAL;
+	return st;
+}
+
 void updateMotion()
 {
-	if (!isHALEnabled()) {
+	// battery empty: motors off for good (BatteryMonitor latches it)
+	if (!isHALEnabled() || batteryState() == BATTERY_CRITICAL) {
 		drive.stop();
 	} else {
 		LR_moveVector cmd = getMoveCommand();
@@ -113,6 +122,51 @@ const LR_figure &motionBody()
 	return motion.body();
 }
 
+static volatile bool sitting = false;
+
+MotionStatus motionStatus()
+{
+	MotionStatus st;
+	st.gaitActive  = motion.gait().isActive();
+	st.staticGait  = motion.gait().params().staticStability;
+	st.sitting     = sitting;
+	st.unreachable = motion.unreachableCount();
+	st.jointLimit  = motion.jointLimitCount();
+	st.servoRange  = motion.servoRangeCount();
+	return st;
+}
+
+/**
+ * Battery critical: ignore the client, let the gait put every foot down,
+ * lower the body by SIT_HEIGHT, then turn the servos off so the robot rests
+ * low instead of dropping from full height when the battery cuts out.
+ * Returns the command to use.
+ */
+static LR_moveVector batteryGuard(const LR_moveVector &cmd)
+{
+	static uint32_t settledAt = 0;
+	static bool     servosOff = false;
+
+	if (batteryState() != BATTERY_CRITICAL) {
+		return cmd;
+	}
+	LR_moveVector stop = { { 0, 0, 0 }, { 0, 0, 0 } };
+	sitting = true;
+	setLeveling(false);
+	if (!motion.gait().isActive()) {
+		motion.setHeightOffset(SIT_HEIGHT, 20.0f);
+	}
+	if (!servosOff && motion.heightOffset() == SIT_HEIGHT) {
+		if (settledAt == 0) {
+			settledAt = millis() | 1;
+		} else if (millis() - settledAt > 1000) {
+			disableServos();
+			servosOff = true;
+		}
+	}
+	return stop;
+}
+
 void updateMotion()
 {
 	if (!isHALEnabled()) {
@@ -137,7 +191,7 @@ void updateMotion()
 		pendingGait = nullptr;
 	}
 
-	motion.update(LOOP_DT, getMoveCommand(), imuCorrection);
+	motion.update(LOOP_DT, batteryGuard(getMoveCommand()), imuCorrection);
 }
 
 #endif

@@ -6,6 +6,8 @@ import {
   P_CLI,
   P_MOVE,
   P_TELEMETRY,
+  TS,
+  batteryState,
   decode,
   encodeAxis,
   encodeCli,
@@ -89,6 +91,30 @@ test('telemetry package decodes like the firmware encodes it', () => {
   view.setUint16(8, 2345);
   const msg = decode(b);
   assert.deepEqual(msg, { type: 'telemetry', telemetry: { statuses: 0, voltage: 7.412, current: -0.15, loopTime: 2345 } });
+});
+
+test('version 2 telemetry adds tilt, missed ticks, IK counters and battery state', () => {
+  const b = new Uint8Array(22);
+  const view = new DataView(b.buffer);
+  b[0] = P_TELEMETRY;
+  b[1] = 2;
+  view.setUint16(2, TS.hal | TS.gaitActive | TS.leveling | (2 << 7)); // battery low
+  view.setUint16(4, 6712);
+  view.setInt16(10, -125);
+  view.setInt16(12, 340);
+  view.setUint16(14, 3);
+  view.setUint16(16, 1);
+  view.setUint16(18, 2);
+  view.setUint16(20, 65535);
+  const msg = decode(b);
+  assert.ok(msg && msg.type === 'telemetry');
+  const t = msg.telemetry;
+  assert.equal(t.pitch, -1.25);
+  assert.equal(t.roll, 3.4);
+  assert.equal(t.missedTicks, 3);
+  assert.deepEqual(t.ik, { reach: 1, jointLimit: 2, servoRange: 65535 });
+  assert.equal(batteryState(t.statuses), 'low');
+  assert.ok(t.statuses & TS.leveling);
 });
 
 test('short telemetry package is ignored', () => {

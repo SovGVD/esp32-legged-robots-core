@@ -178,4 +178,17 @@ const LevelerParams LEVEL_PARAMS = {
 	0.026  // deadband, rad
 };
 
+// Battery protection (motion.cpp): warn below lowVoltage, below
+// criticalVoltage stop, sit down by SIT_HEIGHT and turn the servos off.
+// Defaults are for a 2S LiPo (3.4 / 3.2 V per cell); change for your pack.
+const BatteryParams BATTERY_PARAMS = {
+	6.8,   // lowVoltage, V
+	6.4,   // criticalVoltage, V
+	2.0,   // filter, s (servo current makes the voltage sag every step)
+	3.0    // holdTime, s
+};
+
+// Body lowered this much (mm) to sit down when the battery is empty
+const float SIT_HEIGHT = -30;
+
 #endif

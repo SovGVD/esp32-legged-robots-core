@@ -35,7 +35,15 @@ class MotionController
 		 */
 		uint8_t update(float dt, const LR_moveVector &command, const LR_angle &correction);
 
-		const LR_figure &body() const { return _gait.body(); }
+		/**
+		 * Lower (negative) or raise the body by `mm`, approached at `rate`
+		 * mm/s; the feet stay where they are. Used to sit down.
+		 */
+		void setHeightOffset(float mm, float rate = 20.0f) { _heightTarget = mm; _heightRate = rate; }
+		float heightOffset() const { return _height; }
+		bool  heightSettled() const { return _height == _heightTarget; }
+
+		const LR_figure &body() const { return _body; }
 		GaitEngine &gait() { return _gait; }
 
 		/** Since begin(): legs out of reach (kept), legs clamped to joint limits / servo range. */
@@ -54,6 +62,10 @@ class MotionController
 		uint32_t       _unreachable = 0;
 		uint32_t       _jointLimit  = 0;
 		uint32_t       _servoRange  = 0;
+		LR_figure      _body        = {};
+		float          _height       = 0;
+		float          _heightTarget = 0;
+		float          _heightRate   = 20.0f;
 };
 
 #endif

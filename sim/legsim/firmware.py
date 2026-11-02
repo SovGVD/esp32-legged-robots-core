@@ -90,6 +90,9 @@ class FirmwareCore:
         L.rc_tilt_estimate.restype = None
         L.rc_tilt_estimate.argtypes = [ctypes.c_float, f32p, f32p, f32p]
         L.rc_tilt_reset.restype = None
+        L.rc_set_height_offset.restype = None
+        L.rc_set_height_offset.argtypes = [ctypes.c_float, ctypes.c_float]
+        L.rc_sit_height.restype = ctypes.c_float
         L.rc_set_leveling.restype = None
         L.rc_set_leveling.argtypes = [ctypes.c_int]
         L.rc_level_correction.restype = None
@@ -175,6 +178,14 @@ class FirmwareCore:
         self.lib.rc_tilt_estimate(self.loop_dt if dt is None else dt,
                                   f3(*(float(a) / 9.81 for a in imu["accel"])), f3(*map(float, imu["gyro"])), out)
         return (out[0], out[1], dog.body_orientation()["yaw"])
+
+    def set_height_offset(self, mm, rate=20.0):
+        """Lower (negative) or raise the body, mm, like the battery sit-down. Undone by reset()."""
+        self.lib.rc_set_height_offset(float(mm), float(rate))
+
+    def sit_height(self):
+        """The model's SIT_HEIGHT, mm."""
+        return float(self.lib.rc_sit_height())
 
     def set_leveling(self, on):
         """IMU leveling (BodyLeveler) on/off; stays across reset()."""

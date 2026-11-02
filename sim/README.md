@@ -4,7 +4,7 @@ A MuJoCo model of the ESP32 small robot dog for testing motion code before it
 goes on the real robot. Python, `pip install -r requirements.txt`.
 
 ```
-python -m pytest -q tests            # 41 checks, ~18 s (builds the firmware bridge on first run)
+python -m pytest -q tests            # 42 checks, ~20 s (builds the firmware bridge on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4

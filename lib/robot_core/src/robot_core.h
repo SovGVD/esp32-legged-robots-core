@@ -17,5 +17,6 @@
 #include "hardware.h"
 #include "body_leveler.h"
 #include "tilt_estimator.h"
+#include "battery_monitor.h"
 
 #endif
