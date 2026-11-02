@@ -52,29 +52,40 @@ class Geometry:
     l1: float = 0.0             # hip offset; 0 in the firmware IK
     l2: float = 51.9            # upper leg (hip pitch axis to knee axis)
     l3: float = 50.0            # lower leg (knee axis to foot point)
-    # Collision/visual shapes [stl, est]
-    torso_size: tuple = (94.0, 190.0, 32.0)   # full size x, y, z (legs holder width, overall length)
-    torso_z_offset: float = 4.0               # torso box centre above the hip axes
-    foot_radius: float = 5.5                  # TPU shoe, ~11 mm across [stl]
+    # Hip pitch axis below the roll axis, along the leg. The bracket holds the hip-pitch
+    # servo centred on the roll axis, so 0, like the firmware IK; kept as a knob for
+    # testing a misaligned build [stl, photos]
+    hip_pitch_drop: float = 0.0
+    # Collision shapes; the visuals are the STL meshes (assembly.py) [stl]
+    torso_size: tuple = (94.0, 171.0, 31.4)   # legs holders: 94 wide, outer plates 171 apart, z -22..9.4
+    torso_z_offset: float = -6.3              # torso box centre relative to the roll axes
+    battery_size: tuple = (42.0, 80.0, 21.0)  # 2x18650 holder under the middle frame [est]
+    battery_z: float = -24.0                  # battery box centre, right under the middle frame [est]
+    foot_radius: float = 6.0                  # TPU shoe around the foot ring [stl]
     upper_leg_width: float = 6.5              # leg_top thickness [stl]
     lower_leg_width: float = 5.8              # leg_bottom thickness [stl]
 
 
 @dataclass
 class Masses:
-    """Grams. Total ~435 g, see /mnt/project-files/sim/dog-hardware-sources.md."""
-    # Torso: 4 hip-roll servos (54), 2x18650 + holder (107), electronics (30),
-    # wiring/screws/bearings (15), legs holders + body + cover + clamps (~74) [stl, ds, est]
+    """Grams per link. Total ~438 g, see /mnt/project-files/sim/dog-hardware-sources.md.
+
+    The printed parts and servos inside each link are placed individually
+    (assembly.py), so MuJoCo computes centres of mass and inertias from them;
+    whatever is left of a link's total (screws, horns, bearings, wires) is
+    added as a small lump.
+    """
+    # 4 hip-roll servos (54), 2x18650 + holder (107), electronics (30),
+    # wiring/screws/bearings (15), printed holders + body + cover + clamps (~74) [stl, ds, est]
     torso: float = 280.0
-    torso_com: tuple = (0.0, 0.0, -6.0)       # mm; battery under the body pulls it down [est]
-    # Shoulder (rotates with hip roll): shoulder parts 5.3 + servo gear 1.2 + hip-pitch servo 13.4 [stl, ds]
+    battery: float = 107.0
+    electronics: float = 30.0                 # ESP32 perfboard, Mini360 x3, INA219, MPU9250
+    # shoulder parts 5.3 + hip-pitch servo 13.4 + bearings [stl, ds]
     shoulder: float = 20.0
-    # Upper leg: leg_top 2.8 + horns/screws [stl]
+    # leg_top 2.8 + two horns [stl]
     upper_leg: float = 3.5
-    # Lower leg: leg_bottom 2.2 + knee servo 13.4 + shoe 0.5 [stl, ds]; the article
-    # puts the knee servo housing in the lower leg, so its CoM is close to the knee.
-    lower_leg: float = 16.0
-    lower_leg_com_from_knee: float = 12.0     # mm along the lower leg [est]
+    # leg_bottom 2.2 + knee servo 13.4 + shoe 0.5 [stl, ds]
+    lower_leg: float = 16.1
 
     def total(self) -> float:
         return self.torso + 4 * (self.shoulder + self.upper_leg + self.lower_leg)
@@ -135,4 +146,4 @@ class DogParams:
     hal: HalParams = field(default_factory=HalParams)
     env: Environment = field(default_factory=Environment)
     legs: tuple = LEGS
-    imu_pos: tuple = (0.0, 0.0, 6.0)    # mm, MPU9250 on the perfboard in the middle frame [est]
+    imu_pos: tuple = (0.0, 0.0, 1.0)    # mm, MPU9250 on the perfboard in the middle frame [est]

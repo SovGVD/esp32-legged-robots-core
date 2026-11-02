@@ -8,11 +8,16 @@ from legsim import hal
 
 P = DogParams()
 GEO = P.geometry
+IDEAL = DogParams().geometry          # the firmware's geometry: pitch axis on the roll axis
+IDEAL.hip_pitch_drop = 0.0
+DROPPED = DogParams().geometry        # a build with the pitch axis below the roll axis
+DROPPED.hip_pitch_drop = 9.1
 
 
 @pytest.mark.parametrize("leg", P.legs, ids=lambda l: l.name)
 def test_fk_inverts_firmware_ik(leg):
     """Sim joint convention == firmware IK convention, over the working space."""
+    GEO = IDEAL
     hip = hip_position(GEO, leg)
     for dx in (-10, 0, 15, 25):
         for dy in (-35, -10, 0, 20, 35):
@@ -38,6 +43,18 @@ def test_mjcf_matches_fk():
         for i, leg in enumerate(P.legs):
             expect = forward_kinematics(GEO, leg, q[i * 3:i * 3 + 3]) + hip_position(GEO, leg)
             np.testing.assert_allclose(feet[i], expect, atol=1e-6)
+
+
+@pytest.mark.parametrize("leg", P.legs, ids=lambda l: l.name)
+def test_hip_pitch_drop_offsets_feet(leg):
+    """With a hip pitch drop the foot lands hip_pitch_drop further along the leg's down direction."""
+    GEO = DROPPED
+    foot = default_foot(GEO, leg)
+    a = firmware_ik(GEO, leg, foot)
+    got = forward_kinematics(GEO, leg, leg_angles_to_q(*a)) + hip_position(GEO, leg)
+    roll = math.pi / 2 - a[0]
+    expect = foot + GEO.hip_pitch_drop * np.array([leg.side * math.sin(roll), 0, -math.cos(roll)])
+    np.testing.assert_allclose(got, expect, atol=1e-6)
 
 
 def test_default_pose_angles():
