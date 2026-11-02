@@ -1,3 +1,6 @@
+#ifndef MODEL_TANK_SETTINGS_H
+#define MODEL_TANK_SETTINGS_H
+
 #define MODEL_SETTINGS_KEY 0x10CC   // Some magic UNQIE key to verify EEPROM
 #define MAX_CPU_CORES      2
 
@@ -12,3 +15,5 @@ typedef struct {
 	uint8_t                structSize;
 	modelSettingsAngleTrim trim[LEG_NUM];
 } modelSettings;
+
+#endif

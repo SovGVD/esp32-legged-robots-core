@@ -1,0 +1,12 @@
+{
+  "name": "robot_core",
+  "version": "0.1.0",
+  "description": "Hardware independent motion core for ESP32 legged robots: geometry, inverse kinematics, body kinematics and gait engine. Builds for ESP32 and natively for unit tests.",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "flags": [
+      "-fsingle-precision-constant"
+    ]
+  }
+}

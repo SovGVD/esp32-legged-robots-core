@@ -61,6 +61,11 @@ upload() {
 	fi
 }
 
+runTests() {
+	requirePio
+	pio test -e native
+}
+
 monitor() {
 	requirePio
 	echo "Press Ctrl-C to exit"
@@ -85,6 +90,7 @@ help() {
 	echo "  build-client-env    Build robot web client (src/web -> web/index.html.gz.h)"
 	echo "  compile <model>     Compile ESP32 firmware (pio run -e <model>)"
 	echo "  upload <model> [port]  Compile and upload"
+	echo "  test                Run motion core unit tests on this PC"
 	echo "  cli [port]          Serial monitor"
 }
 
@@ -112,6 +118,9 @@ case $COMMAND in
 		;;
 	upload)
 		upload
+		;;
+	test)
+		runTests
 		;;
 	cli)
 		monitor

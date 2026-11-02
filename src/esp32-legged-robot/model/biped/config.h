@@ -1,0 +1,102 @@
+#ifndef MODEL_BIPED_CONFIG_H
+#define MODEL_BIPED_CONFIG_H
+
+/**
+ * Bipedal robot configuration
+ */
+
+/**
+ * LEFT side view
+ *
+ *  <- front
+ * 
+ *   |        |
+ *   +--------*
+ *       |
+ *       o               <- 3DOF (alpha, beta, gamma), LEG_BODY_(X,Y,Z)
+ *        \
+ *         \  L1
+ *          o            <- 1DOF (delta)
+ *         /
+ *        / L2
+ *       o               <- 2 DOF (epsilon, zeta), LEG_FOOT_(X,Y,Z)
+ *       | L3            <- from joint to the ground
+ *    -------
+ *    / / / /
+ *                    ^ z
+ *                    |
+ *               y <--*
+ */
+
+// default legs state
+#define LEG_BODY_X      60.5
+#define LEG_BODY_Y       0.0
+#define LEG_BODY_Z       0.0
+#define LEG_POINT_X     60.5
+#define LEG_POINT_Y      0.0
+#define LEG_POINT_Z    141.42		// sqrt(L1^2+L2^2) (straight leg on ground, but distance only between joints, not to the ground, so 90deg between L1 and L2)
+
+// Robot config
+#define LEG_NUM BIPEDAL_ROBOT
+#define LEG_DOF 6
+
+// ESP32 cores config
+#define MOTOR_CORE   1	// @TODO same as i2c
+#define DO_HAL_CORE  1
+
+
+// PID
+#define PID_LEVEL_P 0.01
+#define PID_LEVEL_I 0.008
+#define PID_LEVEL_D 0.3
+
+
+// Size of leg parts in mm
+#define LEG_SIZE_L1  100.0
+#define LEG_SIZE_L2  100.0
+#define LEG_SIZE_L3   40.0
+
+
+// Just human-friendly contstants
+#define LEGL 0   // left  leg
+#define LEGR 1   // right leg
+
+// Balance settings
+//#define HORIZON_LEVEL
+
+
+/**
+ * Not all servos are perfect
+ *
+ * This is for TowerPro MG90D (or maybe I have clone, who knows)
+ */
+
+/**
+ * Hardware
+ */
+// @TODO temporary disabled just to not thing about it right now
+//#define ESP32CAMERA
+//#define ESP32CAMERA_FRAMESIZE    FRAMESIZE_QVGA
+//#define ESP32CAMERA_JPEG_QUALITY 12
+//#define ESP32CAMERA_FPS          25
+
+#define I2C_SDA 3
+#define I2C_SCL 13
+
+#define PWM_CONTROLLER_ADDRESS   0x40
+#define PWM_CONTROLLER_TYPE      PCA9685
+
+#define IMU_ADDRESS              0x68
+#define IMU_TYPE                 MPU9250
+
+#define POWER_SENSOR_ADDRESS     0x41
+#define POWER_SENSOR             INA219
+
+#define IGNORE_BROWNOUT_CONDITION
+
+//Cores loop time
+#define LOOP_TIME 7000   // microseconds (10^-6 seconds)
+#define SERVICE_LOOP_TIME 100000
+#define SERVICE_FAST_LOOP_TIME 7000
+
+#endif

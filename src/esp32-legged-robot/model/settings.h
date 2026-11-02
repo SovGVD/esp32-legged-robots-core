@@ -1,3 +1,6 @@
+#ifndef MODEL_SETTINGS_H
+#define MODEL_SETTINGS_H
+
 #if ROBOT_MODEL == MODEL_DOG
   #include "dog/settings.h"
 #endif
@@ -12,4 +15,6 @@
 
 #if ROBOT_MODEL == MODEL_HEXAPOD
   #include "hexapod/settings.h"
+#endif
+
 #endif

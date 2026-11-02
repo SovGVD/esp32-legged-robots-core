@@ -1,3 +1,6 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
 /**
  * Configuration file
  */
@@ -38,3 +41,4 @@
 #define SERVO_MAX 2400
 #define SERVO_FREQ 330	// for PCA9685
 
+#endif

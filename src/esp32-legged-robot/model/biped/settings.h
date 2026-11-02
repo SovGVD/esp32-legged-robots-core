@@ -1,3 +1,6 @@
+#ifndef MODEL_BIPED_SETTINGS_H
+#define MODEL_BIPED_SETTINGS_H
+
 #define MODEL_SETTINGS_KEY 0xB1bE   // Some magic UNQIE key to verify EEPROM
 #define MAX_CPU_CORES      2
 
@@ -15,3 +18,5 @@ typedef struct {
 	uint8_t                structSize;
 	modelSettingsAngleTrim trim[LEG_NUM];
 } modelSettings;
+
+#endif

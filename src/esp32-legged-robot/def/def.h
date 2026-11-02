@@ -1,3 +1,8 @@
+#ifndef DEF_DEF_H
+#define DEF_DEF_H
+
+#include <stdint.h>
+
 /**
  * Some usuful defines
  */
@@ -85,3 +90,5 @@ typedef struct {
   uint16_t deg150;  // PWM pulse at 150 deg
   uint16_t degMax;  // PWM pusle at maxAngle deg
 } servoProfile;
+
+#endif
