@@ -59,10 +59,10 @@
 <geom name="LF_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="-0.011 0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
 <geom name="RF_servo_gear" type="mesh" mesh="servo_gear" class="part" pos="0.011 0.0804 0" quat="0.707107 -0.707107 0 0" mass="0.0012"/>
 <geom name="RF_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="0.011 0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
-<geom name="LH_servo_gear" type="mesh" mesh="servo_gear_m" class="part" pos="0.011 -0.0804 0" quat="0 0 -0.707107 0.707107" mass="0.0012"/>
-<geom name="LH_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="0.011 -0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
-<geom name="RH_servo_gear" type="mesh" mesh="servo_gear" class="part" pos="-0.011 -0.0804 0" quat="0 0 -0.707107 0.707107" mass="0.0012"/>
-<geom name="RH_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="-0.011 -0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
+<geom name="LH_servo_gear" type="mesh" mesh="servo_gear" class="part" pos="-0.011 -0.0804 0" quat="0 0 -0.707107 0.707107" mass="0.0012"/>
+<geom name="LH_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="-0.011 -0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
+<geom name="RH_servo_gear" type="mesh" mesh="servo_gear_m" class="part" pos="0.011 -0.0804 0" quat="0 0 -0.707107 0.707107" mass="0.0012"/>
+<geom name="RH_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="0.011 -0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
 <geom name="body" type="mesh" mesh="body" class="part" pos="0 0 -0.0076" quat="0.707107 0 0 0.707107" mass="0.0099"/>
 <geom name="battery" type="box" class="part" size="0.021 0.04 0.0105" pos="0 0 -0.024" mass="0.107" rgba="0.1 0.1 0.1 1"/>
 <geom name="electronics" type="box" class="part" size="0.025 0.035 0.004" pos="0 0 -0.0016" mass="0.03" rgba="0.1 0.4 0.2 1"/>
@@ -115,8 +115,8 @@
     </body>
     <body name="LH_shoulder" pos="-0.0395 -0.0705 0">
       <joint name="LH_roll" type="hinge" axis="0 1 0" range="-0.785398 0.785398" armature="8e-05" frictionloss="0.008" damping="0.0005"/>
-      <geom name="LH_shoulder_part2" type="mesh" mesh="shoulder_part2_m" class="part" pos="0 -0.0109 0" quat="0 0 -0.707107 0.707107" mass="0.0031"/>
-<geom name="LH_shoulder_part1" type="mesh" mesh="shoulder_part1_m" class="part" pos="0 -0.0109 0" quat="0.5 0.5 -0.5 0.5" mass="0.0022"/>
+      <geom name="LH_shoulder_part2" type="mesh" mesh="shoulder_part2" class="part" pos="0 -0.0109 0" quat="0 0 -0.707107 0.707107" mass="0.0031"/>
+<geom name="LH_shoulder_part1" type="mesh" mesh="shoulder_part1" class="part" pos="0 -0.0109 0" quat="-0.5 -0.5 -0.5 0.5" mass="0.0022"/>
 <geom name="LH_pitch_servo" type="box" class="part" size="0.01135 0.0114 0.0061" pos="0 0.0055 -0.0091" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
 <geom name="LH_shoulder_misc" type="sphere" class="part" size="0.003" pos="0 0.0041 0" mass="0.0013" rgba="0.5 0.5 0.5 0"/>
       <body name="LH_upper" pos="0 0 -0.0091">
@@ -137,8 +137,8 @@
     </body>
     <body name="RH_shoulder" pos="0.0395 -0.0705 0">
       <joint name="RH_roll" type="hinge" axis="0 -1 0" range="-0.785398 0.785398" armature="8e-05" frictionloss="0.008" damping="0.0005"/>
-      <geom name="RH_shoulder_part2" type="mesh" mesh="shoulder_part2" class="part" pos="0 -0.0109 0" quat="0 0 -0.707107 0.707107" mass="0.0031"/>
-<geom name="RH_shoulder_part1" type="mesh" mesh="shoulder_part1" class="part" pos="0 -0.0109 0" quat="-0.5 -0.5 -0.5 0.5" mass="0.0022"/>
+      <geom name="RH_shoulder_part2" type="mesh" mesh="shoulder_part2_m" class="part" pos="0 -0.0109 0" quat="0 0 -0.707107 0.707107" mass="0.0031"/>
+<geom name="RH_shoulder_part1" type="mesh" mesh="shoulder_part1_m" class="part" pos="0 -0.0109 0" quat="0.5 0.5 -0.5 0.5" mass="0.0022"/>
 <geom name="RH_pitch_servo" type="box" class="part" size="0.01135 0.0114 0.0061" pos="0 0.0055 -0.0091" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
 <geom name="RH_shoulder_misc" type="sphere" class="part" size="0.003" pos="0 0.0041 0" mass="0.0013" rgba="0.5 0.5 0.5 0"/>
       <body name="RH_upper" pos="0 0 -0.0091">

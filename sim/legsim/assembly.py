@@ -140,7 +140,11 @@ def lower_parts():
 
 
 def leg_transform(side, end, turn_hind):
-    """Linear map from the RF description to a leg. Mirror for the left side;
-    the holder and shoulder of hind legs are additionally turned around (180 deg about Z).
-    Leg links are only mirrored: all knees bend the same way in the firmware IK."""
-    return np.diag([side * (end if turn_hind else 1), end if turn_hind else 1, 1.0])
+    """Linear map from the RF description to a leg.
+
+    Front legs: RF as is, LF mirrored. The hind holder and shoulders are the front
+    ones turned around (180 deg about Z): RH is LF turned, LH is RF turned, so
+    the gears stay on the inner side (toward the body centre line) at both ends.
+    That is diag(side, end, 1). Leg links are only mirrored: all knees bend the
+    same way in the firmware IK."""
+    return np.diag([float(side), float(end) if turn_hind else 1.0, 1.0])
