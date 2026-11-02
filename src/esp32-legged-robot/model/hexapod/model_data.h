@@ -166,4 +166,16 @@ const GaitParams GAIT_PARAMS = {
 	false     // no foot contact sensors
 };
 
+// IMU leveling (HORIZON_LEVEL or CLI `level on`), not tuned for this model yet:
+// the dog's values (tuned in the simulator) as a starting point
+const LevelerParams LEVEL_PARAMS = {
+	0.0,   // kp
+	1.0,   // ki, 1/s
+	0.0,   // kd, s
+	0.25,  // limit, rad
+	0.5,   // rate, rad/s
+	0.0,   // IMU low-pass, s
+	0.026  // deadband, rad
+};
+
 #endif

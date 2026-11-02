@@ -30,9 +30,11 @@ static MotionController motion;
 static const GaitParams *gaitParams = &GAIT_PARAMS;
 static LR_angle         imuCorrection = { 0, 0, 0 };
 
+static BodyLeveler      leveler;
 #ifdef HORIZON_LEVEL
-	// same gains and conversion as src/esp32-legged-robot/motion.cpp
-	static AnglePID imuCorrectionPID(PID_LEVEL_P, PID_LEVEL_I / BRIDGE_LOOP_DT, PID_LEVEL_D * BRIDGE_LOOP_DT, -0.2, 0.2);
+	static bool levelOn = true;
+#else
+	static bool levelOn = false;
 #endif
 
 // Pristine copy of the model legs, so rc_init() can start over
@@ -58,9 +60,8 @@ RC_API void rc_init()
 		memcpy((void *)legs, (const void *)initialLegs, sizeof(legs));
 	}
 	imuCorrection = { 0, 0, 0 };
-	#ifdef HORIZON_LEVEL
-		imuCorrectionPID = AnglePID(PID_LEVEL_P, PID_LEVEL_I / BRIDGE_LOOP_DT, PID_LEVEL_D * BRIDGE_LOOP_DT, -0.2, 0.2);
-	#endif
+	leveler.begin(LEVEL_PARAMS);
+	leveler.setEnabled(levelOn);
 	motion.begin(*gaitParams, legs, LEG_NUM, modelIK, LEG_DOF, &servoMainProfile);
 	LR_moveVector zero = {};
 	motion.update(0.0f, zero, imuCorrection);
@@ -71,8 +72,9 @@ RC_API void rc_init()
  *
  * @param dt      seconds since the previous tick (firmware: rc_loop_dt())
  * @param command 6 floats in [-1, 1]: move x, y, z, rotate pitch, roll, yaw
- * @param imu     3 floats, body pitch, roll, yaw in rad (used only when the
- *                model enables HORIZON_LEVEL), may be NULL
+ * @param imu     3 floats, body pitch, roll, yaw in rad in the firmware
+ *                convention (pitch about forward Y), used by the leveler
+ *                (rc_set_leveling), may be NULL
  * @param pulses  out, LEG_NUM * LEG_DOF pulse widths in us, leg*dof + joint
  * @return        number of legs without an IK solution this tick
  */
@@ -82,15 +84,16 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 		{ command[0], command[1], command[2] },
 		{ command[3], command[4], command[5] }
 	};
-	#ifdef HORIZON_LEVEL
+	if (imu || !leveler.enabled()) {
+		LR_angle current = { 0, 0, 0 };
 		if (imu) {
-			LR_angle current = { imu[0], imu[1], imu[2] };
-			LR_angle target  = { 0, 0, 0 };
-			imuCorrection = imuCorrectionPID.update(current, target, dt);
+			current = { imu[0], imu[1], imu[2] };
 		}
-	#else
-		(void)imu;
-	#endif
+		LR_angle target = { 0, 0, 0 };
+		// same rule as the firmware (motion.cpp): hold during a dynamic gait
+		bool hold = motion.gait().isActive() && !motion.gait().params().staticStability;
+		imuCorrection = leveler.update(dt, current, target, hold);
+	}
 
 	int unsolved = motion.update(dt, cmd, imuCorrection);
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
@@ -172,6 +175,39 @@ RC_API void rc_set_stability_gain(float sideways, float foreAft)
 	p.stabilityGain.x = sideways < 0 ? 0 : sideways;
 	p.stabilityGain.y = foreAft < 0 ? 0 : foreAft;
 	motion.gait().setParams(p);
+}
+
+/**
+ * The firmware IMU driver's tilt estimate from raw sensor values, so the
+ * simulator feeds the leveler what the robot would. accel in g,
+ * gyro in rad/s, sensor frame X right, Y forward, Z up. out: pitch, roll in
+ * the firmware convention (pitch = lean about the forward axis).
+ */
+static TiltEstimator tilt;
+RC_API void rc_tilt_estimate(float dt, const float *accel, const float *gyro, float *out)
+{
+	tilt.update(dt, accel, gyro);
+	out[0] = tilt.aboutY();
+	out[1] = tilt.aboutX();
+}
+
+RC_API void rc_tilt_reset()
+{
+	tilt.reset();
+}
+
+/** IMU leveling on (1) or off (0); kept across rc_init(). */
+RC_API void rc_set_leveling(int on)
+{
+	levelOn = on != 0;
+	leveler.setEnabled(levelOn);
+}
+
+/** Leveler correction: pitch, roll (rad, firmware convention). */
+RC_API void rc_level_correction(float *out)
+{
+	out[0] = imuCorrection.pitch;
+	out[1] = imuCorrection.roll;
 }
 
 /**

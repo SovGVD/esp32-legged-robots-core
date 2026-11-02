@@ -15,5 +15,7 @@
 #include "servo_hal.h"
 #include "diff_drive.h"
 #include "hardware.h"
+#include "body_leveler.h"
+#include "tilt_estimator.h"
 
 #endif

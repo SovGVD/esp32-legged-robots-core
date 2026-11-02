@@ -61,15 +61,18 @@ pio test -e native
 ### Code layout
 
 - `lib/robot_core/` - hardware independent motion code, shared by the firmware and the native tests
-- `src/esp32-legged-robot/` - firmware: `main.cpp`, `motion.cpp` (gait -> body -> IK pipeline), HAL backends
-  (`hal_esp32pwm.cpp`, `hal_pca9685.cpp`, `hal_dcmotor.cpp`), sensors, WiFi/web server, CLI, settings
+- `src/esp32-legged-robot/` - firmware: `main.cpp` (fixed-rate motion task on an `esp_timer`), `motion.cpp`
+  (gait -> body -> IK pipeline, or the tank's differential drive), drivers behind the `ServoBus`, `Imu` and
+  `PowerSensor` interfaces from `lib/robot_core/src/hardware.h` (`hal_esp32pwm.cpp`, `hal_pca9685.cpp`,
+  `hal_dcmotor.cpp`, `sensors.cpp`), WiFi/web server, CLI, settings (NVS)
 - `src/esp32-legged-robot/model/<name>/config.h` - compile time config of a robot (pins, sizes, hardware)
-- `src/esp32-legged-robot/model/<name>/model.cpp` - robot description: legs, servo profile, gait parameters, IK solver
+- `src/esp32-legged-robot/model/<name>/model_data.h` - robot description: legs, servo profile, gait and leveling
+  parameters (no Arduino, also used by the tests and the simulator); `model.cpp` adds the IK solver and CLI
 - `test/` - native unit tests
 
 ### Gait
 
-Every model has `GAIT_PARAMS` in its `model.cpp`: cycle time, duty factor, per leg phase offsets, step height,
+Every model has `GAIT_PARAMS` in its `model_data.h`: cycle time, duty factor, per leg phase offsets, step height,
 max speed/turn rate and acceleration. The move command from the web client is a velocity; the body moves
 continuously and feet swing on a cycloid path to footholds placed ahead of the body (Raibert style). The gait is
 time based (open loop); set `useContactSensors` to `true` once a robot has foot contact sensors filling
@@ -81,6 +84,23 @@ centre of mass is steered to the weighted feet centroid, scaled per axis by `sta
 with three feet on the ground. The dog has a second gait, `GAIT_PARAMS_WALK` (crawl: LH, LF, RH, RF, 1.2 s cycle,
 20 mm/s, sideways shift only, about 16 mm stability margin); switch with the CLI command `gait walk` / `gait trot`
 (applied once the robot stands still). In the simulator this walk tilts about 2° instead of 3-6° without the shift.
+
+**IMU leveling.** `level on` in the CLI (or `HORIZON_LEVEL` in `config.h` to start with it on) tilts the body
+against the slope the IMU measures, on top of the gait and static stability. The tilt comes from the accelerometer
+and gyro fused by `TiltEstimator` (the accelerometer alone is thrown off by the robot's own accelerations), and
+`BodyLeveler` is mostly integral with a 1.5° deadband, so it removes a steady slope without chasing the gait's
+rocking; it holds its value during a trot. Parameters are `LEVEL_PARAMS` in `model_data.h`. In the simulator an
+8° slope leaves under 3° of tilt (standing) and the static walk on a 6° side slope tilts half as much. Before
+using it on a robot, check the IMU mounting with `level state`: raise the left side and the pitch must change,
+raise the nose and the roll must change (the firmware's pitch is the sideways lean, as on the web client); fix
+it with `IMU_SWAP_ROLL_PITCH`, `IMU_PITCH_SIGN` and `IMU_ROLL_SIGN`. `calib imu` offsets are saved in NVS.
+
+**Tank.** No gait: the move command is mixed into left/right track speeds, slew limited (`TANK_DRIVE_PARAMS` in
+`model/tank/model_data.h`: acceleration, deadband, minimum duty that starts the motors) and written as H-bridge
+duties.
+
+**Settings** are stored in NVS (`Preferences`, namespace `robot`) with a version and per-field defaults; the first
+boot after updating imports the trims saved by the old EEPROM code.
 
 Servos on plain ESP32 boards (`PWM_CONTROLLER_TYPE ESP32PWM`) are driven by the LEDC hardware PWM
 peripheral (up to 16 servos, 50Hz by default, override with `ESP32PWM_SERVO_FREQ`).

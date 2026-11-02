@@ -150,4 +150,18 @@ const GaitParams GAIT_PARAMS_WALK = {
 	{ 0, 0, 0 }   // centre of mass, mm from the body origin (battery is centred)
 };
 
+// IMU leveling (HORIZON_LEVEL or CLI `level on`), tuned in the simulator:
+// mostly integral, so it removes a slope's steady tilt but doesn't chase
+// the gait's own rocking (the IMU estimate is off by 1-3 deg while walking).
+// It holds its value during a trot (see BodyLeveler::update, hold).
+const LevelerParams LEVEL_PARAMS = {
+	0.0,   // kp
+	1.0,   // ki, 1/s
+	0.0,   // kd, s
+	0.25,  // limit, rad (~14 deg)
+	0.5,   // rate, rad/s
+	0.0,   // IMU low-pass, s (TiltEstimator already filters)
+	0.026 // deadband, rad (1.5 deg): the integral ignores the walking estimate error
+};
+
 #endif

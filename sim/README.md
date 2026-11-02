@@ -79,8 +79,10 @@ Each tick is `rc_update(dt, command, imu) -> pulses[12]`, the same as
 `updateMotion()` + `servoSet()` on the robot, then `SimDog.write_pulses()`.
 The command is `LR_moveVector`: move x (+ right), y (+ forward), z, rotate
 pitch, roll, yaw (+ turns right), each in [-1, 1], like the web client.
-The body pitch/roll/yaw from the sim is passed in as the IMU reading and is
-used only when the model enables `HORIZON_LEVEL` (the dog doesn't yet).
+The IMU reading is the simulated accelerometer and gyro run through the
+firmware's own `TiltEstimator` (`fw.imu_angles(dog)`); it feeds the IMU
+leveler, which is off unless `fw.set_leveling(True)` (or the model's
+`HORIZON_LEVEL`).
 `fw.select_gait("walk")` picks the dog's statically stable walk
 (`GAIT_PARAMS_WALK`), `fw.support_margin()` reports how far the centre of
 mass is inside the support polygon, and `fw.tune_gait(...)` /
@@ -90,7 +92,8 @@ mass is inside the support polygon, and `fw.tune_gait(...)` /
 pulses as the Python port, that the firmware stands, trots, strafes,
 turns and stops in the sim, and that the static walk keeps the centre of
 mass inside the triangle and tilts less than the same walk without the
-shift.
+shift, and that leveling takes out most of an 8° slope (gravity tilted)
+without rocking the robot on flat ground.
 
 ### Manual control
 

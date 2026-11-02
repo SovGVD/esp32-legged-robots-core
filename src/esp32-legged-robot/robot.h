@@ -37,6 +37,8 @@ extern const GaitParams  GAIT_PARAMS;
 extern LegIK            &MODEL_IK;
 #if PWM_CONTROLLER_TYPE == DCMOTOR
 extern const DiffDriveParams TANK_DRIVE_PARAMS;
+#else
+extern const LevelerParams   LEVEL_PARAMS;
 #endif
 extern const cliCommand *modelCliCommands;
 extern const uint8_t     modelCliCommandsCount;
@@ -93,6 +95,10 @@ ServoBus &servoBus();
 /**
  * Sensors (sensors.cpp)
  */
+// IMU leveling (motion.cpp), on with HORIZON_LEVEL or `level on`
+void     setLeveling(bool on);
+bool     levelingEnabled();
+LR_angle levelCorrection();
 Imu         &imu();           // IMU_TYPE, or NoImu
 PowerSensor &powerSensor();   // POWER_SENSOR, or NoPowerSensor
 void initIMU();
@@ -151,6 +157,7 @@ void cliPwmServo();
 void cliAngleServo();
 void cliSetTrim();
 void cliHal();
+void cliLevel();
 void cliDisplayState();
 void cliRunServoCalibrate();
 void cliDebug();

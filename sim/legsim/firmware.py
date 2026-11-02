@@ -87,19 +87,28 @@ class FirmwareCore:
         L.rc_reject_counts.argtypes = [ctypes.POINTER(ctypes.c_uint32)]
         L.rc_shift.restype = None
         L.rc_shift.argtypes = [f32p]
+        L.rc_tilt_estimate.restype = None
+        L.rc_tilt_estimate.argtypes = [ctypes.c_float, f32p, f32p, f32p]
+        L.rc_tilt_reset.restype = None
+        L.rc_set_leveling.restype = None
+        L.rc_set_leveling.argtypes = [ctypes.c_int]
+        L.rc_level_correction.restype = None
+        L.rc_level_correction.argtypes = [f32p]
         self.legs = L.rc_leg_count()
         self.dof = L.rc_leg_dof()
         self.loop_dt = float(L.rc_loop_dt())
         self.unsolved = 0
+        self.last_imu = (0.0, 0.0, 0.0)
         self.reset()
 
     def reset(self):
         self.lib.rc_init()
+        self.lib.rc_tilt_reset()
         self.unsolved = 0
 
     def update(self, command=(0, 0, 0, 0, 0, 0), dt=None, imu=None):
         """One control tick. command: move x, y, z, rotate pitch, roll, yaw, each in [-1, 1]
-        (y = forward, yaw = turn). imu: (pitch, roll, yaw) rad, used only with HORIZON_LEVEL.
+        (y = forward, yaw = turn). imu: (pitch, roll, yaw) rad, firmware convention (see imu_angles()), used by the leveler.
         Returns the servo pulses (us), leg*dof + joint."""
         cmd = (ctypes.c_float * 6)(*[float(c) for c in command])
         imu_arr = None if imu is None else (ctypes.c_float * 3)(*[float(v) for v in imu])
@@ -155,6 +164,26 @@ class FirmwareCore:
         self.lib.rc_reject_counts(buf)
         return {"reach": buf[0], "joint_limits": buf[1], "servo_range": buf[2]}
 
+    def imu_angles(self, dog, dt=None):
+        """What the firmware IMU driver reports: the simulated accelerometer and
+        gyro through the firmware's TiltEstimator (so walking accelerations
+        are in it, like on the robot). (pitch, roll, yaw), firmware convention:
+        pitch is the sideways lean, roll the nose up/down tilt. Call once per tick."""
+        imu = dog.read_imu()
+        f3 = ctypes.c_float * 3
+        out = (ctypes.c_float * 2)()
+        self.lib.rc_tilt_estimate(self.loop_dt if dt is None else dt,
+                                  f3(*(float(a) / 9.81 for a in imu["accel"])), f3(*map(float, imu["gyro"])), out)
+        return (out[0], out[1], dog.body_orientation()["yaw"])
+
+    def set_leveling(self, on):
+        """IMU leveling (BodyLeveler) on/off; stays across reset()."""
+        self.lib.rc_set_leveling(1 if on else 0)
+
+    def level_correction(self):
+        """Leveler output: pitch, roll in rad, firmware convention."""
+        return self._floats(self.lib.rc_level_correction, 2)
+
     def gait_active(self):
         return bool(self.lib.rc_gait_active())
 
@@ -164,8 +193,8 @@ class FirmwareCore:
         ticks = 1 if duration is None else max(1, int(round(duration / self.loop_dt)))
         pulses = None
         for _ in range(ticks):
-            o = dog.body_orientation()
-            pulses = self.update(command, imu=(o["pitch"], o["roll"], o["yaw"]))
+            self.last_imu = self.imu_angles(dog)
+            pulses = self.update(command, imu=self.last_imu)
             dog.write_pulses(pulses)
             dog.step(self.loop_dt)
         return pulses

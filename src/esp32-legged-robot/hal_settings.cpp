@@ -70,6 +70,27 @@ void cliHal()
 	cliDisplayState();
 }
 
+void cliLevel()
+{
+	char* mode = CLI_readWord();
+	if (strcmp(mode, TITLE_ON) == 0) {
+		if (!imu().ready()) {
+			cliSerial->println("No IMU, leveling stays off.");
+		} else {
+			setLeveling(true);
+		}
+	}
+	if (strcmp(mode, TITLE_OFF) == 0) {
+		setLeveling(false);
+	}
+
+	LR_angle c = levelCorrection();
+	cliSerial->printf("Leveling: %s, IMU %s\n", levelingEnabled() ? TITLE_ON : TITLE_OFF, imu().name());
+	cliSerial->printf("IMU pitch %.1f roll %.1f deg\n",
+	                  radToDeg(IMU_DATA.pitch), radToDeg(IMU_DATA.roll));
+	cliSerial->printf("Correction pitch %.1f roll %.1f deg\n", radToDeg(c.pitch), radToDeg(c.roll));
+}
+
 void cliDisplayState()
 {
 	cliSerial->print("HAL: ");
