@@ -1,0 +1,124 @@
+#include "robot.h"
+
+float testAngle = 0;
+float testAngleInc = 0.5;
+bool testAngleWay = true;
+bool isServoReady = false;
+
+/**
+ * Sanity check of the servo pin map, printed at boot. A duplicated pin makes
+ * two joints share one signal; ESP32 strapping pins can stop the board from
+ * booting (GPIO 12 high at reset selects 1.8V flash) and GPIO 34-39 are
+ * input only.
+ */
+static uint8_t checkServoPins()
+{
+	#if PWM_CONTROLLER_TYPE == DCMOTOR
+		return 0;
+	#else
+	uint8_t pins[LEG_NUM * LEG_DOF];
+	uint8_t n = 0;
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		pins[n++] = legs[i].hal.pin.alpha;
+		pins[n++] = legs[i].hal.pin.beta;
+		#if LEG_DOF > 2
+			pins[n++] = legs[i].hal.pin.gamma;
+		#endif
+		#if LEG_DOF > 3
+			pins[n++] = legs[i].hal.pin.delta;
+			pins[n++] = legs[i].hal.pin.epsilon;
+			pins[n++] = legs[i].hal.pin.zeta;
+		#endif
+	}
+
+	uint8_t problems = 0;
+	for (uint8_t i = 0; i < n; i++) {
+		for (uint8_t j = i + 1; j < n; j++) {
+			if (pins[i] == pins[j]) {
+				Serial.printf("\nWARNING: servo pin %u is used by servo %u and %u", pins[i], i, j);
+				problems++;
+			}
+		}
+		#if PWM_CONTROLLER_TYPE == ESP32PWM
+			switch (pins[i]) {
+				case 0: case 2: case 5: case 12: case 15:
+					Serial.printf("\nWARNING: servo %u uses strapping pin GPIO%u, the board may fail to boot", i, pins[i]);
+					problems++;
+					break;
+				case 34: case 35: case 36: case 37: case 38: case 39:
+					Serial.printf("\nERROR: servo %u uses input only pin GPIO%u", i, pins[i]);
+					problems++;
+					break;
+			}
+		#elif PWM_CONTROLLER_TYPE == PCA9685
+			if (pins[i] >= servoChannelLimit()) {
+				Serial.printf("\nERROR: servo %u uses PCA9685 channel %u, only %u available", i, pins[i], servoChannelLimit());
+				problems++;
+			}
+		#endif
+	}
+	if (problems) {
+		Serial.println();
+	}
+	return problems;
+	#endif
+}
+
+void initServo()
+{
+	if (xPortGetCoreID() != MOTOR_CORE) {
+		return;
+	}
+
+	Serial.print("Servo on core");
+	Serial.print(xPortGetCoreID());
+	Serial.print(" ");
+	checkServoPins();
+	initServoHAL();
+	Serial.println();
+	isServoReady = true;
+}
+
+/**
+ * Set servo to init robot calibration position
+ */
+void setMotorsToCalibratePosition()
+{
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		legs[i].angle.alpha = legs[i].calibrate.alpha;
+		legs[i].angle.beta  = legs[i].calibrate.beta;
+		#if LEG_DOF > 2
+			legs[i].angle.gamma = legs[i].calibrate.gamma;
+		#endif
+		#if LEG_DOF > 3
+			legs[i].angle.delta    = legs[i].calibrate.delta;
+			legs[i].angle.epsilon  = legs[i].calibrate.epsilon;
+			legs[i].angle.zeta     = legs[i].calibrate.zeta;
+		#endif
+		setLegPWM(legs[i]);
+	}
+}
+
+void servoSet()
+{
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		setLegPWM(legs[i]);
+	}
+}
+
+void doMotors()
+{
+  for (uint8_t i = 0; i < LEG_NUM; i++) {
+    doLeg(legs[i]);
+  }
+}
+
+bool servoReady()
+{
+	return isServoReady;
+}
+
+uint16_t angleToPulse(float angleRad)
+{
+	return lrAngleToPulse(servoMainProfile, angleRad);
+}

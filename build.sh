@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
+# Thin wrapper around PlatformIO (see platformio.ini) plus the web client build.
+# You can also call PlatformIO directly, e.g. `pio run -e robot-dog -t upload`.
 set -e
 CWD=$(pwd -P)
-
-ARDUINO_PATH="${CWD}/arduino-cli-ide"
-ARDUINO_BIN_DIR="${ARDUINO_PATH}/bin"
-ARDUINO_BIN="${ARDUINO_BIN_DIR}/arduino-cli"
-ARDUINO_CONFIG="${ARDUINO_PATH}/arduino-ide-esp32-legged-robot-dog.yaml"
-ARDUINO_DATA="${ARDUINO_PATH}/.arduino"
-ARDUINO_DOWNLOADS="${ARDUINO_PATH}/.arduino/staging"
-ARDUINO_USER="${ARDUINO_PATH}/Arduino"
-ARDUINO_LIB="${ARDUINO_USER}/libraries"
-ARDUINO_BUILD="${ARDUINO_PATH}/.arduino/build"
-ARDUINO_CLI="${ARDUINO_BIN} --no-color --config-file ${ARDUINO_CONFIG}"
-
-SRC="${CWD}/src/esp32-legged-robot"
-SRC_CONFIG_MODEL="${SRC}/config_model.h"
 
 WEB_CLIENT_DIR="${CWD}/src/web"
 
@@ -22,11 +10,14 @@ COMMAND="$1"
 PARAM1="$2"
 PARAM2="$3"
 
-installArduinoCli()
+requirePio()
 {
-	# Create folders for Arduino CLI
-	mkdir -p $ARDUINO_BIN_DIR
-	curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=$ARDUINO_BIN_DIR sh -s 1.2.0
+	if ! command -v pio >/dev/null 2>&1; then
+		echo "PlatformIO CLI (pio) not found. Install it with:"
+		echo "  pip install -U platformio"
+		echo "or see https://docs.platformio.org/en/latest/core/installation/index.html"
+		exit 1
+	fi
 }
 
 buildWebClientEnv()
@@ -34,7 +25,6 @@ buildWebClientEnv()
 	# Check node version to fail if node was not install
 	# or at least show version for debug
 	# @see https://nodejs.org/en/download/package-manager/
-	# Expected latest LTS (currently 16.x)
 	node -v
 	npm -v
 	cd $WEB_CLIENT_DIR
@@ -43,97 +33,10 @@ buildWebClientEnv()
 	cd $CWD
 }
 
-buildEnv() {
-	if [ ! -f "$ARDUINO_BIN" ]; then
-		installArduinoCli
-	fi
-	# Create folders for Arduino
-	mkdir -p $ARDUINO_PATH
-	mkdir -p $ARDUINO_DATA
-	mkdir -p $ARDUINO_DOWNLOADS
-	mkdir -p $ARDUINO_USER
-	mkdir -p $ARDUINO_BUILD
-
-	echo "Build environment in: $CWD"
-	echo "Arduino path: $ARDUINO_PATH"
-
-	$ARDUINO_CLI config set board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-	echo "config: esp packages"
-	$ARDUINO_CLI config set directories.data $ARDUINO_DATA
-	echo "config: dir data"
-	$ARDUINO_CLI config set directories.downloads $ARDUINO_DOWNLOADS
-	echo "config: dir downloads"
-	$ARDUINO_CLI config set directories.user $ARDUINO_USER
-	echo "config: dir use"
-	$ARDUINO_CLI config set library.enable_unsafe_install true
-	echo "config: set unsafe"
-	$ARDUINO_CLI config dump
-	echo "Config steps done"
-
-	# Install ESP32
-	if [ ! -d "$ARDUINO_DATA/packages/esp32/hardware/esp32/1.0.6" ]; then
-		$ARDUINO_CLI core update-index
-		$ARDUINO_CLI core install esp32:esp32@1.0.6
-		$ARDUINO_CLI core list
-		$ARDUINO_CLI board listall
-		echo "ESP32 core done"
-	fi
-
-	# Install libraries
-	$ARDUINO_CLI lib install ESP32_ISR_Servo@1.1.0
-	echo "ESP32_IRS installed"
-	$ARDUINO_CLI lib install MPU9250_WE@1.1.3
-	echo "MPI9250 installed"
-	$ARDUINO_CLI lib install INA219_WE@1.3.1
-	echo "INA219 installed"
-	$ARDUINO_CLI lib install "Adafruit PWM Servo Driver Library"@2.4.0
-	echo "PWM installed"
-
-	# Install other libraries
-	cd $ARDUINO_LIB
-	if [ ! -d "$ARDUINO_LIB/esp32camera" ]; then
-		git clone https://github.com/SovGVD/esp32camera.git
-	fi
-	cd $ARDUINO_LIB/esp32camera
-	git checkout 193ea76a1047cc83b34a8e366241fca0f08e4022
-	echo "ESP32cam installed"
-
-	cd $ARDUINO_LIB
-	if [ ! -d "$ARDUINO_LIB/ESPAsyncWebServer" ]; then
-		git clone https://github.com/me-no-dev/ESPAsyncWebServer.git
-	fi
-	cd $ARDUINO_LIB/ESPAsyncWebServer
-	git checkout f71e3d427b5be9791a8a2c93cf8079792c3a9a26
-	echo "ESP async server installed"
-
-	cd $ARDUINO_LIB
-	if [ ! -d "$ARDUINO_LIB/AsyncTCP" ]; then
-		git clone https://github.com/me-no-dev/AsyncTCP.git
-	fi
-	cd $ARDUINO_LIB/AsyncTCP
-	git checkout ca8ac5f919d02bea07b474531981ddbfd64de97c
-	echo "Async TCP installed"
-
-	cd $CWD
-}
-
-setModelAndBoard() {
+requireModel() {
 	case $PARAM1 in
-		robot-dog)
-			MODEL="MODEL_DOG"
-			BOARD="esp32:esp32:esp32doit-devkit-v1"
-			;;
-		robot-biped)
-			MODEL="MODEL_BIPED"
-			BOARD="esp32:esp32:esp32cam"
-			;;
-		robot-tank)
-			MODEL="MODEL_TANK"
-			BOARD="esp32:esp32:esp32doit-devkit-v1"
-			;;
-		robot-hexapod)
-			MODEL="MODEL_HEXAPOD"
-			BOARD="esp32:esp32:esp32cam"
+		robot-dog|robot-biped|robot-tank|robot-hexapod)
+			ENV="$PARAM1"
 			;;
 		*)
 			compileHelp
@@ -143,49 +46,52 @@ setModelAndBoard() {
 }
 
 compile() {
-	setModelAndBoard
-	# Compile
-	# TODO: exit on error!
-	echo "Compile: ${ARDUINO_CLI} compile --fqbn ${BOARD} ${SRC}..."
-	echo "#define ROBOT_MODEL ${MODEL}" > $SRC_CONFIG_MODEL
-	$ARDUINO_CLI cache clean
-	$ARDUINO_CLI compile --fqbn $BOARD $SRC -v --build-path $ARDUINO_BUILD
-	#rm $SRC_CONFIG_MODEL
+	requirePio
+	requireModel
+	pio run -e "$ENV"
 }
 
 upload() {
-	[[ -z "$PARAM2" ]] && { echo "Port required" ; exit 1; }
-	compile
-	echo "Uploading ${MODEL}. Port:${PARAM2}..."
-	$ARDUINO_CLI upload -p ${PARAM2} --fqbn $BOARD $SRC -v --input-dir $ARDUINO_BUILD
+	requirePio
+	requireModel
+	if [[ -n "$PARAM2" ]]; then
+		pio run -e "$ENV" -t upload --upload-port "$PARAM2"
+	else
+		pio run -e "$ENV" -t upload
+	fi
+}
+
+runTests() {
+	requirePio
+	pio test -e native
 }
 
 monitor() {
-	[[ -z "$PARAM1" ]] && { echo "Port required" ; exit 1; }
+	requirePio
 	echo "Press Ctrl-C to exit"
-	$ARDUINO_CLI monitor -p ${PARAM1} -c baudrate=115200
+	if [[ -n "$PARAM1" ]]; then
+		pio device monitor -b 115200 -p "$PARAM1"
+	else
+		pio device monitor -b 115200
+	fi
 }
 
 helpHeader() {
-	echo "ESP32 legged robot build command line interface."
+	echo "ESP32 legged robot build command line interface (PlatformIO)."
 	echo ""
 }
 
 help() {
 	helpHeader
 	echo "Usage:"
-	echo "  ./build.sh [command]"
-	echo ""
-	echo "Examples:"
 	echo "  ./build.sh <command> [flags...]"
 	echo ""
 	echo "Available Commands:"
-	echo "  install-arduino-cli Install latest version of Arduino CLI from Arduno CLI repository"
-	echo "  build-env           Build environment for ESP32 and install required libraries"
-	echo "  build-client-env    Build environment for robot web client"
-	echo "  compile             Compile ESP32 binary"
-	echo "  upload              Compile and upload"
-	echo "  cli                 Arduino monitor, terminal"
+	echo "  build-client-env    Build robot web client (src/web -> web/index.html.gz.h)"
+	echo "  compile <model>     Compile ESP32 firmware (pio run -e <model>)"
+	echo "  upload <model> [port]  Compile and upload"
+	echo "  test                Run motion core unit tests on this PC"
+	echo "  cli [port]          Serial monitor"
 }
 
 compileHelp() {
@@ -196,7 +102,7 @@ compileHelp() {
 	echo "Examples:"
 	echo "  ./build.sh compile robot-dog"
 	echo ""
-	echo "Available Commands:"
+	echo "Available models:"
 	echo "  robot-dog      quadruped dog-like robot"
 	echo "  robot-biped    bipedal robot"
 	echo "  robot-tank     tank-like robot"
@@ -204,12 +110,6 @@ compileHelp() {
 }
 
 case $COMMAND in
-	install-arduino-cli)
-		installArduinoCli
-		;;
-	build-env)
-		buildEnv
-		;;
 	build-client-env)
 		buildWebClientEnv
 		;;
@@ -218,6 +118,9 @@ case $COMMAND in
 		;;
 	upload)
 		upload
+		;;
+	test)
+		runTests
 		;;
 	cli)
 		monitor

@@ -1,9 +1,12 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
 /**
  * Configuration file
  */
 
 //Fail safe
-#define FS_WS_THR 20  // cycles, 1 second = FS_WS_THR*LOOP_TIME, e.g. 1 000 * 1 000 = 1 000 000 = 1 second
+#define FS_TIMEOUT_MS 500  // stop when no move package arrives for this long (the web client sends one every 50 ms)
 
 // Serial
 #define SERIAL_BAUD 115200 
@@ -38,3 +41,4 @@
 #define SERVO_MAX 2400
 #define SERVO_FREQ 330	// for PCA9685
 
+#endif
