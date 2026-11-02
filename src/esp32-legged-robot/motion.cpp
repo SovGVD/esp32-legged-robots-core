@@ -6,6 +6,7 @@
 #include "robot.h"
 
 static MotionController motion;
+static const GaitParams * volatile pendingGait = nullptr;   // set from the CLI (core 0)
 
 #ifdef HORIZON_LEVEL
 	// Gains were tuned per loop tick; convert to per second for the dt based PID
@@ -17,6 +18,11 @@ void initMotion()
 {
 	Serial.println("Init gait");
 	motion.begin(GAIT_PARAMS, legs, LEG_NUM, MODEL_IK);
+}
+
+void requestGait(const GaitParams &params)
+{
+	pendingGait = &params;
 }
 
 const LR_figure &motionBody()
@@ -33,6 +39,13 @@ void updateMotion()
 
 	if (!isHALEnabled()) {
 		return;
+	}
+
+	// switch gaits only while standing, so no leg is in the air
+	const GaitParams *next = pendingGait;
+	if (next != nullptr && !motion.gait().isActive()) {
+		motion.gait().setParams(*next);
+		pendingGait = nullptr;
 	}
 
 	motion.update(LOOP_DT, getMoveCommand(), imuCorrection);

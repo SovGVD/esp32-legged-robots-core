@@ -27,7 +27,7 @@ def fw():
 
 @pytest.fixture
 def dog(fw):
-    fw.reset()
+    fw.select_gait("default")   # also resets
     d = SimDog()
     d.step(0.3)
     return d
@@ -101,3 +101,40 @@ def test_stops_and_settles(fw, dog):
     fw.drive(dog, STOP, 1.0)
     assert np.linalg.norm(dog.body_position_mm()[:2] - p0[:2]) < 3.0
     assert tilt_deg(dog) < 2.0
+
+
+def _walk(fw, dog, command, seconds):
+    p0 = dog.body_position_mm().copy()
+    tilt = 0.0
+    margin = 1e9
+    for _ in range(int(seconds / fw.loop_dt)):
+        fw.drive(dog, command)
+        tilt = max(tilt, tilt_deg(dog))
+        if any(fw.feet()[:, 2] > -79.99):    # a leg in the air
+            margin = min(margin, fw.support_margin())
+    return dog.body_position_mm() - p0, tilt, margin
+
+
+@pytest.mark.parametrize("command", [(0, 1, 0, 0, 0, 0), (1, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 1)],
+                         ids=["forward", "strafe", "turn"])
+def test_static_walk_is_steadier_than_without_shift(fw, dog, command):
+    """Slow walk with the static stability shift vs the same walk without it."""
+    fw.select_gait("walk")
+    d = SimDog()
+    d.step(0.3)
+    moved, tilt, margin = _walk(fw, d, command, 6.0)
+    assert fw.unsolved == 0
+    assert margin > 4.0            # centre of mass inside the three-foot triangle
+    assert tilt < 3.0, tilt
+    if command[1]:
+        assert moved[1] > 80.0, moved  # 20 mm/s minus slip
+    if command[0]:
+        assert moved[0] > 80.0, moved
+
+    fw.select_gait("walk")
+    fw.set_stability_gain(-1)      # same gait, no shift
+    d = SimDog()
+    d.step(0.3)
+    _, tilt_off, margin_off = _walk(fw, d, command, 6.0)
+    assert margin_off < 0.0
+    assert tilt < 0.7 * tilt_off, (tilt, tilt_off)

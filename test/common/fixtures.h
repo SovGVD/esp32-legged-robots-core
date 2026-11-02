@@ -55,4 +55,15 @@ static inline GaitParams dogTrot()
 	return p;
 }
 
+/** Same as GAIT_PARAMS_WALK in model/dog/model_data.h */
+static inline GaitParams dogWalk()
+{
+	GaitParams p = {
+		true, 1.2f, 0.9f, { 0.65f, 0.15f, 0.9f, 0.4f, 0, 0 },
+		25, 20, 0.35f, 300, 2, 3, false,
+		true, 0.15f, { 1, 0, 0 }, { 0, 0, 0 }
+	};
+	return p;
+}
+
 #endif

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <unity.h>
 #include <robot_core.h>
 #include "../common/fixtures.h"
@@ -136,23 +137,31 @@ void test_turning_in_place()
 void test_full_speed_walk_is_always_reachable()
 {
 	// gait + body kinematics + IK together: every foot target must be solvable
+	// trot at full speed, and the static walk (its body shift needs reach too)
+	const GaitParams gaits[2] = { dogTrot(), dogWalk() };
+	for (const GaitParams &p : gaits) {
 	leg legs[4] = DOG_LEGS;
 	GaitEngine gait;
 	BodyKinematics bodyKinematics;
 	QuadrupedLegIK ik;
-	gait.begin(dogTrot(), legs, 4);
+	gait.begin(p, legs, 4);
 	LR_angle noCorrection = {};
 
-	LR_moveVector cmds[] = { command(0, 1, 0), command(1, 0, 0), command(-0.7f, -0.7f, 0), command(0.5f, 1, -1) };
+	LR_moveVector cmds[] = { command(0, 1, 0), command(1, 0, 0), command(-0.7f, -0.7f, 0), command(0.5f, 1, -1), command(0, 0, 1) };
 	for (const LR_moveVector &c : cmds) {
-		for (int t = 0; t < (int)(2.0f / DT); t++) {
+		for (int t = 0; t < (int)(2.0f * p.cycleTime / 0.4f / DT); t++) {
 			gait.update(DT, c);
 			bodyKinematics.update(legs, 4, gait.body(), noCorrection, c);
 			for (int i = 0; i < 4; i++) {
 				iksolver s = ik.solve(legs[i], gait.body(), c);
-				TEST_ASSERT_TRUE_MESSAGE(s.isSolved, "foot target out of reach");
+				if (!s.isSolved) {
+					char msg[96];
+					snprintf(msg, sizeof(msg), "out of reach: gait %d cmd %d t %.2f leg %d", (int)(&p - gaits), (int)(&c - cmds), t * DT, i);
+					TEST_FAIL_MESSAGE(msg);
+				}
 			}
 		}
+	}
 	}
 }
 
@@ -198,6 +207,104 @@ void test_disabled_gait_never_moves()
 	TEST_ASSERT_FLOAT_WITHIN(1e-6f, 0, gait.body().position.y);
 }
 
+void test_support_margin_geometry()
+{
+	LR_point tri[3] = { { 0, 0, 0 }, { 100, 0, 0 }, { 0, 100, 0 } };
+	LR_point in = { 10, 20, 0 };
+	LR_point out = { -5, 50, 0 };
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, 10, lrSupportMargin(tri, 3, in));      // nearest edge x = 0
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, -5, lrSupportMargin(tri, 3, out));
+	// point order does not matter
+	LR_point cw[3] = { tri[0], tri[2], tri[1] };
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, 10, lrSupportMargin(cw, 3, in));
+	// a quadrilateral with an inner point that is not part of the hull
+	LR_point quad[5] = { { 0, 0, 0 }, { 100, 0, 0 }, { 100, 100, 0 }, { 0, 100, 0 }, { 50, 50, 0 } };
+	LR_point c = { 50, 40, 0 };
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, 40, lrSupportMargin(quad, 5, c));
+	// two feet: never stable, minus the distance to the line between them
+	LR_point two[2] = { { 0, 0, 0 }, { 100, 0, 0 } };
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, -7, lrSupportMargin(two, 2, (LR_point){ 30, 7, 0 }));
+}
+
+static float minThreeLegMargin(const GaitParams &p, const LR_moveVector &cmd, float seconds, float *maxStepMm)
+{
+	leg legs[4] = DOG_LEGS;
+	GaitEngine gait;
+	gait.begin(p, legs, 4);
+	float worst = 1e9f;
+	float maxStep = 0;
+	LR_point prev = gait.body().position;
+	LR_point prevBase = gait.basePosition();
+	for (int t = 0; t < (int)(seconds / DT); t++) {
+		gait.update(DT, cmd);
+		int air = 0;
+		for (int i = 0; i < 4; i++) air += gait.isSwinging(i) ? 1 : 0;
+		if (air > 0) {
+			float m = gait.supportMargin();
+			if (m < worst) worst = m;
+		}
+		// body motion on top of the odometry: the shift itself
+		LR_point b = gait.body().position, base = gait.basePosition();
+		float dx = (b.x - prev.x) - (base.x - prevBase.x);
+		float dy = (b.y - prev.y) - (base.y - prevBase.y);
+		float step = sqrtf(dx * dx + dy * dy);
+		if (step > maxStep) maxStep = step;
+		prev = b;
+		prevBase = base;
+	}
+	if (maxStepMm) *maxStepMm = maxStep;
+	return worst;
+}
+
+void test_static_walk_keeps_center_of_mass_over_three_feet()
+{
+	const LR_moveVector cmds[4] = { command(0, 1, 0), command(0, -1, 0), command(1, 0, 0), command(0, 0, 1) };
+	for (int c = 0; c < 4; c++) {
+		float maxStep = 0;
+		float margin = minThreeLegMargin(dogWalk(), cmds[c], 8.0f, &maxStep);
+		// about 16 mm in steady state; the first step and turning a bit less
+		TEST_ASSERT_GREATER_THAN_FLOAT(4.0f, margin);
+		// the shift is smooth: well under 2 mm per tick (450 mm/s)
+		TEST_ASSERT_LESS_THAN_FLOAT(2.0f, maxStep);
+	}
+
+	// the same walk without the shift tips over a diagonal (negative margin)
+	GaitParams off = dogWalk();
+	off.staticStability = false;
+	TEST_ASSERT_LESS_THAN_FLOAT(0.0f, minThreeLegMargin(off, command(0, 1, 0), 8.0f, nullptr));
+}
+
+void test_static_walk_forward_steady_margin()
+{
+	leg legs[4] = DOG_LEGS;
+	GaitEngine gait;
+	gait.begin(dogWalk(), legs, 4);
+	float worst = 1e9f;
+	for (int t = 0; t < (int)(8.0f / DT); t++) {
+		gait.update(DT, command(0, 1, 0));
+		if (t * DT > 1.2f && (gait.isSwinging(0) || gait.isSwinging(1) || gait.isSwinging(2) || gait.isSwinging(3))) {
+			float m = gait.supportMargin();
+			if (m < worst) worst = m;
+		}
+	}
+	TEST_ASSERT_GREATER_THAN_FLOAT(12.0f, worst);
+	// odometry still walks at the commanded 20 mm/s (after the ramp)
+	TEST_ASSERT_FLOAT_WITHIN(10.0f, 20.0f * 8.0f, gait.basePosition().y);
+}
+
+void test_no_shift_without_static_stability()
+{
+	leg legs[4] = DOG_LEGS;
+	GaitEngine gait;
+	gait.begin(dogTrot(), legs, 4);
+	for (int t = 0; t < 1000; t++) {
+		gait.update(DT, command(0.5f, 1, 0.3f));
+		TEST_ASSERT_FLOAT_WITHIN(1e-6f, 0, gait.shift().x);
+		TEST_ASSERT_FLOAT_WITHIN(1e-6f, 0, gait.shift().y);
+		TEST_ASSERT_FLOAT_WITHIN(1e-4f, gait.basePosition().x, gait.body().position.x);
+	}
+}
+
 int main()
 {
 	UNITY_BEGIN();
@@ -209,5 +316,9 @@ int main()
 	RUN_TEST(test_full_speed_walk_is_always_reachable);
 	RUN_TEST(test_contact_sensor_ends_swing_early);
 	RUN_TEST(test_disabled_gait_never_moves);
+	RUN_TEST(test_support_margin_geometry);
+	RUN_TEST(test_static_walk_keeps_center_of_mass_over_three_feet);
+	RUN_TEST(test_static_walk_forward_steady_margin);
+	RUN_TEST(test_no_shift_without_static_stability);
 	return UNITY_END();
 }

@@ -27,6 +27,7 @@
 #define BRIDGE_LOOP_DT (LOOP_TIME / 1000000.0f)
 
 static MotionController motion;
+static const GaitParams *gaitParams = &GAIT_PARAMS;
 static LR_angle         imuCorrection = { 0, 0, 0 };
 
 #ifdef HORIZON_LEVEL
@@ -60,7 +61,7 @@ RC_API void rc_init()
 	#ifdef HORIZON_LEVEL
 		imuCorrectionPID = AnglePID(PID_LEVEL_P, PID_LEVEL_I / BRIDGE_LOOP_DT, PID_LEVEL_D * BRIDGE_LOOP_DT, -0.2, 0.2);
 	#endif
-	motion.begin(GAIT_PARAMS, legs, LEG_NUM, modelIK);
+	motion.begin(*gaitParams, legs, LEG_NUM, modelIK);
 	LR_moveVector zero = {};
 	motion.update(0.0f, zero, imuCorrection);
 }
@@ -130,4 +131,68 @@ RC_API void rc_body(float *out)
 RC_API int rc_gait_active()
 {
 	return motion.gait().isActive() ? 1 : 0;
+}
+
+/**
+ * Pick the gait for the next rc_init(): 0 = the model default (GAIT_PARAMS),
+ * 1 = slow walk with static stability (GAIT_PARAMS_WALK). Returns 0 if unknown.
+ */
+RC_API int rc_select_gait(int id)
+{
+	switch (id) {
+		case 0: gaitParams = &GAIT_PARAMS; return 1;
+		case 1: gaitParams = &GAIT_PARAMS_WALK; return 1;
+	}
+	return 0;
+}
+
+/** Centre of mass distance to the support polygon edge, mm (see GaitEngine::supportMargin). */
+RC_API float rc_support_margin()
+{
+	return motion.gait().supportMargin();
+}
+
+/** Static stability body shift, world x, y in mm. */
+RC_API void rc_shift(float *out)
+{
+	LR_point s = motion.gait().shift();
+	out[0] = s.x;
+	out[1] = s.y;
+}
+
+/**
+ * Override the static stability gains (0..1, sideways and fore-aft) of the
+ * current gait, for experiments; rc_init() restores the model values.
+ * Negative sideways gain: switch static stability off.
+ */
+RC_API void rc_set_stability_gain(float sideways, float foreAft)
+{
+	GaitParams p = motion.gait().params();
+	p.staticStability = sideways >= 0;
+	p.stabilityGain.x = sideways < 0 ? 0 : sideways;
+	p.stabilityGain.y = foreAft < 0 ? 0 : foreAft;
+	motion.gait().setParams(p);
+}
+
+/**
+ * Tune the current gait for experiments (rc_init() restores the model
+ * values). Values < 0 are left unchanged.
+ */
+RC_API void rc_tune_gait(float cycleTime, float dutyFactor, float maxSpeed, float stepHeight, float stabilityBlend)
+{
+	GaitParams p = motion.gait().params();
+	if (cycleTime >= 0) p.cycleTime = cycleTime;
+	if (maxSpeed >= 0) p.maxSpeed = maxSpeed;
+	if (stepHeight >= 0) p.stepHeight = stepHeight;
+	if (stabilityBlend >= 0) p.stabilityBlend = stabilityBlend;
+	if (dutyFactor >= 0) {
+		// keep each leg's swing start, move the offsets with the duty factor
+		for (uint8_t i = 0; i < LEG_NUM; i++) {
+			float start = p.dutyFactor - p.phaseOffset[i];
+			float o = dutyFactor - start;
+			p.phaseOffset[i] = o - floorf(o);
+		}
+		p.dutyFactor = dutyFactor;
+	}
+	motion.gait().setParams(p);
 }

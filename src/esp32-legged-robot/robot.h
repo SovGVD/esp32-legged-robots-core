@@ -57,6 +57,7 @@ extern modelSettings settings;
 void initMotion();
 void updateMotion();
 const LR_figure &motionBody();
+void requestGait(const GaitParams &params);   // applied once the robot stands still
 
 /**
  * HAL (hal.cpp, servo.cpp, hal_*.cpp)

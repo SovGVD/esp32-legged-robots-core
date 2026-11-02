@@ -11,8 +11,26 @@
 static QuadrupedLegIK modelLegIK;
 LegIK &MODEL_IK = modelLegIK;
 
-const cliCommand *modelCliCommands     = nullptr;
-const uint8_t     modelCliCommandsCount = 0;
+static void cliGait()
+{
+	char *name = CLI_readWord();
+	if (strcmp(name, "walk") == 0) {
+		requestGait(GAIT_PARAMS_WALK);
+	} else if (strcmp(name, "trot") == 0) {
+		requestGait(GAIT_PARAMS);
+	} else {
+		cliSerial->println("Usage: gait trot|walk");
+		return;
+	}
+	cliSerial->printf("Gait: %s (switches when the robot stands still)\n", name);
+}
+
+static const cliCommand dogCliCommands[] = {
+	{ "gait", cliGait, "Gait [trot|walk]", 1, 0 }
+};
+
+const cliCommand *modelCliCommands     = dogCliCommands;
+const uint8_t     modelCliCommandsCount = sizeof(dogCliCommands) / sizeof(dogCliCommands[0]);
 
 void modelSettingsPrint()
 {

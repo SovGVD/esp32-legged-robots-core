@@ -75,6 +75,13 @@ continuously and feet swing on a cycloid path to footholds placed ahead of the b
 time based (open loop); set `useContactSensors` to `true` once a robot has foot contact sensors filling
 `leg.sensor.onGround`, and swings then end on touchdown.
 
+**Static stability.** With `staticStability` the body shifts so the centre of mass stays over the feet that carry
+it: each foot gets a support weight (0 in swing, ramping in after touchdown and out before lift-off) and the
+centre of mass is steered to the weighted feet centroid, scaled per axis by `stabilityGain`. It is for slow gaits
+with three feet on the ground. The dog has a second gait, `GAIT_PARAMS_WALK` (crawl: LH, LF, RH, RF, 1.2 s cycle,
+20 mm/s, sideways shift only, about 16 mm stability margin); switch with the CLI command `gait walk` / `gait trot`
+(applied once the robot stands still). In the simulator this walk tilts about 2° instead of 3-6° without the shift.
+
 Servos on plain ESP32 boards (`PWM_CONTROLLER_TYPE ESP32PWM`) are driven by the LEDC hardware PWM
 peripheral (up to 16 servos, 50Hz by default, override with `ESP32PWM_SERVO_FREQ`).
 

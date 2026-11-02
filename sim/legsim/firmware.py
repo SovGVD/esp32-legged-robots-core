@@ -76,6 +76,15 @@ class FirmwareCore:
             getattr(L, name).restype = None
             getattr(L, name).argtypes = [f32p]
         L.rc_gait_active.restype = ctypes.c_int
+        L.rc_select_gait.restype = ctypes.c_int
+        L.rc_select_gait.argtypes = [ctypes.c_int]
+        L.rc_support_margin.restype = ctypes.c_float
+        L.rc_set_stability_gain.restype = None
+        L.rc_set_stability_gain.argtypes = [ctypes.c_float, ctypes.c_float]
+        L.rc_tune_gait.restype = None
+        L.rc_tune_gait.argtypes = [ctypes.c_float] * 5
+        L.rc_shift.restype = None
+        L.rc_shift.argtypes = [f32p]
         self.legs = L.rc_leg_count()
         self.dof = L.rc_leg_dof()
         self.loop_dt = float(L.rc_loop_dt())
@@ -111,6 +120,32 @@ class FirmwareCore:
     def body(self):
         """Gait body pose: x, y, z (mm), pitch, roll, yaw (rad)."""
         return self._floats(self.lib.rc_body, 6)
+
+    GAITS = {"default": 0, "trot": 0, "walk": 1}
+
+    def select_gait(self, name):
+        """'default'/'trot' (model GAIT_PARAMS) or 'walk' (GAIT_PARAMS_WALK, static stability). Resets the robot."""
+        if not self.lib.rc_select_gait(self.GAITS[name]):
+            raise ValueError(name)
+        self.reset()
+
+    def support_margin(self):
+        """mm from the centre of mass to the support polygon edge, negative = outside."""
+        return float(self.lib.rc_support_margin())
+
+    def set_stability_gain(self, sideways, fore_aft=0.0):
+        """Override the current gait's stabilityGain (0..1 per axis); a negative sideways gain
+        turns static stability off. Undone by reset()/select_gait()."""
+        self.lib.rc_set_stability_gain(float(sideways), float(fore_aft))
+
+    def tune_gait(self, cycle_time=-1, duty_factor=-1, max_speed=-1, step_height=-1, stability_blend=-1):
+        """Change the current gait's timing for experiments (undone by reset()/select_gait()).
+        A new duty factor keeps each leg's swing start."""
+        self.lib.rc_tune_gait(cycle_time, duty_factor, max_speed, step_height, stability_blend)
+
+    def shift(self):
+        """Static stability body shift, world x, y, mm."""
+        return self._floats(self.lib.rc_shift, 2)
 
     def gait_active(self):
         return bool(self.lib.rc_gait_active())
