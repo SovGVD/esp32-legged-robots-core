@@ -3,8 +3,34 @@
 A MuJoCo model of the ESP32 small robot dog for testing motion code before it
 goes on the real robot. Python, `pip install -r requirements.txt`.
 
+## Quick start
+
+Needs Python 3.9+, a display for the viewer, and a C++17 compiler for the
+firmware bridge (built automatically on first use): `g++` on Linux
+(`sudo apt install g++`), Xcode command line tools on macOS
+(`xcode-select --install`), MinGW-w64 `g++` on Windows (untested; WSL works
+like Linux). Set `CXX` to pick another compiler.
+
 ```
-python -m pytest -q tests            # 42 checks, ~20 s (builds the firmware bridge on first run)
+git clone -b development https://github.com/SovGVD/esp32-legged-robots-core.git
+cd esp32-legged-robots-core/sim
+python -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m pytest -q tests            # checks everything works, builds the firmware bridge
+python examples/drive.py             # viewer + control window: drive with WASD/arrows or an Xbox pad
+```
+
+`drive.py` runs the real firmware gait (lib/robot_core) on the sim; the
+controls are in the table under "Manual control" below. To just look at the
+model, run `python -m mujoco.viewer --mjcf models/dog.xml` (on macOS use
+`mjpython` instead of `python` for any viewer command; `drive.py` doesn't run
+on macOS, use `trot.py --view` or a video there).
+
+## Commands
+
+```
+python -m pytest -q tests            # 42 checks, ~30 s (builds the firmware bridge on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
