@@ -77,5 +77,5 @@ def forward_kinematics(geo: Geometry, leg: LegConfig, q):
     """Foot point relative to the shoulder in the body frame, mm, from sim joint q."""
     q_roll, q_pitch, q_knee = q
     back = geo.l2 * math.sin(q_pitch) + geo.l3 * math.sin(q_pitch - q_knee)
-    down = geo.l2 * math.cos(q_pitch) + geo.l3 * math.cos(q_pitch - q_knee)
+    down = geo.hip_pitch_drop + geo.l2 * math.cos(q_pitch) + geo.l3 * math.cos(q_pitch - q_knee)
     return np.array([leg.side * down * math.sin(q_roll), -back, -down * math.cos(q_roll)])

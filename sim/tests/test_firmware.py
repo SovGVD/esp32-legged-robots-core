@@ -78,9 +78,10 @@ def test_strafes_right(fw, dog):
     fw.drive(dog, (1, 0, 0, 0, 0, 0), 3.0)
     d = dog.body_position_mm() - p0
     assert d[0] > 250.0, d
-    # Known: the trot drifts backward, worst when strafing (~40 mm/s here,
+    # Known: the trot drifts backward, worst when strafing (~40 mm/s with the
+    # box model, ~57 mm/s with the STL mass layout and the lower middle frame;
     # see "Known limits" in README.md). Loose bound so a regression still shows.
-    assert abs(d[1]) < 0.5 * d[0], d
+    assert abs(d[1]) < 0.6 * d[0], d
     assert tilt_deg(dog) < 8.0
 
 
@@ -105,15 +106,18 @@ def test_stops_and_settles(fw, dog):
 
 
 def _walk(fw, dog, command, seconds):
+    """Returns (moved mm, tilt deg, margin mm). Tilt is the 95th percentile: with
+    the STL model a foot slipping while turning gives single-tick spikes that say
+    little about how steady the walk is."""
     p0 = dog.body_position_mm().copy()
-    tilt = 0.0
+    tilts = []
     margin = 1e9
     for _ in range(int(seconds / fw.loop_dt)):
         fw.drive(dog, command)
-        tilt = max(tilt, tilt_deg(dog))
+        tilts.append(tilt_deg(dog))
         if any(fw.feet()[:, 2] > -79.99):    # a leg in the air
             margin = min(margin, fw.support_margin())
-    return dog.body_position_mm() - p0, tilt, margin
+    return dog.body_position_mm() - p0, float(np.percentile(tilts, 95)), margin
 
 
 @pytest.mark.parametrize("command", [(0, 1, 0, 0, 0, 0), (1, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 1)],
@@ -126,7 +130,7 @@ def test_static_walk_is_steadier_than_without_shift(fw, dog, command):
     moved, tilt, margin = _walk(fw, d, command, 6.0)
     assert fw.unsolved == 0
     assert margin > 3.0            # centre of mass inside the three-foot triangle
-    assert tilt < 4.5, tilt
+    assert tilt < 2.5, tilt
     if command[1]:
         assert moved[1] > 80.0, moved  # 20 mm/s minus slip
     if command[0]:
@@ -138,7 +142,7 @@ def test_static_walk_is_steadier_than_without_shift(fw, dog, command):
     d.step(0.3)
     _, tilt_off, margin_off = _walk(fw, d, command, 6.0)
     assert margin_off < 0.0
-    assert tilt < 0.7 * tilt_off, (tilt, tilt_off)
+    assert tilt < 0.6 * tilt_off, (tilt, tilt_off)
 
 
 def _slope(dog, deg, sideways):

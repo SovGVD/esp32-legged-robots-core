@@ -4,10 +4,11 @@ A MuJoCo model of the ESP32 small robot dog for testing motion code before it
 goes on the real robot. Python, `pip install -r requirements.txt`.
 
 ```
-python -m pytest -q tests            # 33 checks, ~8 s (builds the firmware bridge on first run)
+python -m pytest -q tests            # 41 checks, ~18 s (builds the firmware bridge on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
+python examples/snapshot.py dog.png  # still images of the standing robot
 python examples/build_model.py       # regenerate models/dog.xml after editing params
 ```
 
@@ -17,16 +18,40 @@ python examples/build_model.py       # regenerate models/dog.xml after editing p
 
 | Part | Source | Notes |
 |---|---|---|
-| Geometry: hips at (±39.5, ±70.5, 0) mm, L2 = 51.9, L3 = 50, neutral foot (±56, ±70.5, −80) | `model/dog/model.h` | Hip Y is still "not sure" in the firmware; change it in `legsim/params.py` |
+| Geometry: hips at (±39.5, ±70.5, 0) mm, L2 = 51.9, L3 = 50, neutral foot (±56, ±70.5, −80) | `model/dog/model.h`, checked against the STLs | The parts confirm all of these, including the "not sure" hip Y (see below) |
+| Hip pitch axis level with the roll axis (`hip_pitch_drop` = 0) | STLs + photos (shoulder bracket) | Same as the firmware IK. The knob stays in `legsim/params.py` to try a misaligned build |
 | 3 joints per leg: alpha = hip roll, beta = hip pitch, gamma = knee | firmware IK | Joint angles map 1:1 to firmware leg angles (see below) |
-| Masses: torso 280 g, shoulder 20 g (incl. hip-pitch servo), upper leg 3.5 g, lower leg 16 g (incl. knee servo); total 438 g | STL volumes + datasheets | Estimates. A scale reading would only be a check |
+| Masses: torso 280 g, shoulder 20 g (incl. hip-pitch servo), upper leg 3.5 g, lower leg 16.1 g (incl. knee servo); total 438 g | STL volumes + datasheets | Centres of mass and inertias come from the placed STL parts and servo/battery boxes. A scale reading would only be a check |
 | MG90D servo: 0.21 N·m stall, 0.10 s/60°, ~4° proportional band, 0.5° deadband, 50 Hz pulse latching, torque-speed line, rotor inertia, gear friction | datasheet + estimates | Hip roll gets the 2:1 gear: twice the torque, half the speed |
 | Pulse → angle: `servoMainProfile` calibration table, `getHALAngle` with mid/ratio/inverse | `hal.cpp`, `servo.cpp` | The sim servo is assumed to follow the calibration exactly |
 | IMU: accelerometer + gyro at the middle frame, body axes X right / Y forward / Z up | MPU9250 orientation in the IK comments | Optional Gaussian noise |
 | Foot contacts: touch sensor per foot | — | Exposed but optional; the real robot has none yet |
-| Feet: 5.5 mm spheres, friction 0.8 | shoe STL | Only feet, legs and torso box touch the floor; no self collisions |
+| Looks: Gleb's printed parts (STL meshes) plus boxes for servos, battery and electronics | Thingiverse 4822059 | `models/meshes/`, placed by `legsim/assembly.py` |
+| Collisions: torso box, battery box, leg capsules, 6 mm foot spheres, friction 0.8 | shoe STL | Hidden (geom group 3); no self collisions |
 
 Every number in `legsim/params.py` is tagged with where it came from: `[code]`, `[stl]`, `[ds]` (datasheet) or `[est]` (guess, tune later).
+
+## Printed parts (STL meshes)
+
+The FreeCAD design (github.com/SovGVD/esp32-small-robot-dog-hardware) has the
+parts but no assembly, so `legsim/assembly.py` places them from their
+geometry. Each STL's origin turned out to sit on a joint axis:
+
+| Part | What it shows |
+|---|---|
+| `leg_top` | servo hub holes 51.94 mm apart, exactly L2 |
+| `leg_bottom` | knee servo pocket with the shaft ~50 mm from the foot ring, L3 |
+| `legs_holder_part1/2` | roll bearings (12 mm) at x = ±39.5 on the roll axis; alpha servo gear at x = ±11 (28.5 mm centre distance, 2:1 with the shoulder sector) |
+| `body` | 86.6 mm long; its ends meet the inner holder plates, which puts the hip pitch axis at y = ±70.4, so the "not sure" 70.5 is right |
+| `shoulder_part2` | the U bracket lies in the plane of its gear sector and holds the hip-pitch servo centred on the roll axis, shaft pointing outward, so the pitch axis is level with the roll axis |
+
+Estimated, not visible in the parts: where the hip-pitch servo sits in the
+bracket (±1.5 mm), how leg_top / knee servo / leg_bottom stack sideways, and
+the electronics/battery positions. Left legs use mirrored meshes, and the hind
+holders and shoulders are the front ones turned around.
+
+`models/meshes/` holds decimated copies made by `tools/prepare_meshes.py`
+from the Thingiverse files (CC BY-NC, by the robot's author).
 
 ## Joint convention
 
@@ -118,7 +143,7 @@ needs `mjpython`, which conflicts with pygame's window.
 
 ## Plan
 
-1. **Model (this change).** Parametric MJCF, servo and IMU models, tests that
+1. **Model (done).** Parametric MJCF, servo and IMU models, tests that
    pin the joint convention to the firmware IK and HAL.
 2. **Firmware bridge (done, see above).** Build `lib/robot_core` (Arduino-free since the
    C++ module refactor) for the host as a small shared library with a C API:
@@ -137,15 +162,16 @@ needs `mjpython`, which conflicts with pygame's window.
 
 ## Known limits and first findings
 
-* Masses and inertias are estimates from STL volumes; link shapes are boxes
-  and capsules, not the STL meshes.
-* The L1 = 0 simplification of the firmware IK is used as the true geometry.
-  If the real hip-pitch axis is offset from the roll axis, both the IK and the
-  sim need the offset.
+* Masses are estimates from STL volumes (20 % infill); inertias come from
+  the meshes as shells, which suits printed parts.
+* **Hip geometry:** the hip pitch axis is level with the roll axis and the
+  leg plane is within ~2 mm of it sideways, so the firmware IK's L1 = 0 holds.
+  `hip_pitch_drop` can model a pitch axis below the roll axis if a build
+  differs (the sim then stands that much taller than the IK expects).
 * Servo voltage is assumed ~5 V (datasheet 4.8 V values).
 * With the firmware gait the drift is still there: ~13 mm/s backward when
   trotting nearly in place and ~35-45 mm/s backward while strafing at full
-  speed (forward walking hides it). Sideways stepping makes it worse, which
+  speed (~57 mm/s with the STL mass layout) (forward walking hides it). Sideways stepping makes it worse, which
   points at stance-leg compliance rather than the gait timing.
 * **Trotting in place drifts backward** in the sim (about 30 mm/s with the
   Python demo trot, duty 0.5, 15 mm step height). The most likely cause is stance-leg
