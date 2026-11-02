@@ -305,6 +305,24 @@ void test_no_shift_without_static_stability()
 	}
 }
 
+void test_trot_keeps_center_of_mass_over_stance_centre()
+{
+	// centre of mass 8 mm behind the body origin: the body sits 8 mm forward,
+	// also while turning (the offset turns with the body)
+	leg legs[4] = DOG_LEGS;
+	GaitParams p = dogTrot();
+	p.centerOfMass = { 0, -8, 0 };
+	GaitEngine gait;
+	gait.begin(p, legs, 4);
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, 8.0f, gait.body().position.y - gait.basePosition().y);
+	for (int t = 0; t < 1000; t++) {
+		gait.update(DT, command(0.5f, 1, 0.3f));
+		float yaw = gait.body().orientation.yaw;
+		TEST_ASSERT_FLOAT_WITHIN(1e-3f, -8.0f * sinf(yaw), gait.shift().x);
+		TEST_ASSERT_FLOAT_WITHIN(1e-3f,  8.0f * cosf(yaw), gait.shift().y);
+	}
+}
+
 int main()
 {
 	UNITY_BEGIN();
@@ -320,5 +338,6 @@ int main()
 	RUN_TEST(test_static_walk_keeps_center_of_mass_over_three_feet);
 	RUN_TEST(test_static_walk_forward_steady_margin);
 	RUN_TEST(test_no_shift_without_static_stability);
+	RUN_TEST(test_trot_keeps_center_of_mass_over_stance_centre);
 	return UNITY_END();
 }

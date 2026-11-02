@@ -23,8 +23,8 @@ import mujoco.viewer
 from legsim import SimDog, FirmwareCore
 from legsim.control import ManualControl
 
-dog = SimDog()
 fw = FirmwareCore()
+dog = fw.place(SimDog())
 ui = ManualControl()
 
 dt = fw.loop_dt
@@ -41,8 +41,8 @@ with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
         if "quit" in events:
             break
         if "reset" in events:
-            dog.reset()
             fw.reset()
+            fw.place(dog)
             viewer.sync()
             wall_start, sim_start = time.perf_counter(), dog.data.time
         if "gait" in events and not fw.gait_active():

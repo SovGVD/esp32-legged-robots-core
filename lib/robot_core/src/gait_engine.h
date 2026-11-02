@@ -23,7 +23,8 @@
  * steered to the weighted average of the feet, so before a leg lifts the body
  * has already moved over the triangle of the other three. `stabilityGain`
  * scales the shift per body axis (1 puts the centre of mass on the triangle
- * centroid). For a quadruped walk a sideways-only shift is usually best:
+ * centroid; the constant `centerOfMass` offset is always compensated in full,
+ * in every gait). For a quadruped walk a sideways-only shift is usually best:
  * the support triangles share the diagonal through the body centre, so a
  * sideways shift alone gives a margin, while a fore-aft sway makes the body
  * rush back and forth in the four-foot phases. Meant for slow
@@ -54,7 +55,9 @@ typedef struct {
 	bool  staticStability;            // shift the body over the supporting feet (see above)
 	float stabilityBlend;             // max fraction of the cycle a support weight ramps over, e.g. 0.1
 	LR_point stabilityGain;           // 0..1 per body axis (x sideways, y fore-aft): how far towards the support centroid the body shifts
-	LR_point centerOfMass;            // mm, centre of mass relative to the body origin, body frame (z unused)
+	LR_point centerOfMass;            // mm, centre of mass relative to the body origin, body frame (z unused);
+	                                  // without static stability the body is offset by -centerOfMass so the
+	                                  // centre of mass stays over the middle of the neutral stance
 } GaitParams;
 
 class GaitEngine

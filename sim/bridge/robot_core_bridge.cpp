@@ -222,6 +222,15 @@ RC_API void rc_level_correction(float *out)
 	out[1] = imuCorrection.roll;
 }
 
+/** Override the current gait's centre of mass (mm, body frame); rc_init() restores it. */
+RC_API void rc_set_center_of_mass(float x, float y)
+{
+	GaitParams p = motion.gait().params();
+	p.centerOfMass.x = x;
+	p.centerOfMass.y = y;
+	motion.gait().setParams(p);
+}
+
 /**
  * Tune the current gait for experiments (rc_init() restores the model
  * values). Values < 0 are left unchanged.
