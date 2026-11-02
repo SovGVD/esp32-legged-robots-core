@@ -7,9 +7,11 @@ worked out from the part geometry (hole positions) and the photos:
   leg_top     hub holes 51.94 mm apart                 -> exactly L2 (51.9)
   leg_bottom  foot ring to knee servo shaft ~50 mm     -> L3 (50.0)
   holders     bearing holes at x = +-39.5, z = 0       -> hip X, roll axis height
+              (part2 = outer plate, part1 = inner plate + alpha servo box)
   holders     alpha servo gear at x = +-11             -> 28.5 mm centre distance, 2:1 gear
   body        86.6 mm long, its ends meet the inner holder plates
               -> hip pitch axis at y = +-70.4, matches LEG_BODY_Y (70.5, "not sure")
+Checked against photos of the real robot (Gleb, 2026-11-02).
 
 Everything is described for the right front leg (RF) in mm, in the frame of
 the sim link it belongs to, with the link axes parallel to the body axes
@@ -68,9 +70,12 @@ def torso_parts(hip_y):
     the others once per end (front/hind).
     """
     ys0 = hip_y + SHAFT_FROM_GEAR                 # shoulder gear plane (shoulder_part z = 0)
+    # part2 is the plain outer plate; part1 is the inner plate plus the box that
+    # holds the two alpha servos, its arms reaching out to the outer plate.
+    turn = np.diag([-1.0, -1.0, 1.0])
     per_end = [
-        ("mesh", "legs_holder_part1", np.eye(3), (0, ys0 + 4, 0)),
-        ("mesh", "legs_holder_part2", np.eye(3), (0, ys0 - 34, 0)),
+        ("mesh", "legs_holder_part1", turn, (0, ys0 - 34, 0)),
+        ("mesh", "legs_holder_part2", np.eye(3), (0, ys0 + 8, 0)),
     ]
     per_leg = [
         # alpha servo gear: axis along Y, in the shoulder gear plane, meshes at x = 11
@@ -104,7 +109,8 @@ def shoulder_parts(visual_drop):
     ]
 
 
-# leg_top: hip hub at its origin, knee hub at (50.02, -13.99); horns sit on the -y face, outward.
+# leg_top: hip hub at its origin, knee hub at (50.02, -13.99); the horn recesses are in the
+# y = 0 face, which faces outward (the horns are screwed on from the outside).
 LEG_TOP_KNEE = np.array([50.02, 0.0, -13.99])
 LEG_TOP_INNER_FACE = 11.1      # mm outward of the leg plane (knee servo top + spline) [est]
 
@@ -115,8 +121,8 @@ KNEE_SERVO_LATERAL = -4.65     # knee servo body centre, inward of the leg plane
 
 
 def upper_parts():
-    R = _rot_from_pairs(LEG_TOP_KNEE, (0, 0, -1), (0, 1, 0), (-1, 0, 0))
-    return [("mesh", "leg_top", R, (LEG_TOP_INNER_FACE, 0, 0))]
+    R = _rot_from_pairs(LEG_TOP_KNEE, (0, 0, -1), (0, 1, 0), (1, 0, 0))
+    return [("mesh", "leg_top", R, (LEG_TOP_INNER_FACE + 6.5, 0, 0))]
 
 
 def lower_parts():

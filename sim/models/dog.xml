@@ -51,10 +51,10 @@
       <freejoint name="root"/>
       <geom name="torso_geom" type="box" size="0.047 0.0855 0.0157" pos="0 0 -0.0063" group="3" rgba="0.95 0.95 0.95 0.3" mass="0"/>
       <geom name="battery_geom" type="box" size="0.021 0.04 0.0105" pos="0 0 -0.019" group="3" rgba="0.1 0.1 0.1 0.3" mass="0"/>
-      <geom name="front_legs_holder_part1" type="mesh" mesh="legs_holder_part1" class="part" pos="0 0.0854 0" quat="1 0 0 0" mass="0.0177"/>
-<geom name="front_legs_holder_part2" type="mesh" mesh="legs_holder_part2" class="part" pos="0 0.0474 0" quat="1 0 0 0" mass="0.0075"/>
-<geom name="hind_legs_holder_part1" type="mesh" mesh="legs_holder_part1" class="part" pos="0 -0.0854 0" quat="0 0 0 1" mass="0.0177"/>
-<geom name="hind_legs_holder_part2" type="mesh" mesh="legs_holder_part2" class="part" pos="0 -0.0474 0" quat="0 0 0 1" mass="0.0075"/>
+      <geom name="front_legs_holder_part1" type="mesh" mesh="legs_holder_part1" class="part" pos="0 0.0474 0" quat="0 0 0 1" mass="0.0177"/>
+<geom name="front_legs_holder_part2" type="mesh" mesh="legs_holder_part2" class="part" pos="0 0.0894 0" quat="1 0 0 0" mass="0.0075"/>
+<geom name="hind_legs_holder_part1" type="mesh" mesh="legs_holder_part1" class="part" pos="0 -0.0474 0" quat="1 0 0 0" mass="0.0177"/>
+<geom name="hind_legs_holder_part2" type="mesh" mesh="legs_holder_part2" class="part" pos="0 -0.0894 0" quat="0 0 0 1" mass="0.0075"/>
 <geom name="LF_servo_gear" type="mesh" mesh="servo_gear_m" class="part" pos="-0.011 0.0804 0" quat="0.707107 -0.707107 0 0" mass="0.0012"/>
 <geom name="LF_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="-0.011 0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
 <geom name="RF_servo_gear" type="mesh" mesh="servo_gear" class="part" pos="0.011 0.0804 0" quat="0.707107 -0.707107 0 0" mass="0.0012"/>
@@ -78,7 +78,7 @@
       <body name="LF_upper" pos="0 0 -0.0091">
         <joint name="LF_pitch" type="hinge" axis="-1 0 0" range="-1.39626 1.39626" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
         <geom name="LF_upper_geom" type="capsule" fromto="0 0 0 0 0 -0.0519" size="0.00325" class="link"/>
-        <geom name="LF_leg_top" type="mesh" mesh="leg_top_m" class="part" pos="-0.0111 0 0" quat="0.563327 -0.42739 -0.42739 -0.563327" mass="0.0028"/>
+        <geom name="LF_leg_top" type="mesh" mesh="leg_top_m" class="part" pos="-0.0176 0 0" quat="0.563327 0.42739 -0.42739 0.563327" mass="0.0028"/>
 <geom name="LF_upper_misc" type="sphere" class="part" size="0.003" pos="0 0 -0.02595" mass="0.0007" rgba="0.5 0.5 0.5 0"/>
         <body name="LF_lower" pos="0 0 -0.0519">
           <joint name="LF_knee" type="hinge" axis="1 0 0" range="0.174533 2.96706" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
@@ -100,7 +100,7 @@
       <body name="RF_upper" pos="0 0 -0.0091">
         <joint name="RF_pitch" type="hinge" axis="-1 0 0" range="-1.39626 1.39626" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
         <geom name="RF_upper_geom" type="capsule" fromto="0 0 0 0 0 -0.0519" size="0.00325" class="link"/>
-        <geom name="RF_leg_top" type="mesh" mesh="leg_top" class="part" pos="0.0111 0 0" quat="0.563327 -0.42739 0.42739 0.563327" mass="0.0028"/>
+        <geom name="RF_leg_top" type="mesh" mesh="leg_top" class="part" pos="0.0176 0 0" quat="0.563327 0.42739 0.42739 -0.563327" mass="0.0028"/>
 <geom name="RF_upper_misc" type="sphere" class="part" size="0.003" pos="0 0 -0.02595" mass="0.0007" rgba="0.5 0.5 0.5 0"/>
         <body name="RF_lower" pos="0 0 -0.0519">
           <joint name="RF_knee" type="hinge" axis="1 0 0" range="0.174533 2.96706" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
@@ -122,7 +122,7 @@
       <body name="LH_upper" pos="0 0 -0.0091">
         <joint name="LH_pitch" type="hinge" axis="-1 0 0" range="-1.39626 1.39626" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
         <geom name="LH_upper_geom" type="capsule" fromto="0 0 0 0 0 -0.0519" size="0.00325" class="link"/>
-        <geom name="LH_leg_top" type="mesh" mesh="leg_top_m" class="part" pos="-0.0111 0 0" quat="0.563327 -0.42739 -0.42739 -0.563327" mass="0.0028"/>
+        <geom name="LH_leg_top" type="mesh" mesh="leg_top_m" class="part" pos="-0.0176 0 0" quat="0.563327 0.42739 -0.42739 0.563327" mass="0.0028"/>
 <geom name="LH_upper_misc" type="sphere" class="part" size="0.003" pos="0 0 -0.02595" mass="0.0007" rgba="0.5 0.5 0.5 0"/>
         <body name="LH_lower" pos="0 0 -0.0519">
           <joint name="LH_knee" type="hinge" axis="1 0 0" range="0.174533 2.96706" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
@@ -144,7 +144,7 @@
       <body name="RH_upper" pos="0 0 -0.0091">
         <joint name="RH_pitch" type="hinge" axis="-1 0 0" range="-1.39626 1.39626" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
         <geom name="RH_upper_geom" type="capsule" fromto="0 0 0 0 0 -0.0519" size="0.00325" class="link"/>
-        <geom name="RH_leg_top" type="mesh" mesh="leg_top" class="part" pos="0.0111 0 0" quat="0.563327 -0.42739 0.42739 0.563327" mass="0.0028"/>
+        <geom name="RH_leg_top" type="mesh" mesh="leg_top" class="part" pos="0.0176 0 0" quat="0.563327 0.42739 0.42739 -0.563327" mass="0.0028"/>
 <geom name="RH_upper_misc" type="sphere" class="part" size="0.003" pos="0 0 -0.02595" mass="0.0007" rgba="0.5 0.5 0.5 0"/>
         <body name="RH_lower" pos="0 0 -0.0519">
           <joint name="RH_knee" type="hinge" axis="1 0 0" range="0.174533 2.96706" armature="2e-05" frictionloss="0.004" damping="0.0005"/>
