@@ -45,6 +45,12 @@ class LegIK
 };
 
 /**
+ * Joint angle limits from `leg.min` / `leg.max` for the first `dof` joints.
+ * Clamps `angle` into them; returns true if any joint was clamped.
+ */
+bool lrClampJointLimits(const leg &l, LR_legAngle &angle, uint8_t dof);
+
+/**
  * Quadruped, Boston Dynamics Spot style 3 DOF leg (see ik_quadruped.cpp).
  */
 class QuadrupedLegIK : public LegIK

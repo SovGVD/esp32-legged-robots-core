@@ -96,6 +96,33 @@ static void initWebServerRoutes()
 	server.begin();
 }
 
+#ifdef CAMERAENABLED
+/**
+ * Camera task (esp32camera::addTask): each JPEG frame goes to the controlling
+ * client as a binary message. A JPEG starts with 0xFF 0xD8, which is no
+ * package id, so the client can tell frames from other packages. Frames are
+ * dropped while the client's send queue is full instead of piling up.
+ */
+static void sendCameraFrame(camera_fb_t *fb)
+{
+	uint32_t id = controllingClientId;
+	if (id == 0 || fb == nullptr || !ws.availableForWrite(id)) {
+		return;
+	}
+	ws.binary(id, fb->buf, fb->len);
+}
+
+void initCameraStream()
+{
+	// LEDC channel/timer for the camera clock away from the ones ledcAttach()
+	// hands out first (servos, DC motors)
+	if (mainCamera.setup(ESP32CAMERA_FRAMESIZE, ESP32CAMERA_FPS, ESP32CAMERA_JPEG_QUALITY,
+	                     LEDC_CHANNEL_7, LEDC_TIMER_3)) {
+		mainCamera.addTask(sendCameraFrame);
+	}
+}
+#endif
+
 /**
  * One client controls the robot at a time: the newest connection takes over
  * (a phone that reconnects often leaves a stale connection behind) and the
@@ -113,9 +140,6 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 		client->text("Ok");
 		clientOnline = true;
 		cliSerial->setClientReady(client->id());
-		#ifdef CAMERAENABLED
-			mainCamera.setClientReady(client);
-		#endif
 		cliInitHelp();
 	} else if (type == WS_EVT_DATA) {
 		if (client->id() != controllingClientId || len == 0) {
@@ -160,7 +184,7 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 		setFailsafe();
 		cliSerial->setClientDisconnected();
 		#ifdef CAMERAENABLED
-			mainCamera.setClientDisconnected();
+			mainCameraStream = false;
 		#endif
 
 		clientOnline = false;

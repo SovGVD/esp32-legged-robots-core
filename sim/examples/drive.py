@@ -29,6 +29,7 @@ ui = ManualControl()
 
 dt = fw.loop_dt
 paused = False
+gait = "trot"
 
 with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
     viewer.cam.distance, viewer.cam.elevation, viewer.cam.azimuth = 0.7, -20, 135
@@ -44,6 +45,10 @@ with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
             fw.reset()
             viewer.sync()
             wall_start, sim_start = time.perf_counter(), dog.data.time
+        if "gait" in events and not fw.gait_active():
+            # only while standing: no foot is in the air
+            gait = "walk" if gait == "trot" else "trot"
+            fw.select_gait(gait)
         if "pause" in events:
             paused = not paused
             wall_start, sim_start = time.perf_counter(), dog.data.time
@@ -61,7 +66,7 @@ with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
             o = dog.body_orientation()
             p = dog.body_position_mm()
             ui.draw([
-                "PAUSED" if paused else f"sim time {dog.data.time:6.1f} s",
+                ("PAUSED" if paused else f"sim time {dog.data.time:6.1f} s") + f"   gait: {gait}",
                 f"body x {p[0]:7.0f}  y {p[1]:7.0f}  z {p[2]:5.0f} mm",
                 f"pitch {math.degrees(o['pitch']):+5.1f}  roll {math.degrees(o['roll']):+5.1f}  "
                 f"yaw {math.degrees(o['yaw']):+6.1f} deg",

@@ -14,15 +14,18 @@ Keyboard (focus the "robot control" window; keys act while held):
   Q / E or Left / Right   turn left / right
   I / K, J / L            tilt body: pitch, roll
   Shift                   slow (40 %)
+  G  switch gait (trot / static walk, while standing)
   R  reset robot    P  pause    Esc  quit
 
 Xbox 360 gamepad:
   left stick              move (forward/back, strafe)
   right stick X           turn
   hold LB + right stick   tilt body instead of turning
-  Back  reset robot       Start  pause
+  Y  switch gait          Back  reset robot       Start  pause
 
 Keyboard and gamepad add up, so either can be used at any time.
+
+poll() also reports events: "reset", "pause", "quit", "gait".
 """
 
 from dataclasses import dataclass
@@ -131,6 +134,8 @@ class ManualControl:
                     events.add("reset")
                 elif e.key == pg.K_p:
                     events.add("pause")
+                elif e.key == pg.K_g:
+                    events.add("gait")
             elif e.type == pg.KEYUP:
                 self.held.discard(e.key)
             elif e.type == pg.CONTROLLERDEVICEADDED:
@@ -142,6 +147,8 @@ class ManualControl:
                     events.add("reset")
                 elif e.button == pg.CONTROLLER_BUTTON_START:
                     events.add("pause")
+                elif e.button == pg.CONTROLLER_BUTTON_Y:
+                    events.add("gait")
             elif e.type == pg.WINDOWFOCUSLOST:
                 self.held.clear()   # keys released while another window has focus never arrive
 
@@ -166,7 +173,7 @@ class ManualControl:
         lines = [
             "Focus this window to drive with the keyboard.",
             "WASD/arrows move+turn, Q/E turn, IJKL tilt, Shift slow",
-            "R reset, P pause, Esc quit. Gamepad: sticks, LB tilt",
+            "G gait, R reset, P pause, Esc quit. Pad: sticks, LB tilt, Y gait",
             "gamepads: " + (", ".join(self.gamepad_names()) or "none"),
             "",
             f"move x {c[0]:+.2f}   y {c[1]:+.2f}   yaw {c[5]:+.2f}",

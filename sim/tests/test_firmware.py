@@ -27,7 +27,8 @@ def fw():
 
 @pytest.fixture
 def dog(fw):
-    fw.reset()
+    fw.set_leveling(False)
+    fw.select_gait("default")   # also resets
     d = SimDog()
     d.step(0.3)
     return d
@@ -102,3 +103,106 @@ def test_stops_and_settles(fw, dog):
     fw.drive(dog, STOP, 1.0)
     assert np.linalg.norm(dog.body_position_mm()[:2] - p0[:2]) < 3.0
     assert tilt_deg(dog) < 2.0
+
+
+def _walk(fw, dog, command, seconds):
+    """Returns (moved mm, tilt deg, margin mm). Tilt is the 95th percentile: with
+    the STL model a foot slipping while turning gives single-tick spikes that say
+    little about how steady the walk is."""
+    p0 = dog.body_position_mm().copy()
+    tilts = []
+    margin = 1e9
+    for _ in range(int(seconds / fw.loop_dt)):
+        fw.drive(dog, command)
+        tilts.append(tilt_deg(dog))
+        if any(fw.feet()[:, 2] > -79.99):    # a leg in the air
+            margin = min(margin, fw.support_margin())
+    return dog.body_position_mm() - p0, float(np.percentile(tilts, 95)), margin
+
+
+@pytest.mark.parametrize("command", [(0, 1, 0, 0, 0, 0), (1, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 1)],
+                         ids=["forward", "strafe", "turn"])
+def test_static_walk_is_steadier_than_without_shift(fw, dog, command):
+    """Slow walk with the static stability shift vs the same walk without it."""
+    fw.select_gait("walk")
+    d = SimDog()
+    d.step(0.3)
+    moved, tilt, margin = _walk(fw, d, command, 6.0)
+    assert fw.unsolved == 0
+    assert margin > 3.0            # centre of mass inside the three-foot triangle
+    assert tilt < 2.5, tilt
+    if command[1]:
+        assert moved[1] > 80.0, moved  # 20 mm/s minus slip
+    if command[0]:
+        assert moved[0] > 80.0, moved
+
+    fw.select_gait("walk")
+    fw.set_stability_gain(-1)      # same gait, no shift
+    d = SimDog()
+    d.step(0.3)
+    _, tilt_off, margin_off = _walk(fw, d, command, 6.0)
+    assert margin_off < 0.0
+    assert tilt < 0.6 * tilt_off, (tilt, tilt_off)
+
+
+def _slope(dog, deg, sideways):
+    """Stand the dog on a slope by tilting gravity (sideways: about the forward axis)."""
+    a = math.radians(deg)
+    g = 9.81
+    dog.model.opt.gravity[:] = [g * math.sin(a), 0, -g * math.cos(a)] if sideways \
+        else [0, g * math.sin(a), -g * math.cos(a)]
+
+
+def _tilt_from_gravity_deg(dog):
+    """True angle between the body Z axis and 'up' (against gravity)."""
+    R = dog.data.xmat[dog._torso].reshape(3, 3)
+    up = -np.asarray(dog.model.opt.gravity) / np.linalg.norm(dog.model.opt.gravity)
+    return math.degrees(math.acos(max(-1.0, min(1.0, float(R[:, 2] @ up)))))
+
+
+def _mean_tilt_on_slope(fw, deg, sideways, gait, command, seconds):
+    fw.select_gait(gait)
+    d = SimDog()
+    _slope(d, deg, sideways)
+    fw.drive(d, STOP, 1.0)
+    tilts = []
+    for i in range(int(seconds / fw.loop_dt)):
+        fw.drive(d, command)
+        if i * fw.loop_dt > seconds / 2:
+            tilts.append(_tilt_from_gravity_deg(d))
+    return float(np.mean(tilts))
+
+
+@pytest.mark.parametrize("sideways", [True, False], ids=["side-slope", "up-slope"])
+def test_leveling_on_slope(fw, dog, sideways):
+    """IMU leveling (TiltEstimator from the simulated accel + gyro, BodyLeveler) on an 8 deg slope."""
+    without = _mean_tilt_on_slope(fw, 8, sideways, "default", STOP, 6.0)
+    fw.set_leveling(True)
+    try:
+        level = _mean_tilt_on_slope(fw, 8, sideways, "default", STOP, 6.0)
+    finally:
+        fw.set_leveling(False)
+    assert without > 7.0, without
+    assert level < 3.0, level   # the deadband leaves up to ~1.5 deg per axis
+    assert fw.unsolved == 0
+
+
+def test_leveling_static_walk_on_side_slope(fw, dog):
+    without = _mean_tilt_on_slope(fw, 6, True, "walk", (0, 1, 0, 0, 0, 0), 8.0)
+    fw.set_leveling(True)
+    try:
+        level = _mean_tilt_on_slope(fw, 6, True, "walk", (0, 1, 0, 0, 0, 0), 8.0)
+    finally:
+        fw.set_leveling(False)
+    assert level < 0.5 * without, (level, without)
+
+
+def test_leveling_on_flat_ground_stays_small(fw, dog):
+    """On flat ground the leveler only sees the estimate's error; it must not rock the robot."""
+    fw.set_leveling(True)
+    try:
+        moved, tilt, _ = _walk(fw, dog, (0, 1, 0, 0, 0, 0), 6.0)
+    finally:
+        fw.set_leveling(False)
+    assert tilt < 8.0, tilt
+    assert moved[1] > 300, moved

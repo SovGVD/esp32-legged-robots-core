@@ -35,3 +35,18 @@ float LegIK::clampUnit(float value)
 	}
 	return value;
 }
+
+bool lrClampJointLimits(const leg &l, LR_legAngle &a, uint8_t dof)
+{
+	const float eps = 1e-4f;
+	float *v[6]       = { &a.alpha, &a.beta, &a.gamma, &a.delta, &a.epsilon, &a.zeta };
+	const float lo[6] = { l.min.alpha, l.min.beta, l.min.gamma, l.min.delta, l.min.epsilon, l.min.zeta };
+	const float hi[6] = { l.max.alpha, l.max.beta, l.max.gamma, l.max.delta, l.max.epsilon, l.max.zeta };
+	bool clamped = false;
+	if (dof > 6) dof = 6;
+	for (uint8_t j = 0; j < dof; j++) {
+		if (*v[j] < lo[j] - eps) { *v[j] = lo[j]; clamped = true; }
+		if (*v[j] > hi[j] + eps) { *v[j] = hi[j]; clamped = true; }
+	}
+	return clamped;
+}

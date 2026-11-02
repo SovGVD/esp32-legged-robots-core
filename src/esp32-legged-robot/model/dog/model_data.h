@@ -119,7 +119,49 @@ const GaitParams GAIT_PARAMS = {
 	600,      // max acceleration, mm/s^2
 	6,        // max yaw acceleration, rad/s^2
 	3,        // idle tolerance, mm
-	false     // no foot contact sensors
+	false,    // no foot contact sensors
+	false,    // no static stability shift: a trot is supported by a diagonal line
+	0.1,      // (stability blend)
+	{ 1, 1, 0 },  // (stability gain)
+	{ 0, 0, 0 }   // centre of mass, mm from the body origin
+};
+
+/**
+ * Slow statically stable walk (crawl): one leg at a time, LH, LF, RH, RF,
+ * with the body shifted over the other three feet before each lift-off.
+ * Select with the CLI command `gait walk`.
+ */
+const GaitParams GAIT_PARAMS_WALK = {
+	true,     // enabled
+	1.2,      // cycle time, s
+	0.9,      // duty factor: one leg swings at a time (120 ms), 180 ms four-foot phases in between to shift the body
+	{ 0.65, 0.15, 0.9, 0.4, 0, 0 },   // phase offsets LF, RF, LH, RH: swing order LH, LF, RH, RF
+	25,       // step height, mm
+	20,       // max speed, mm/s (stride ~22 mm: the legs also have to reach the shift)
+	0.25,     // max yaw rate, rad/s
+	300,      // max acceleration, mm/s^2
+	2,        // max yaw acceleration, rad/s^2
+	3,        // idle tolerance, mm
+	false,    // no foot contact sensors
+	true,     // keep the centre of mass over the supporting feet
+	0.15,     // support weights ramp over the four-foot phases
+	{ 0.7, 0, 0 },  // shift sideways only, 70 % of the way to the support centroid (~11 mm margin):
+	              // the hip roll servos (2:1 gear, 20-160 deg) leave about +-23 deg of leg roll
+	{ 0, 0, 0 }   // centre of mass, mm from the body origin (battery is centred)
+};
+
+// IMU leveling (HORIZON_LEVEL or CLI `level on`), tuned in the simulator:
+// mostly integral, so it removes a slope's steady tilt but doesn't chase
+// the gait's own rocking (the IMU estimate is off by 1-3 deg while walking).
+// It holds its value during a trot (see BodyLeveler::update, hold).
+const LevelerParams LEVEL_PARAMS = {
+	0.0,   // kp
+	1.0,   // ki, 1/s
+	0.0,   // kd, s
+	0.25,  // limit, rad (~14 deg)
+	0.5,   // rate, rad/s
+	0.0,   // IMU low-pass, s (TiltEstimator already filters)
+	0.026 // deadband, rad (1.5 deg): the integral ignores the walking estimate error
 };
 
 #endif

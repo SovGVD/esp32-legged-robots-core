@@ -35,6 +35,11 @@ extern leg               legs[LEG_NUM];
 extern servoProfile      servoMainProfile;
 extern const GaitParams  GAIT_PARAMS;
 extern LegIK            &MODEL_IK;
+#if PWM_CONTROLLER_TYPE == DCMOTOR
+extern const DiffDriveParams TANK_DRIVE_PARAMS;
+#else
+extern const LevelerParams   LEVEL_PARAMS;
+#endif
 extern const cliCommand *modelCliCommands;
 extern const uint8_t     modelCliCommandsCount;
 void modelSettingsPrint();
@@ -50,6 +55,7 @@ extern uint16_t      servoPulse[LEG_NUM][LEG_DOF];
 extern bool          isHalDoReady;
 extern unsigned long loopTime;
 extern modelSettings settings;
+uint32_t motionOverrunCount();   // motion ticks missed because a tick ran longer than LOOP_TIME
 
 /**
  * Motion (motion.cpp): gait, body kinematics, IK
@@ -57,6 +63,7 @@ extern modelSettings settings;
 void initMotion();
 void updateMotion();
 const LR_figure &motionBody();
+void requestGait(const GaitParams &params);   // applied once the robot stands still
 
 /**
  * HAL (hal.cpp, servo.cpp, hal_*.cpp)
@@ -79,18 +86,21 @@ void doMotors();
 bool servoReady();
 uint16_t angleToPulse(float angleRad);
 
-// implemented by the selected PWM_CONTROLLER_TYPE backend
-void initServoHAL();
-void doLeg(leg &_leg);
 void disableServos();
 void enableServos();
-#if PWM_CONTROLLER_TYPE == PCA9685
-uint8_t servoChannelLimit();   // channels across all PCA9685 boards
-#endif
+
+// the bus of the selected PWM_CONTROLLER_TYPE (hal_esp32pwm/hal_pca9685/hal_dcmotor.cpp)
+ServoBus &servoBus();
 
 /**
  * Sensors (sensors.cpp)
  */
+// IMU leveling (motion.cpp), on with HORIZON_LEVEL or `level on`
+void     setLeveling(bool on);
+bool     levelingEnabled();
+LR_angle levelCorrection();
+Imu         &imu();           // IMU_TYPE, or NoImu
+PowerSensor &powerSensor();   // POWER_SENSOR, or NoPowerSensor
 void initIMU();
 void updateIMU();
 void calibrateIMU();
@@ -123,6 +133,9 @@ void WiFiInfo();
 void initWebServer();
 void updateWebServer();
 void pMove(uint8_t *data, size_t len);
+#ifdef ESP32CAMERA
+void initCameraStream();   // web_server.cpp, needs the esp32camera library
+#endif
 void int16ToBytes(int value, uint8_t _offset);
 void pTelemetry();
 void pCli(uint8_t *data, size_t len);
@@ -147,6 +160,7 @@ void cliPwmServo();
 void cliAngleServo();
 void cliSetTrim();
 void cliHal();
+void cliLevel();
 void cliDisplayState();
 void cliRunServoCalibrate();
 void cliDebug();

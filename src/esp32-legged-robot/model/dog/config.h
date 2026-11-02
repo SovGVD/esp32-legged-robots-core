@@ -65,6 +65,12 @@
 
 #define IMU_ADDRESS          0x68
 #define IMU_TYPE             MPU9250
+// GY-91 flat on the top board, pin header to the front. The MPU9250 sits
+// rotated so its X axis points backward and Y to the right (from the chip's
+// pin 1 mark), so sensor X is the firmware pitch axis, reversed.
+// Check with `level state`: lift the left side -> pitch +, lift the nose -> roll +.
+#define IMU_SWAP_ROLL_PITCH  true
+#define IMU_PITCH_SIGN       -1
 
 #define POWER_SENSOR         INA219
 #define POWER_SENSOR_ADDRESS 0x40

@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include "leg.h"
+#include "hardware.h"
 
 /**
  * Servo calibration: measured pulse widths at fixed servo angles, linear
@@ -35,6 +36,18 @@ float lrHalAngle(float angle, float mid, float trimAngle, float gearRatio, bool 
 
 /** Servo shaft angle (rad) -> pulse width (us) using the calibration profile. */
 uint16_t lrAngleToPulse(const servoProfile &profile, float angleRad);
+
+/**
+ * Clamps each joint angle so its servo angle (after middle, gear ratio,
+ * mirroring and trim) stays inside the profile's minAngle..maxAngle.
+ * Returns true if any joint was clamped. The result is the pose the servos
+ * really take, so the controller knows it instead of the pulse being
+ * clamped silently in lrAngleToPulse.
+ */
+bool lrClampServoRange(const leg &l, LR_legAngle &angle, uint8_t dof, const servoProfile &profile);
+
+/** Servo shaft angle -> leg joint angle, the inverse of lrHalAngle. */
+float lrLegAngleFromServo(float servoAngle, float mid, float trimAngle, float gearRatio, bool inverse);
 
 /** All joints of a leg (first `dof` of alpha..zeta) -> pulse widths. */
 void lrLegPulses(const leg &l, uint8_t dof, const servoProfile &profile, uint16_t *pulses);

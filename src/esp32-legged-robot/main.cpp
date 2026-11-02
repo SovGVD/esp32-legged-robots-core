@@ -1,11 +1,13 @@
 /**
  * ESP32 legged robot firmware entry point.
  *
- * Core 1: robot loop (motion pipeline, sensors, failsafe, servo output).
+ * Core 1: motion task, woken every LOOP_TIME by a hardware timer (esp_timer):
+ *         failsafe, sensors, motion pipeline, servo output.
  * Core 0: services loop (WiFi, web server, CLI, camera).
  */
 #include "robot.h"
 #include <Wire.h>
+#include <esp_timer.h>
 
 #ifdef IGNORE_BROWNOUT_CONDITION
 	#include "soc/soc.h"           // Disable brownout problems
@@ -35,8 +37,10 @@ static cliStream cliStreamObj;
 cliStream *cliSerial = &cliStreamObj;
 
 static TaskHandle_t core0tasks;
+static TaskHandle_t motionTaskHandle = nullptr;
+static esp_timer_handle_t motionTimer = nullptr;
+static volatile uint32_t motionOverruns = 0;   // ticks that came before the previous one was done
 
-static unsigned long previousTime            = 0;
 static unsigned long servicePreviousTime     = 0;
 static unsigned long serviceFastPreviousTime = 0;
 
@@ -87,11 +91,7 @@ static void servicesSetup()
 		vTaskDelay(100);
 
 		#ifdef ESP32CAMERA
-			mainCamera.setup(
-				ESP32CAMERA_FRAMESIZE,
-				ESP32CAMERA_FPS,
-				ESP32CAMERA_JPEG_QUALITY
-			);
+			initCameraStream();
 		#endif
 
 		Serial.println("ServicesSetup complete");
@@ -100,31 +100,67 @@ static void servicesSetup()
 }
 
 /**
- * Everything related to robot-only code: i2c, servos, imu, etc
+ * One motion tick: everything related to robot-only code (i2c, servos, imu).
  */
-static void robotLoop()
+static void robotStep()
 {
 	unsigned long currentTime = micros();
-	if (currentTime - previousTime >= LOOP_TIME) {
-		previousTime = currentTime;
 
-		updateFailsafe();
-		updatePower();  // TODO not so often!
+	updateFailsafe();
+	updatePower();  // TODO not so often!
 
-		if (!isHalDoReady) {
-			updateMotion();
-			isHalDoReady = true;
+	if (!isHalDoReady) {
+		updateMotion();
+		isHalDoReady = true;
+	}
+	#if DO_HAL_CORE == 1
+		doHAL();
+	#endif
+
+	loopTime = micros() - currentTime;
+}
+
+static void motionTimerTick(void *)
+{
+	xTaskNotifyGive(motionTaskHandle);
+}
+
+/**
+ * Fixed rate motion task. A periodic esp_timer (microsecond resolution;
+ * the FreeRTOS tick is 1 ms, too coarse for the 4.4 ms LOOP_TIME) wakes it
+ * every LOOP_TIME, instead of loop() spinning on micros().
+ */
+static void motionTask(void *)
+{
+	for (;;) {
+		uint32_t pending = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		if (pending > 1) {
+			motionOverruns += pending - 1;
 		}
-		#if DO_HAL_CORE == 1
-			doHAL();
-		#endif
-
-		loopTime = micros() - currentTime;
-		if (loopTime > LOOP_TIME) {
-			Serial.print("WARNING! Increase LOOP_TIME: ");
-			Serial.println(loopTime);
+		if (robotLoopReady && serviceLoopReady) {
+			robotStep();
 		}
 	}
+}
+
+static void startMotionTask()
+{
+	xTaskCreatePinnedToCore(motionTask, "motion", 8192, NULL, 5, &motionTaskHandle, MOTOR_CORE);
+
+	const esp_timer_create_args_t args = {
+		.callback = motionTimerTick,
+		.arg = nullptr,
+		.dispatch_method = ESP_TIMER_TASK,
+		.name = "motion",
+		.skip_unhandled_events = true,
+	};
+	ESP_ERROR_CHECK(esp_timer_create(&args, &motionTimer));
+	ESP_ERROR_CHECK(esp_timer_start_periodic(motionTimer, LOOP_TIME));
+}
+
+uint32_t motionOverrunCount()
+{
+	return motionOverruns;
 }
 
 /**
@@ -191,16 +227,23 @@ void setup()
 		0,              /* priority of the task */
 		&core0tasks,    /* Task handle to keep track of created task */
 		0);             /* pin task to core 0 */
+
+	startMotionTask();
 }
 
 /**
- * Core 1
+ * Core 1: the motion task does the work; report overruns once a second.
  */
 void loop()
 {
-	if (robotLoopReady && serviceLoopReady) {
-		robotLoop();
+	static uint32_t reported = 0;
+	uint32_t overruns = motionOverruns;
+	if (overruns != reported) {
+		Serial.printf("WARNING! Motion loop missed %u ticks (last loop %lu us, LOOP_TIME %u us)\n",
+		              (unsigned)(overruns - reported), loopTime, (unsigned)LOOP_TIME);
+		reported = overruns;
 	}
+	vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
 /**

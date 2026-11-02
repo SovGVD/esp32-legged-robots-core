@@ -104,7 +104,11 @@ iksolver BipedLegIK::solve(const leg &l, const LR_figure &body, const LR_moveVec
 	float LegPlaneTmpAngle1 = ikAsin(Ly/Lxyz);
 	float LegPlaneTmpAngle2 = ikAcos((sqLxyz + sqL1 - sqL2) / (2 * Lxyz * l.size.l1));
 
-	angle.alpha   = (Ly == 0 && Lx == 0) ? M_PI_2 : atan2f(Lx, fabsf(Ly)); if (Ly < 0) { angle.alpha = M_PI - angle.alpha; };	// @TODO this is going crazy, should be based on input yaw probably
+	// Hip yaw. It used to be atan2 of the foot offset, which flips between
+	// -90 and 270 deg whenever the foot passes under the hip (the servo then
+	// slammed between its ends). The gait has no per-foot yaw yet, so the hip
+	// stays straight; turning a biped needs foot yaw from the gait (TODO).
+	angle.alpha   = M_PI_2;
 	angle.beta    = ikAsin(Lx/Lxz) + M_PI_2;
 	angle.gamma   = M_PI_2 + LegPlaneTmpAngle1 + LegPlaneTmpAngle2;
 	angle.delta   = ikAcos((sqL1 + sqL2 - sqLxyz) / (2 * l.size.l1 * l.size.l2));
