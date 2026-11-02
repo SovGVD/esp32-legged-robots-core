@@ -77,18 +77,6 @@
 
 #define WEB_SERVER_VERSION "0.0.1"
 
-typedef struct {
-  uint8_t minAngle; // minimal servo angle, deg
-  uint8_t maxAngle; // maximal servo angle, deg
-  uint16_t degMin;  // PWM pulse at minAngle deg
-  uint16_t deg30;   // PWM pulse at 30 deg
-  uint16_t deg50;
-  uint16_t deg70;
-  uint16_t deg90;   // PWM pusle at 90 deg
-  uint16_t deg110;
-  uint16_t deg130;
-  uint16_t deg150;  // PWM pulse at 150 deg
-  uint16_t degMax;  // PWM pusle at maxAngle deg
-} servoProfile;
+// servoProfile (servo calibration table) is defined in lib/robot_core/src/servo_hal.h
 
 #endif

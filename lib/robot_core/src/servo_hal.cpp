@@ -1,0 +1,51 @@
+#include "servo_hal.h"
+#include "lr_compat.h"
+
+float lrLimitServoAngle(float angle)
+{
+	// TODO this is not about the real mechanical limits of each joint
+	if (angle < 0.0f) angle = 0.0f;
+	if (angle > (float)M_PI) angle = M_PI;
+	return angle;
+}
+
+float lrHalAngle(float angle, float mid, float trimAngle, float gearRatio, bool inverse)
+{
+	angle = (angle - mid) * gearRatio + (float)M_PI_2;
+	if (inverse) angle = (float)M_PI - angle;
+	return angle + trimAngle;
+}
+
+static float mapRange(float val, float inMin, float inMax, float outMin, float outMax)
+{
+	return (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+uint16_t lrAngleToPulse(const servoProfile &p, float angleRad)
+{
+	float deg = angleRad * (180.0f / (float)M_PI);
+	if (deg < p.minAngle) deg = p.minAngle;
+	if (deg > p.maxAngle) deg = p.maxAngle;
+
+	const float    a[9] = { (float)p.minAngle, 30, 50, 70, 90, 110, 130, 150, (float)p.maxAngle };
+	const uint16_t u[9] = { p.degMin, p.deg30, p.deg50, p.deg70, p.deg90, p.deg110, p.deg130, p.deg150, p.degMax };
+	for (uint8_t i = 1; i < 8; i++) {
+		if (deg < a[i]) {
+			return (uint16_t)mapRange(deg, a[i - 1], a[i], u[i - 1], u[i]);
+		}
+	}
+	return (uint16_t)mapRange(deg, a[7], a[8], u[7], u[8]);
+}
+
+void lrLegPulses(const leg &l, uint8_t dof, const servoProfile &profile, uint16_t *pulses)
+{
+	const float angle[6] = { l.angle.alpha, l.angle.beta, l.angle.gamma, l.angle.delta, l.angle.epsilon, l.angle.zeta };
+	const float mid[6]   = { l.hal.mid.alpha, l.hal.mid.beta, l.hal.mid.gamma, l.hal.mid.delta, l.hal.mid.epsilon, l.hal.mid.zeta };
+	const float trim[6]  = { l.hal.trim.alpha, l.hal.trim.beta, l.hal.trim.gamma, l.hal.trim.delta, l.hal.trim.epsilon, l.hal.trim.zeta };
+	const float ratio[6] = { l.hal.ratio.alpha, l.hal.ratio.beta, l.hal.ratio.gamma, l.hal.ratio.delta, l.hal.ratio.epsilon, l.hal.ratio.zeta };
+	const bool  inv[6]   = { l.inverse.alpha, l.inverse.beta, l.inverse.gamma, l.inverse.delta, l.inverse.epsilon, l.inverse.zeta };
+	if (dof > 6) dof = 6;
+	for (uint8_t j = 0; j < dof; j++) {
+		pulses[j] = lrAngleToPulse(profile, lrLimitServoAngle(lrHalAngle(angle[j], mid[j], trim[j], ratio[j], inv[j])));
+	}
+}

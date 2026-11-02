@@ -11,5 +11,7 @@
 #include "body_kinematics.h"
 #include "gait_engine.h"
 #include "angle_pid.h"
+#include "motion_controller.h"
+#include "servo_hal.h"
 
 #endif

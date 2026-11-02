@@ -1,12 +1,11 @@
 /**
- * Motion pipeline, run every LOOP_TIME on the motor core:
- * gait engine (body pose + foot targets) -> body kinematics (shoulder
- * positions with tilt and IMU correction) -> IK (joint angles).
+ * Motion pipeline, run every LOOP_TIME on the motor core. The pipeline itself
+ * (gait -> body kinematics -> IK) is MotionController in lib/robot_core, the
+ * same code the simulator runs; this file feeds it the command and IMU.
  */
 #include "robot.h"
 
-static GaitEngine     gaitEngine;
-static BodyKinematics bodyKinematics;
+static MotionController motion;
 
 #ifdef HORIZON_LEVEL
 	// Gains were tuned per loop tick; convert to per second for the dt based PID
@@ -17,12 +16,12 @@ static BodyKinematics bodyKinematics;
 void initMotion()
 {
 	Serial.println("Init gait");
-	gaitEngine.begin(GAIT_PARAMS, legs, LEG_NUM);
+	motion.begin(GAIT_PARAMS, legs, LEG_NUM, MODEL_IK);
 }
 
 const LR_figure &motionBody()
 {
-	return gaitEngine.body();
+	return motion.body();
 }
 
 void updateMotion()
@@ -36,15 +35,5 @@ void updateMotion()
 		return;
 	}
 
-	LR_moveVector command = getMoveCommand();
-	gaitEngine.update(LOOP_DT, command);
-	bodyKinematics.update(legs, LEG_NUM, gaitEngine.body(), imuCorrection, command);
-
-	for (uint8_t i = 0; i < LEG_NUM; i++) {
-		iksolver solution = MODEL_IK.solve(legs[i], gaitEngine.body(), command);
-		// Out of reach: keep the last valid angles instead of a clamped pose
-		if (solution.isSolved) {
-			legs[i].angle = solution.angle;
-		}
-	}
+	motion.update(LOOP_DT, getMoveCommand(), imuCorrection);
 }

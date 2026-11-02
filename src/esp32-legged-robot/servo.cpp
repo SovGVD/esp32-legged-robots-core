@@ -118,46 +118,7 @@ bool servoReady()
 	return isServoReady;
 }
 
-uint16_t angleToPulse(float angleRad) {
-  float angleDeg = radToDeg(angleRad);
-
-  if (angleDeg < servoMainProfile.minAngle) angleDeg = servoMainProfile.minAngle;
-  if (angleDeg > servoMainProfile.maxAngle) angleDeg = servoMainProfile.maxAngle;
-
-  // TODO how to make it better???
-
-  if (angleDeg < 30) {
-    return mapf(angleDeg, servoMainProfile.minAngle, 30, servoMainProfile.degMin, servoMainProfile.deg30);
-  }
-
-  if (angleDeg < 50) {
-    return mapf(angleDeg, 30, 50, servoMainProfile.deg30, servoMainProfile.deg50);
-  }
-
-  if (angleDeg < 70) {
-    return mapf(angleDeg, 50, 70, servoMainProfile.deg50, servoMainProfile.deg70);
-  }
-
-  if (angleDeg < 90) {
-    return mapf(angleDeg, 70, 90, servoMainProfile.deg70, servoMainProfile.deg90);
-  }
-
-  if (angleDeg < 110) {
-    return mapf(angleDeg, 90, 110, servoMainProfile.deg90, servoMainProfile.deg110);
-  }
-
-  if (angleDeg < 130) {
-    return mapf(angleDeg, 110, 130, servoMainProfile.deg110, servoMainProfile.deg130);
-  }
-
-  if (angleDeg < 150) {
-    return mapf(angleDeg, 130, 150, servoMainProfile.deg130, servoMainProfile.deg150);
-  }
-
-  if (angleDeg <= servoMainProfile.maxAngle) {
-    return mapf(angleDeg, 150, servoMainProfile.maxAngle, servoMainProfile.deg150, servoMainProfile.degMax);
-  }
-
-
-  return servoMainProfile.deg90;  // TODO actualy we should fail here...
+uint16_t angleToPulse(float angleRad)
+{
+	return lrAngleToPulse(servoMainProfile, angleRad);
 }

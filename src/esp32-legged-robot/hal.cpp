@@ -22,16 +22,7 @@ void doHAL() {
 
 void setLegPWM(leg &_leg)
 {
-	servoPulse[_leg.id.id][ALPHA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha)));
-	servoPulse[_leg.id.id][BETA]  = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta)));
-	#if LEG_DOF > 2
-		servoPulse[_leg.id.id][GAMMA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma)));
-	#endif
-	#if LEG_DOF > 3
-		servoPulse[_leg.id.id][DELTA]   = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.delta,   _leg.hal.mid.delta,   _leg.hal.trim.delta,   _leg.hal.ratio.delta,   _leg.inverse.delta)));
-		servoPulse[_leg.id.id][EPSILON] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.epsilon, _leg.hal.mid.epsilon, _leg.hal.trim.epsilon, _leg.hal.ratio.epsilon, _leg.inverse.epsilon)));
-		servoPulse[_leg.id.id][ZETA]    = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.zeta,    _leg.hal.mid.zeta,    _leg.hal.trim.zeta,    _leg.hal.ratio.zeta,    _leg.inverse.zeta)));
-	#endif
+	lrLegPulses(_leg, LEG_DOF, servoMainProfile, servoPulse[_leg.id.id]);
 }
 
 void runServoCalibrate(leg &_leg)
@@ -50,21 +41,12 @@ void runServoCalibrate(leg &_leg)
 
 float limitServoAngle(float angle)
 {
-  // TODO this is not right solution, we should restart calc to solve the angle instead of just limit if something wrong
-  //      also this is nothing about real mechanical limits, so need TODO
-  
-  // default servo can handle angles from 0 to 180 (PI) degrees only
-  if (angle < 0.0) angle = 0.0;
-  if (angle > M_PI) angle = M_PI;
-
-  return angle;
+	return lrLimitServoAngle(angle);
 }
 
-float getHALAngle(float angle, float mid, float trimAngle, float gearRatio, bool inverse) {
-  angle = (angle - mid) * gearRatio + M_PI_2;
-  if (inverse) angle = M_PI - angle;
-  angle = angle + trimAngle;
-  return angle;
+float getHALAngle(float angle, float mid, float trimAngle, float gearRatio, bool inverse)
+{
+	return lrHalAngle(angle, mid, trimAngle, gearRatio, inverse);
 }
 
 bool isHALEnabled()
