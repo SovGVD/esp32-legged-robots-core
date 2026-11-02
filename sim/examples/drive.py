@@ -6,7 +6,7 @@ Drive the simulated dog by hand with the real firmware motion code.
 Opens the MuJoCo viewer and a small "robot control" window. Keyboard and
 Xbox 360 gamepad controls are listed in that window and in legsim/control.py.
 Needs a display, a C++ compiler (the firmware is built on first run) and
-`pip install pygame`. On macOS the MuJoCo viewer needs `mjpython`, which runs
+`pip install pygame-ce`. On macOS the MuJoCo viewer needs `mjpython`, which runs
 the script off the main thread; pygame windows need the main thread there, so
 this example is for Linux and Windows.
 """

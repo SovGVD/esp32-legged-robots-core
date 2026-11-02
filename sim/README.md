@@ -149,7 +149,7 @@ without rocking the robot on flat ground.
 ### Manual control
 
 `python examples/drive.py` opens the MuJoCo viewer and a small "robot
-control" window (`pip install pygame`). Focus that window for the keyboard:
+control" window (`pip install pygame-ce`; if plain `pygame` is also installed, `pip uninstall pygame` first, they share the `pygame` module). Focus that window for the keyboard:
 
 | Keyboard | Xbox 360 pad | Action |
 |---|---|---|
