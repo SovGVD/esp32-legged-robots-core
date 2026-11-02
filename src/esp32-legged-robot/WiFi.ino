@@ -1,30 +1,24 @@
 void initWiFi()
 {
-  WiFi.persistent(false);
-  WiFi.onEvent(WiFiEvent);
-  WiFi.softAP(wifiSsid, wifiPass);
-}
-
-void WiFiEvent(WiFiEvent_t event)
-{
-	switch(event) {
-		case SYSTEM_EVENT_AP_START:
-			WiFi.softAPsetHostname(wifiSsid);
-			WiFi.softAPConfig(apIP, apGateway, apSubnet);
-			WiFiIP = WiFi.softAPIP();
-			Serial.print("WiFi AP IP: ");
-			Serial.println(WiFiIP);
-			//dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-			//dnsServer.start(DNS_PORT, "*", WiFiIP);
-			break;
-		default:
-			break;
+	WiFi.persistent(false);
+	WiFi.mode(WIFI_AP);
+	// Configure the AP synchronously: the web server reads WiFiIP right after
+	// this returns to build the websocket URL for the web client.
+	WiFi.softAPConfig(apIP, apGateway, apSubnet);
+	if (!WiFi.softAP(wifiSsid, wifiPass)) {
+		Serial.println("WiFi AP start failed");
 	}
+	WiFi.softAPsetHostname(wifiSsid);
+	WiFiIP = WiFi.softAPIP();
+	Serial.print("WiFi AP IP: ");
+	Serial.println(WiFiIP);
+	//dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+	//dnsServer.start(DNS_PORT, "*", WiFiIP);
 }
 
 void updateWiFi()
 {
-  
+
 }
 
 void WiFiInfo()

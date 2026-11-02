@@ -15,24 +15,24 @@ void updatePower()
 	if (!powerSensorReady) {
 		return;
 	}
-	voltage_V = ina219.getBusVoltage_V();
-	current_A = ina219.getCurrent_mA() / 1000;
+	#if POWER_SENSOR == INA219
+		voltage_V = ina219.getBusVoltage_V();
+		current_A = ina219.getCurrent_mA() / 1000;
+	#endif
 }
 
 void setupPowerSensor()
 {
   #if POWER_SENSOR == INA219
-    ina219 = INA219_WE(POWER_SENSOR_ADDRESS);
-
-    if (ina219.init()) {
-      powerSensorReady = true;
-    } else {
+    if (!ina219.init()) {
       Serial.println(" Failed to find INA219 chip");
+      return;
     }
 
-    ina219.setADCMode(BIT_MODE_9);  // just to make it fast
-    ina219.setPGain(PG_320);
-    ina219.setBusRange(BRNG_16);
+    ina219.setADCMode(INA219_BIT_MODE_9);  // just to make it fast
+    ina219.setPGain(INA219_PG_320);
+    ina219.setBusRange(INA219_BRNG_16);
+    powerSensorReady = true;
   #endif
 }
 

@@ -10,9 +10,22 @@
 #include "def/cli.h"
 #include "def/subscription.h"
 #include "config.h"
-#include "config_model.h"
+// ROBOT_MODEL normally comes from platformio.ini (-DROBOT_MODEL=MODEL_*).
+// A local config_model.h is still honoured for Arduino IDE style builds.
+#if !defined(ROBOT_MODEL) && __has_include("config_model.h")
+	#include "config_model.h"
+#endif
+#ifndef ROBOT_MODEL
+	#error "ROBOT_MODEL is not set. Build with `pio run -e robot-dog` (or another env from platformio.ini)."
+#endif
 #include "model/model.h"
-#include "config_wifi.h"
+// config_wifi.h is not tracked by git; fall back to the example credentials.
+#if __has_include("config_wifi.h")
+	#include "config_wifi.h"
+#else
+	#warning "config_wifi.h not found, using config_wifi.example.h (copy it to config_wifi.h and set your own SSID/password)"
+	#include "config_wifi.example.h"
+#endif
 #include "model/gait.h"
 #include "model/settings.h"
 #include "libraries/planner/planner.h"
@@ -52,10 +65,6 @@
   #include <Adafruit_PWMServoDriver.h>
 #endif
 
-#if PWM_CONTROLLER_TYPE == ESP32PWM
-  #define USE_ESP32_TIMER_NO 0
-  #include "ESP32_ISR_Servo.h"
-#endif
 
 #ifdef POWER_SENSOR
   float voltage_V = 0.0;
@@ -63,12 +72,12 @@
 
   #if POWER_SENSOR == INA219
     #include <INA219_WE.h>
-    INA219_WE ina219;
+    INA219_WE ina219(POWER_SENSOR_ADDRESS);
   #endif
 #endif
 
 LR_angle IMU_DATA = {0, 0, 0};
-MPU9250_WE IMU;
+MPU9250_WE IMU(IMU_ADDRESS);
 
 TaskHandle_t core0tasks;
 
@@ -381,5 +390,6 @@ void core0loop(void * pvParameters) {
 		vTaskDelay(1);
 	}
 
-	vTaskDelay(100);
+	// A FreeRTOS task must never return from its function.
+	vTaskDelete(NULL);
 }

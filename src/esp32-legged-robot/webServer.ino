@@ -16,13 +16,15 @@ class CaptiveRequestHandler : public AsyncWebHandler {
 		CaptiveRequestHandler() {}
 		virtual ~CaptiveRequestHandler() {}
 
-	bool canHandle(AsyncWebServerRequest *request){
+	// Must match the base signature exactly (const), otherwise it does not
+	// override and the handler silently never matches any request.
+	bool canHandle(AsyncWebServerRequest *request) const override {
 		return true;
 	}
 
-	void handleRequest(AsyncWebServerRequest *request) {
+	void handleRequest(AsyncWebServerRequest *request) override {
 		// index.html page
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html",  index_html_gz, index_html_gz_len);
+		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", index_html_gz, index_html_gz_len);
 		response->addHeader("Content-Encoding", "gzip");
 		request->send(response);
 	}

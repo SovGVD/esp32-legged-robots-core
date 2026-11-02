@@ -27,7 +27,7 @@ class cliStream: public Print
 		bool input(uint8_t c);
 
 		size_t write(uint8_t c) {
-			return output((const uint8_t *)c, 1);
+			return output(&c, 1);
 		};
 		size_t write(const char *str) {
 			if (str == NULL) return 0;

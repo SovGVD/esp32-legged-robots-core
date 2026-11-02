@@ -75,7 +75,7 @@ float CLI_readFloat() {
   return atof(floatTextPtr);
 }
 
-char * CLI_readWord() {
+char* CLI_readWord() {
   char * word = strtok(NULL, CLI_delimiters);         //K&R string.h  pg. 250
   return word;
 }

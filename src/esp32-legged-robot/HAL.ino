@@ -48,7 +48,7 @@ void setLegPWM(leg &_leg)
 {
 	servoPulse[_leg.id.id][ALPHA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.alpha, _leg.hal.mid.alpha, _leg.hal.trim.alpha, _leg.hal.ratio.alpha, _leg.inverse.alpha)));
 	servoPulse[_leg.id.id][BETA]  = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.beta,  _leg.hal.mid.beta,  _leg.hal.trim.beta,  _leg.hal.ratio.beta,  _leg.inverse.beta)));
-	#if LED_DOF > 2
+	#if LEG_DOF > 2
 		servoPulse[_leg.id.id][GAMMA] = angleToPulse(limitServoAngle(getHALAngle(_leg.angle.gamma, _leg.hal.mid.gamma, _leg.hal.trim.gamma, _leg.hal.ratio.gamma, _leg.inverse.gamma)));
 	#endif
 	#if LEG_DOF > 3
