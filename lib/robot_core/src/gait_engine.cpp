@@ -281,7 +281,12 @@ LR_point GaitEngine::centerOfMass() const
 
 void GaitEngine::updateShift(float dt)
 {
-	LR_point target = {0, 0, 0};
+	float sy = sinf(_body.orientation.yaw), cy = cosf(_body.orientation.yaw);
+	// the centre of mass always sits over the middle of the neutral stance: a
+	// constant offset, in every gait (an off-centre mass makes a trot rock over
+	// the diagonals and drift towards the heavy end)
+	LR_point com = lrRotateZ(_params.centerOfMass, sy, cy);
+	LR_point target = { -com.x, -com.y, 0 };
 	if (_params.staticStability) {
 		float sum = 0, x = 0, y = 0;
 		for (uint8_t i = 0; i < _legCount; i++) {
@@ -291,15 +296,14 @@ void GaitEngine::updateShift(float dt)
 			sum += w;
 		}
 		if (sum > 1e-3f) {
-			// the centre of mass goes over the weighted feet centroid
-			LR_point com = lrRotateZ(_params.centerOfMass, sinf(_body.orientation.yaw), cosf(_body.orientation.yaw));
-			LR_point w = { x / sum - _base.x - com.x, y / sum - _base.y - com.y, 0 };
-			// scale per body axis
-			float sy = sinf(_body.orientation.yaw), cy = cosf(_body.orientation.yaw);
+			// and moves towards the weighted feet centroid, scaled per body axis
+			LR_point w = { x / sum - _base.x, y / sum - _base.y, 0 };
 			LR_point b = lrRotateZ(w, -sy, cy);
 			b.x *= constrain(_params.stabilityGain.x, 0.0f, 1.0f);
 			b.y *= constrain(_params.stabilityGain.y, 0.0f, 1.0f);
-			target = lrRotateZ(b, sy, cy);
+			b = lrRotateZ(b, sy, cy);
+			target.x += b.x;
+			target.y += b.y;
 		} else {
 			target = _shift;
 		}

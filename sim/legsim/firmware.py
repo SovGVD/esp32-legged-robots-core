@@ -83,6 +83,8 @@ class FirmwareCore:
         L.rc_set_stability_gain.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_tune_gait.restype = None
         L.rc_tune_gait.argtypes = [ctypes.c_float] * 5
+        L.rc_set_center_of_mass.restype = None
+        L.rc_set_center_of_mass.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_reject_counts.restype = None
         L.rc_reject_counts.argtypes = [ctypes.POINTER(ctypes.c_uint32)]
         L.rc_shift.restype = None
@@ -157,6 +159,10 @@ class FirmwareCore:
         A new duty factor keeps each leg's swing start."""
         self.lib.rc_tune_gait(cycle_time, duty_factor, max_speed, step_height, stability_blend)
 
+    def set_center_of_mass(self, x, y):
+        """Override the current gait's centre of mass, mm in the body frame (undone by reset()/select_gait())."""
+        self.lib.rc_set_center_of_mass(x, y)
+
     def shift(self):
         """Static stability body shift, world x, y, mm."""
         return self._floats(self.lib.rc_shift, 2)
@@ -194,6 +200,13 @@ class FirmwareCore:
     def level_correction(self):
         """Leveler output: pitch, roll in rad, firmware convention."""
         return self._floats(self.lib.rc_level_correction, 2)
+
+    def place(self, dog):
+        """Put `dog` on the floor in the firmware's current pose (call after reset()
+        or select_gait()): the standing pose is not the plain neutral stance when
+        the gait offsets the body over the centre of mass."""
+        dog.reset(leg_angles=self.leg_angles())
+        return dog
 
     def gait_active(self):
         return bool(self.lib.rc_gait_active())

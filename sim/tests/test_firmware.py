@@ -29,7 +29,7 @@ def fw():
 def dog(fw):
     fw.set_leveling(False)
     fw.select_gait("default")   # also resets
-    d = SimDog()
+    d = fw.place(SimDog())
     d.step(0.3)
     return d
 
@@ -40,13 +40,15 @@ def tilt_deg(dog):
 
 
 def test_neutral_pulses_match_python_port(fw):
-    """C++ IK + HAL and the Python port in legsim agree on the neutral stance."""
+    """C++ IK + HAL and the Python port in legsim agree on the neutral stance
+    (feet at their defaults, body offset over the centre of mass)."""
     fw.reset()
     pulses = fw.update(STOP, dt=0.0).reshape(4, 3)
+    shift = np.append(fw.shift(), 0.0)
     d = SimDog()
     geo = d.p.geometry
     for i, leg in enumerate(d.p.legs):
-        angles = firmware_ik(geo, leg, default_foot(geo, leg))
+        angles = firmware_ik(geo, leg, default_foot(geo, leg) - shift)
         expected = hal.leg_angles_to_pulses(d.p.hal, leg, angles)
         assert np.all(np.abs(pulses[i] - expected) <= 1), (leg.name, pulses[i], expected)
     assert fw.loop_dt == pytest.approx(0.0044)
@@ -125,7 +127,7 @@ def _walk(fw, dog, command, seconds):
 def test_static_walk_is_steadier_than_without_shift(fw, dog, command):
     """Slow walk with the static stability shift vs the same walk without it."""
     fw.select_gait("walk")
-    d = SimDog()
+    d = fw.place(SimDog())
     d.step(0.3)
     moved, tilt, margin = _walk(fw, d, command, 6.0)
     assert fw.unsolved == 0
@@ -138,7 +140,7 @@ def test_static_walk_is_steadier_than_without_shift(fw, dog, command):
 
     fw.select_gait("walk")
     fw.set_stability_gain(-1)      # same gait, no shift
-    d = SimDog()
+    d = fw.place(SimDog())
     d.step(0.3)
     _, tilt_off, margin_off = _walk(fw, d, command, 6.0)
     assert margin_off < 0.0
@@ -162,7 +164,7 @@ def _tilt_from_gravity_deg(dog):
 
 def _mean_tilt_on_slope(fw, deg, sideways, gait, command, seconds):
     fw.select_gait(gait)
-    d = SimDog()
+    d = fw.place(SimDog())
     _slope(d, deg, sideways)
     fw.drive(d, STOP, 1.0)
     tilts = []

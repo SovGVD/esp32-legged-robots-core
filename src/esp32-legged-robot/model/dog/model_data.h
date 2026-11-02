@@ -113,7 +113,9 @@ const GaitParams GAIT_PARAMS = {
 	0.4,      // cycle time, s (two pairs of diagonal legs)
 	0.75,     // duty factor: each leg swings 100ms of every 400ms
 	{ 0.5, 0.0, 0.0, 0.5, 0, 0 },   // phase offsets LF, RF, LH, RH: trot (diagonal pairs)
-	30,       // step height, mm
+	15,       // step height, mm: MG90D servos (0.1 s/60 deg, 50 Hz pulses) can't lift a foot
+	          // 30 mm and put it back in a 100 ms swing; the foot landed 50-100 ms late, the body
+	          // stood on two legs that much longer and rocked over the diagonal (simulator)
 	150,      // max speed, mm/s
 	1.5,      // max yaw rate, rad/s
 	600,      // max acceleration, mm/s^2
@@ -123,7 +125,10 @@ const GaitParams GAIT_PARAMS = {
 	false,    // no static stability shift: a trot is supported by a diagonal line
 	0.1,      // (stability blend)
 	{ 1, 1, 0 },  // (stability gain)
-	{ 0, 0, 0 }   // centre of mass, mm from the body origin
+	{ 0, -8, 0 }  // centre of mass, mm from the body origin: the body is moved this much the other
+	              // way so it sits over the middle of the feet. The parts put it ~5 mm behind the
+	              // hips' centre; -8 balances best in the simulator (rocking, backward drift).
+	              // Check on the robot: it balances on a ruler edge this far behind the middle.
 };
 
 /**
@@ -147,7 +152,8 @@ const GaitParams GAIT_PARAMS_WALK = {
 	0.15,     // support weights ramp over the four-foot phases
 	{ 0.7, 0, 0 },  // shift sideways only, 70 % of the way to the support centroid (~11 mm margin):
 	              // the hip roll servos (2:1 gear, 20-160 deg) leave about +-23 deg of leg roll
-	{ 0, 0, 0 }   // centre of mass, mm from the body origin (battery is centred)
+	{ 0, -8, 0 }  // centre of mass, mm from the body origin (see GAIT_PARAMS; the fore-aft
+	              // part has no effect here with the sideways-only gain)
 };
 
 // IMU leveling (HORIZON_LEVEL or CLI `level on`), tuned in the simulator:
