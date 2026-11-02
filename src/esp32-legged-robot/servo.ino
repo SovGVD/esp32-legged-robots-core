@@ -56,8 +56,8 @@ bool servoReady()
 	return isServoReady;
 }
 
-uint16_t angleToPulse(double angleRad) {
-  double angleDeg = radToDeg(angleRad);
+uint16_t angleToPulse(float angleRad) {
+  float angleDeg = radToDeg(angleRad);
 
   if (angleDeg < servoMainProfile.minAngle) angleDeg = servoMainProfile.minAngle;
   if (angleDeg > servoMainProfile.maxAngle) angleDeg = servoMainProfile.maxAngle;

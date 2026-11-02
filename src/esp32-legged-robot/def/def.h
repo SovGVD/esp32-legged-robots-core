@@ -38,8 +38,8 @@
 #define SOFTWARE_CORE_VERSION 1
 
 /* Math */
-#define RADTODEG 180/PI
-#define DEGTORAD PI/180
+#define RADTODEG 57.295779513f   // 180/PI
+#define DEGTORAD 0.0174532925f  // PI/180
 
 /* WiFi */
 #define AP_MODE 0

@@ -37,12 +37,12 @@ void setupPowerSensor()
 }
 
 // return V
-double getPowerSensorVoltage() {
+float getPowerSensorVoltage() {
   return voltage_V;
 }
 
 
 // return A
-double getPowerSensorCurrent() {
+float getPowerSensorCurrent() {
   return current_A;
 }

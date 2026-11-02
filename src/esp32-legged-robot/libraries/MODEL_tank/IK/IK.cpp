@@ -22,8 +22,8 @@ iksolver IK::solve(uint8_t legId)
 	iksolver s;
 	// This is too simple and ignoring all ideas of using coordinates... but who cares, currently it is just for fun
 
-	double left  = constrain(-(_vector->move.y + _vector->rotate.yaw), -1.0, 1.0);	// inverted because forward is -1, but logicaly it should be +1
-	double right = constrain(-(_vector->move.y - _vector->rotate.yaw), -1.0, 1.0);
+	float left  = constrain(-(_vector->move.y + _vector->rotate.yaw), -1.0, 1.0);	// inverted because forward is -1, but logicaly it should be +1
+	float right = constrain(-(_vector->move.y - _vector->rotate.yaw), -1.0, 1.0);
 
 	if (legId == TRACKL) {
 		angle.alpha = (left >= 0 ?  left : 0) * _legs[legId]->max.alpha;
@@ -45,7 +45,7 @@ iksolver IK::solve(uint8_t legId)
 
 // @TODO move all that service methods into other class or even extend IK classes from some base class
 
-double IK::normalizeAngleRad(double angleRad)
+float IK::normalizeAngleRad(float angleRad)
 {
 	// TODO It is not working as expected
     //angleRad = fmod(angleRad,M_2_PI);
@@ -55,17 +55,39 @@ double IK::normalizeAngleRad(double angleRad)
 
 // this can be update to use table of angles (faster) insted of using trigonometry functions
 // or at least add cache
-double IK::ikAtan2(double x, double y)
+float IK::ikAtan2(float x, float y)
 {
-	return normalizeAngleRad(atan2(x, y));
+	return normalizeAngleRad(atan2f(x, y));
 }
 
-double IK::ikAcos(double angleRad)
+/**
+ * acos/asin are only defined on [-1, 1]. Outside of it (target out of reach,
+ * or 0/0 when the foot sits exactly on a joint) they return NaN, which used to
+ * end up as a servo pulse. Clamp instead and mark the solution as not solved.
+ */
+float IK::ikClampUnit(float value)
 {
-	return normalizeAngleRad(acos(angleRad));
+	if (isnan(value)) {
+		_clamped = true;
+		return 1.0f;
+	}
+	if (value > 1.0f) {
+		_clamped = true;
+		return 1.0f;
+	}
+	if (value < -1.0f) {
+		_clamped = true;
+		return -1.0f;
+	}
+	return value;
 }
 
-double IK::ikAsin(double angleRad)
+float IK::ikAcos(float value)
 {
-	return normalizeAngleRad(asin(angleRad));
+	return normalizeAngleRad(acosf(ikClampUnit(value)));
+}
+
+float IK::ikAsin(float value)
+{
+	return normalizeAngleRad(asinf(ikClampUnit(value)));
 }

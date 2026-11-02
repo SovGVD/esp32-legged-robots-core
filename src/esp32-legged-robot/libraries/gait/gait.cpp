@@ -81,7 +81,7 @@ void gait::start(uint8_t legId, LR_point from, LR_point to) {
 	uint16_t ticksAfterSwing  = 0;
 
 	/**
-	 * Here double to uint16 - kind of dangerous
+	 * Here float to uint16 - kind of dangerous
 	 */
 
 	if (from.x == to.x && from.y == to.y && from.z == to.z) {

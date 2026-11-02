@@ -1,13 +1,13 @@
-double radToDeg(double angleRad)
+float radToDeg(float angleRad)
 {
   return angleRad*RADTODEG;
 }
 
-double degToRad(double angleDeg)
+float degToRad(float angleDeg)
 {
   return angleDeg*DEGTORAD;
 }
 
-double mapf(double val, double in_min, double in_max, double out_min, double out_max) {
+float mapf(float val, float in_min, float in_max, float out_min, float out_max) {
   return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }

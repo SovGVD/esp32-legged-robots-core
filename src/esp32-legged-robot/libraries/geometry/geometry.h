@@ -1,6 +1,8 @@
 #ifndef geometry_h
 #define geometry_h
 
+#include "../compat/compat.h"
+
 // Up to 6 dof should be enought for now
 #define ALPHA   0
 #define BETA    1
@@ -26,16 +28,16 @@
 
 // pount in 3D
 typedef struct {
-	double x;
-	double y;
-	double z;
+	float x;
+	float y;
+	float z;
 } LR_point;
 
 // angle in 3D
 typedef struct {
-	double pitch;   // X axis
-	double roll;    // Y axis
-	double yaw;     // Z axis
+	float pitch;   // X axis
+	float roll;    // Y axis
+	float yaw;     // Z axis
 } LR_angle;
 
 //body

@@ -5,32 +5,32 @@
 
 // see IK.h
 typedef struct {
-	double alpha;
-	double beta;
-	double gamma;
-	double delta;
-	double epsilon;
-	double zeta;
+	float alpha;
+	float beta;
+	float gamma;
+	float delta;
+	float epsilon;
+	float zeta;
 } LR_legAngle;
 
 //Leg gears ratio
 typedef struct {
-	double alpha;
-	double beta;
-	double gamma;
-	double delta;
-	double epsilon;
-	double zeta;
+	float alpha;
+	float beta;
+	float gamma;
+	float delta;
+	float epsilon;
+	float zeta;
 } LR_legGear;
 
 // see IK.h
 typedef struct {
-	double l1;
-	double l2;
-	double l3;
-	double l4;
-	double l5;
-	double l6;
+	float l1;
+	float l2;
+	float l3;
+	float l4;
+	float l5;
+	float l6;
 } LR_legSize;
 
 // Hardware pin numbers

@@ -86,7 +86,7 @@ void cliAngleServo()
 {
 	char*  legTitle = CLI_readWord();
 	char*  legAngle = CLI_readWord();
-	double angle    = degToRad(CLI_readFloat());
+	float angle    = degToRad(CLI_readFloat());
 
 	int angleId = getAngleIdByAngleTitle(legAngle);
 
@@ -135,7 +135,7 @@ void cliSetTrim()
 {
 	char*  legTitle     = CLI_readWord();
 	char*  legAngle     = CLI_readWord();
-	double trimValueRad = degToRad(CLI_readFloat());
+	float trimValueRad = degToRad(CLI_readFloat());
 	
 	int angleId = getAngleIdByAngleTitle(legAngle);
 	

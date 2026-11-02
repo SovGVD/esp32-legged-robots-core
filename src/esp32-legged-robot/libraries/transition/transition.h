@@ -79,8 +79,8 @@
 typedef struct {
 	LR_figure initialValue;
 	LR_figure targetValue;
-	double offTheGround;
-	double transitionProgressStep[2];
+	float offTheGround;
+	float transitionProgressStep[2];
 } transitionParameters;
 
 class transition
@@ -88,21 +88,21 @@ class transition
 	public:
 		transition();
 		void set(transitionParameters param);
-		LR_figure swing(double progress);
-		LR_figure linear(double progress);
+		LR_figure swing(float progress);
+		LR_figure linear(float progress);
 	private:
 		transitionParameters _param;
 		LR_figure  f;
-		double stepProgress;
-		double dPx;
-		double dPy;
-		double dPz;
-		double dOp;
-		double dOr;
-		double dOy;
-		double z;
-		double P_z1; // height off the ground on step1
-		double P_z2; // height off the ground on step2
+		float stepProgress;
+		float dPx;
+		float dPy;
+		float dPz;
+		float dOp;
+		float dOr;
+		float dOy;
+		float z;
+		float P_z1; // height off the ground on step1
+		float P_z2; // height off the ground on step2
 };
 
 #endif

@@ -4,23 +4,23 @@ LR_legAngle modelSettingsLoadTrimLeg(modelSettingsAngleTrim t)
 		#error "LEG DOF required"
 	#elif LEG_DOF == 2
 		return {
-			t.alpha,
-			t.beta
+			(float)t.alpha,
+			(float)t.beta
 		};
 	#elif LEG_DOF == 3
 		return {
-			t.alpha,
-			t.beta,
-			t.gamma
+			(float)t.alpha,
+			(float)t.beta,
+			(float)t.gamma
 		};
 	#elif LEG_DOF == 6
 		return {
-			t.alpha,
-			t.beta,
-			t.gamma,
-			t.delta,
-			t.epsilon,
-			t.zeta
+			(float)t.alpha,
+			(float)t.beta,
+			(float)t.gamma,
+			(float)t.delta,
+			(float)t.epsilon,
+			(float)t.zeta
 		};
 	#else
 		return {};

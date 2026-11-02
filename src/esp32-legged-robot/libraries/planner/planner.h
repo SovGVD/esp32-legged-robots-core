@@ -22,8 +22,8 @@ class planner
 		leg           *_legs[LEG_NUM];
 		LR_figure     _predictedBody;
 		LR_point      _predictedLegFoot[LEG_NUM];
-		double        moveInc = 30;
-		double        rotateInc = -0.3;
+		float        moveInc = 30;
+		float        rotateInc = -0.3;
 };
 
 #endif

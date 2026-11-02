@@ -17,18 +17,18 @@ typedef struct gaitSequence_t {
 typedef struct gaitConfig_t {
 	const gaitSequence sequence[16];
 	const uint8_t      sequenceLength;
-	const double       loopTime;       // loop time in microseconds to correclty calculate number of sub moves per gate item, milliseconds
-	double             offTheGround;   // in mm
-	double             swingDuration;  // duration of swing in microseconds (1sec = 1000 millisec, 1sec = 1000000microsec)
-	double             duration;       // duration of gaitSequence item, in microseconds, should be equal or longer than swingDuration
-	double             transitionProgressStep[2]; // @see transition.h
+	const float       loopTime;       // loop time in microseconds to correclty calculate number of sub moves per gate item, milliseconds
+	float             offTheGround;   // in mm
+	float             swingDuration;  // duration of swing in microseconds (1sec = 1000 millisec, 1sec = 1000000microsec)
+	float             duration;       // duration of gaitSequence item, in microseconds, should be equal or longer than swingDuration
+	float             transitionProgressStep[2]; // @see transition.h
 } gaitConfig;
 
 typedef struct gaitTick_t
 {
 	uint16_t tickCurrent;	// this is from `tickMax` to 0, tickCurrent = tickMax -> 0% of progress, tickCurrent = 0 -> 100%
 	uint16_t tickMax;
-	double   tickProgress;	// 0.0-1.0 (0 to 100%)
+	float   tickProgress;	// 0.0-1.0 (0 to 100%)
 	bool     isInProgress;	// tickCurrent != 0
 	bool     isDone;
 } gaitTick;

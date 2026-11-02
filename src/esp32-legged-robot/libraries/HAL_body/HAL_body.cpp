@@ -20,14 +20,14 @@ void HAL_body::update()
 	 * @see: https://en.wikipedia.org/wiki/Rotation_matrix#General_rotations
 	 */
 	
-	double sinPitch = sin(_body->orientation.pitch - _correction->pitch + _vector->rotate.pitch * 0.2);	// TODO THIS IS WRONG, it should not be there!!!
-	double cosPitch = cos(_body->orientation.pitch - _correction->pitch + _vector->rotate.pitch * 0.2);
+	float sinPitch = sin(_body->orientation.pitch - _correction->pitch + _vector->rotate.pitch * 0.2);	// TODO THIS IS WRONG, it should not be there!!!
+	float cosPitch = cos(_body->orientation.pitch - _correction->pitch + _vector->rotate.pitch * 0.2);
 
-	double sinRoll = sin(_body->orientation.roll - _correction->roll + _vector->rotate.roll * 0.2);
-	double cosRoll = cos(_body->orientation.roll - _correction->roll + _vector->rotate.roll * 0.2);
+	float sinRoll = sin(_body->orientation.roll - _correction->roll + _vector->rotate.roll * 0.2);
+	float cosRoll = cos(_body->orientation.roll - _correction->roll + _vector->rotate.roll * 0.2);
 
-	double sinYaw = sin(_body->orientation.yaw);
-	double cosYaw = cos(_body->orientation.yaw);
+	float sinYaw = sin(_body->orientation.yaw);
+	float cosYaw = cos(_body->orientation.yaw);
 
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		_legs[i]->body.x = _body->position.x 

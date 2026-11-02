@@ -81,11 +81,12 @@ iksolver IK::solve(uint8_t legId)
 {
 	LR_legAngle angle;
 	iksolver s;
+	_clamped = false;
 
 	// normalize by body rotation
 	// We need it to make IK simple ignoring body transitions, and at the same time still have absolute positions for each robot points
-	double tmpSin = sin(_body->orientation.yaw * -1);
-	double tmpCos = cos(_body->orientation.yaw * -1);
+	float tmpSin = sin(_body->orientation.yaw * -1);
+	float tmpCos = cos(_body->orientation.yaw * -1);
 
 	LR_point legFoot = {
 			(_legs[legId]->foot.x - _body->position.x) * tmpCos - (_legs[legId]->foot.y - _body->position.y) * tmpSin,
@@ -101,17 +102,17 @@ iksolver IK::solve(uint8_t legId)
 
 
 	// TODO: what can I do with limits?
-	double lx = legFoot.x - legBody.x; if (_legs[legId]->inverse.x) { lx = -lx; };
-	double ly = legFoot.y - legBody.y; if (_legs[legId]->inverse.y) { ly = -ly; };
-	double lz = legFoot.z - legBody.z; if (_legs[legId]->inverse.z) { lz = -lz; };
+	float lx = legFoot.x - legBody.x; if (_legs[legId]->inverse.x) { lx = -lx; };
+	float ly = legFoot.y - legBody.y; if (_legs[legId]->inverse.y) { ly = -ly; };
+	float lz = legFoot.z - legBody.z; if (_legs[legId]->inverse.z) { lz = -lz; };
 
 
-	double a = sq(lx) + sq(lz);        // square of hypotenuse (points between leg.body and leg.foot in XZ-plane)
-	double sqrta = sqrt(a);
-	double b = sq(ly) + a;             // square of hypotenuse (points between leg.body and leg.foot in YLeg-plane)
-	double sqrtb = sqrt(b);            // square of hypotenuse (points between leg.body and leg.foot in YZ-plane)
-	double l2p2 = sq(_legs[legId]->size.l2);   // square of l2		TODO this is const actually
-	double l3p2 = sq(_legs[legId]->size.l3);   // square of l3		TODO this is const actually
+	float a = sq(lx) + sq(lz);        // square of hypotenuse (points between leg.body and leg.foot in XZ-plane)
+	float sqrta = sqrt(a);
+	float b = sq(ly) + a;             // square of hypotenuse (points between leg.body and leg.foot in YLeg-plane)
+	float sqrtb = sqrt(b);            // square of hypotenuse (points between leg.body and leg.foot in YZ-plane)
+	float l2p2 = sq(_legs[legId]->size.l2);   // square of l2		TODO this is const actually
+	float l3p2 = sq(_legs[legId]->size.l3);   // square of l3		TODO this is const actually
 
 
 	// XZ plane
@@ -123,13 +124,13 @@ iksolver IK::solve(uint8_t legId)
 	// YLeg plane
 	angle.gamma = ikAcos((l2p2 + l3p2 - b) / (2 * _legs[legId]->size.l2 * _legs[legId]->size.l3));
 
-	s.isSolved = true;	// TODO
+	s.isSolved = !_clamped;
 	s.angle = angle;
 
 	return s;
 }
 
-double IK::normalizeAngleRad(double angleRad)
+float IK::normalizeAngleRad(float angleRad)
 {
 	// TODO It is not working as expected
     //angleRad = fmod(angleRad,M_2_PI);
@@ -139,17 +140,39 @@ double IK::normalizeAngleRad(double angleRad)
 
 // this can be update to use table of angles (faster) insted of using trigonometry functions
 // or at least add cache
-double IK::ikAtan2(double x, double y)
+float IK::ikAtan2(float x, float y)
 {
-	return normalizeAngleRad(atan2(x, y));
+	return normalizeAngleRad(atan2f(x, y));
 }
 
-double IK::ikAcos(double angleRad)
+/**
+ * acos/asin are only defined on [-1, 1]. Outside of it (target out of reach,
+ * or 0/0 when the foot sits exactly on a joint) they return NaN, which used to
+ * end up as a servo pulse. Clamp instead and mark the solution as not solved.
+ */
+float IK::ikClampUnit(float value)
 {
-	return normalizeAngleRad(acos(angleRad));
+	if (isnan(value)) {
+		_clamped = true;
+		return 1.0f;
+	}
+	if (value > 1.0f) {
+		_clamped = true;
+		return 1.0f;
+	}
+	if (value < -1.0f) {
+		_clamped = true;
+		return -1.0f;
+	}
+	return value;
 }
 
-double IK::ikAsin(double angleRad)
+float IK::ikAcos(float value)
 {
-	return normalizeAngleRad(asin(angleRad));
+	return normalizeAngleRad(acosf(ikClampUnit(value)));
+}
+
+float IK::ikAsin(float value)
+{
+	return normalizeAngleRad(asinf(ikClampUnit(value)));
 }

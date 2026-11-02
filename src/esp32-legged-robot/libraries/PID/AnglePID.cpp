@@ -1,7 +1,7 @@
 #include "math.h"
 #include "AnglePID.h"
 
-AnglePID::AnglePID(LR_angle &current, LR_angle &target, LR_angle &output, double Kp, double Ki, double Kd, double minError, double maxError)
+AnglePID::AnglePID(LR_angle &current, LR_angle &target, LR_angle &output, float Kp, float Ki, float Kd, float minError, float maxError)
 {
 	_current = &current;
 	_target  = &target;
@@ -15,7 +15,7 @@ AnglePID::AnglePID(LR_angle &current, LR_angle &target, LR_angle &output, double
 	_maxError = maxError;
 }
 
-void AnglePID::set(double Kp, double Ki, double Kd)
+void AnglePID::set(float Kp, float Ki, float Kd)
 {
 	_Kp = Kp;
 	_Ki = Ki;
@@ -29,7 +29,7 @@ void AnglePID::update()
 		return;
 	}
 	
-	double dt = (micros() - _t) / 1000.0;
+	float dt = (micros() - _t) / 1000.0;
 	
 	err.pitch = _target->pitch - _current->pitch;
 	err.roll  = _target->roll  - _current->roll;

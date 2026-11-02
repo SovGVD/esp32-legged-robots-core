@@ -25,8 +25,8 @@ void planner::predictPosition()
 	_predictedBody.orientation.yaw   = _body->orientation.yaw + rotateInc * _vector->rotate.yaw;
 	
 	
-	double tmpSin = sin(_predictedBody.orientation.yaw);
-	double tmpCos = cos(_predictedBody.orientation.yaw);
+	float tmpSin = sin(_predictedBody.orientation.yaw);
+	float tmpCos = cos(_predictedBody.orientation.yaw);
 	
 	// TODO use matrix
 	_predictedBody.position.x = _body->position.x + moveInc * (_vector->move.x * tmpCos - _vector->move.y * tmpSin);

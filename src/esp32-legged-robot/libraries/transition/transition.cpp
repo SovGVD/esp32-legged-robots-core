@@ -30,7 +30,7 @@ void transition::set(transitionParameters param)
 /**
  * progress [0,1];
  */
-LR_figure transition::swing(double progress)
+LR_figure transition::swing(float progress)
 {
 	f.position.x = progress*dPx + _param.initialValue.position.x;
 	f.position.y = progress*dPy + _param.initialValue.position.y;
@@ -56,7 +56,7 @@ LR_figure transition::swing(double progress)
 	return f;
 }
 
-LR_figure transition::linear(double progress)
+LR_figure transition::linear(float progress)
 {
 	f.position.x = progress*dPx + _param.initialValue.position.x;
 	f.position.y = progress*dPy + _param.initialValue.position.y;

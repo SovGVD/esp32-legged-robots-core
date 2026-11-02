@@ -40,7 +40,11 @@ void updateLegs() {
 
 	readLegsSensors();
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
-		legs[i].angle = ikLeg.solve(i).angle;
+		iksolver solution = ikLeg.solve(i);
+		// Out of reach: keep the last valid angles instead of a clamped pose
+		if (solution.isSolved) {
+			legs[i].angle = solution.angle;
+		}
 	}
 }
 
@@ -72,7 +76,7 @@ void runServoCalibrate(leg &_leg)
 	#endif
 }
 
-double limitServoAngle(double angle)
+float limitServoAngle(float angle)
 {
   // TODO this is not right solution, we should restart calc to solve the angle instead of just limit if something wrong
   //      also this is nothing about real mechanical limits, so need TODO
@@ -84,7 +88,7 @@ double limitServoAngle(double angle)
   return angle;
 }
 
-double getHALAngle(double angle, double mid, double trimAngle, double gearRatio, bool inverse) {
+float getHALAngle(float angle, float mid, float trimAngle, float gearRatio, bool inverse) {
   angle = (angle - mid) * gearRatio + M_PI_2;
   if (inverse) angle = M_PI - angle;
   angle = angle + trimAngle;

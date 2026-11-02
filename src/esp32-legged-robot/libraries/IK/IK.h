@@ -7,7 +7,7 @@
 #ifndef IK_h
 #define IK_h
 
-#include "math.h"
+#include "../compat/compat.h"
 #include "../leg/leg.h"
 
 typedef struct {
@@ -20,14 +20,16 @@ class IK
 	public:
 		IK(LR_moveVector &vector, LR_figure &bodyObj, LR_point &bodyBalanceOffset, leg (&legs)[LEG_NUM]);
 		iksolver solve(uint8_t legId);
-		double normalizeAngleRad(double angleRad);
+		float normalizeAngleRad(float angleRad);
 	private:
 		LR_moveVector *_vector;
 		LR_figure     *_body;
 		LR_point      *_bodyOffset;
 		leg           *_legs[LEG_NUM];
-		double        ikAtan2(double x, double y);
-		double        ikAcos(double angleRad);
-		double        ikAsin(double angleRad);
+		float        ikAtan2(float x, float y);
+		float        ikAcos(float angleRad);
+		float        ikAsin(float angleRad);
+		float        ikClampUnit(float value);
+		bool          _clamped = false;   // set by ikAcos/ikAsin when the target is out of reach
 };
 #endif
