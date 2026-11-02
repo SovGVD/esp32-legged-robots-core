@@ -1,23 +1,40 @@
+/**
+ * Failsafe: stop the robot when the controlling client goes quiet.
+ *
+ * The web client sends a move package every 50 ms. If nothing arrives for
+ * FS_TIMEOUT_MS (or the client disconnects, or it sends "disabled"), the move
+ * command is reset to zero and the gait settles the feet.
+ */
 #include "robot.h"
 
-bool    FS_FAIL     = false;
-uint8_t FS_WS_count = 0;
+static volatile uint32_t lastCommandMs = 0;
+static volatile bool     everFed       = false;
+bool FS_FAIL = true;   // no client yet
 
-void updateFailsafe() {
-  if (FS_WS_count >= FS_WS_THR) {
-    setFailsafe();
-    return;
-  }
-
-  FS_FAIL = false;
+void failsafeFeed()
+{
+	lastCommandMs = millis();
+	everFed       = true;
 }
 
-void setFailsafe() {
-  vector.move.x     = 0;
-  vector.move.y     = 0;
-  vector.move.z     = 0;
-  vector.rotate.yaw = 0;
+void updateFailsafe()
+{
+	bool timedOut = !everFed || (uint32_t)(millis() - lastCommandMs) > FS_TIMEOUT_MS;
+	if (timedOut) {
+		if (!FS_FAIL) {
+			Serial.println("Failsafe: no commands, stopping");
+		}
+		setFailsafe();
+		return;
+	}
 
-  FS_WS_count = FS_WS_THR;
-  FS_FAIL     = true;
+	FS_FAIL = false;
+}
+
+void setFailsafe()
+{
+	LR_moveVector stop = { {0, 0, 0}, {0, 0, 0} };
+	setMoveCommand(stop);
+	everFed = false;
+	FS_FAIL = true;
 }

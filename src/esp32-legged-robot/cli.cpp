@@ -5,7 +5,6 @@ static void CLI_prepareCommand();
 
 const char *CLI_delimiters = " \n";
 char CLI_BUFFER[CLI_BUFFER_LENGTH + 1];
-uint8_t CLI_params = 0;
 
 #define CLI_COMMANDS 10
 #define CLI_MAIN_SET 0
@@ -14,7 +13,7 @@ uint8_t CLI_params = 0;
 /**
  * @TODO could it be just pointer to cliCommand?
  */
-bool    CLI_commandReady  = false;
+volatile bool CLI_commandReady = false;   // set on core 0, may be cleared on core 1
 uint8_t CLI_commandSet    = 0;
 uint8_t CLI_commandCoreId = 0;
 uint8_t CLI_commandIdx    = 0;
@@ -60,9 +59,6 @@ static bool CLI_get(char * CLI_BUFFER)
         }
         break;
       default:
-        if (CLI_c == 32) {
-          CLI_params++;
-        }
         if (CLI_charsRead < CLI_BUFFER_LENGTH) {
           CLI_BUFFER[CLI_charsRead++] = CLI_c;
         }
@@ -73,71 +69,95 @@ static bool CLI_get(char * CLI_BUFFER)
   return false;
 }
 
+/**
+ * The command line is split into tokens once, when it is received. Commands
+ * read their parameters from that list, so the count check is exact (repeated
+ * or trailing spaces used to be counted as parameters) and nothing depends on
+ * strtok() state, which is per task and the command may run on the other core.
+ */
+#define CLI_MAX_TOKENS 8
+static char    CLI_tokens[CLI_MAX_TOKENS][CLI_BUFFER_LENGTH + 1];
+static uint8_t CLI_tokenCount = 0;
+static uint8_t CLI_tokenRead  = 0;
+
+static void CLI_tokenize(char *line)
+{
+  CLI_tokenCount = 0;
+  CLI_tokenRead  = 1;   // token 0 is the command name
+  char *save = nullptr;
+  for (char *t = strtok_r(line, CLI_delimiters, &save); t != nullptr; t = strtok_r(nullptr, CLI_delimiters, &save)) {
+    if (CLI_tokenCount == CLI_MAX_TOKENS) {
+      CLI_tokenCount++;   // too many, reported as a wrong parameter count
+      break;
+    }
+    strlcpy(CLI_tokens[CLI_tokenCount++], t, sizeof(CLI_tokens[0]));
+  }
+}
+
+static const char *CLI_nextToken()
+{
+  if (CLI_tokenRead >= CLI_tokenCount || CLI_tokenRead >= CLI_MAX_TOKENS) {
+    return "";
+  }
+  return CLI_tokens[CLI_tokenRead++];
+}
+
 int CLI_readInt() {
-  char * numTextPtr = strtok(NULL, CLI_delimiters);   //K&R string.h  pg. 250
-  return atoi(numTextPtr);                            //K&R string.h  pg. 251
+  return atoi(CLI_nextToken());
 }
 
 float CLI_readFloat() {
-  char * floatTextPtr = strtok(NULL, CLI_delimiters);
-  return atof(floatTextPtr);
+  return atof(CLI_nextToken());
 }
 
 char* CLI_readWord() {
-  char * word = strtok(NULL, CLI_delimiters);         //K&R string.h  pg. 250
-  return word;
+  return (char *)CLI_nextToken();
 }
 
 uint16_t CLI_readUInt16() {
-  char * numTextPtr = strtok(NULL, CLI_delimiters);
-  return (uint16_t)atol(numTextPtr);
+  return (uint16_t)atol(CLI_nextToken());
+}
+
+static bool CLI_matchCommand(const cliCommand &cmd, uint8_t set, uint8_t idx, uint8_t params)
+{
+  if (strcmp(CLI_tokens[0], cmd.commandName) != 0) {
+    return false;
+  }
+  if (cmd.params != params) {
+    cliSerial->printf("%u incorrect params number, expected %u.\n", params, cmd.params);
+    return true;
+  }
+  CLI_commandSet    = set;
+  CLI_commandCoreId = cmd.coreId;
+  CLI_commandIdx    = idx;
+  CLI_commandReady  = true;
+  return true;
 }
 
 static void CLI_prepareCommand()
 {
-  char * commandName = strtok(CLI_BUFFER, CLI_delimiters);
-  /**
-   * Default commands
-   */
-  for (int i = 0; i < CLI_COMMANDS; i++) {
-    if (strcmp(commandName, cliCommands[i].commandName) == 0) {
-      if (cliCommands[i].params != CLI_params) {
-        cliSerial->printf("%u incorrect params number, expected %u.\n", CLI_params, cliCommands[i].params);
-        CLI_params = 0;
-        return;
-      }
+  if (CLI_commandReady) {
+    cliSerial->println("Busy, previous command is still pending.");
+    return;
+  }
 
-      CLI_commandSet    = CLI_MAIN_SET;
-      CLI_commandCoreId = cliCommands[i].coreId;
-      CLI_commandIdx    = i;
-      CLI_params        = 0;
-      CLI_commandReady  = true;
+  CLI_tokenize(CLI_BUFFER);
+  if (CLI_tokenCount == 0) {
+    return;   // only spaces
+  }
+  uint8_t params = CLI_tokenCount - 1;
+
+  for (uint8_t i = 0; i < CLI_COMMANDS; i++) {
+    if (CLI_matchCommand(cliCommands[i], CLI_MAIN_SET, i, params)) {
+      return;
+    }
+  }
+  for (uint8_t i = 0; i < modelCliCommandsCount; i++) {
+    if (CLI_matchCommand(modelCliCommands[i], CLI_MODEL_SET, i, params)) {
       return;
     }
   }
 
-  /**
-   * Model commands
-   */
-  for (int i = 0; i < modelCliCommandsCount; i++) {
-    if (strcmp(commandName, modelCliCommands[i].commandName) == 0) {
-      if (modelCliCommands[i].params != CLI_params) {
-        cliSerial->print(CLI_params);
-        cliSerial->printf("%u incorrect params number, expected %u.\n", CLI_params, modelCliCommands[i].params);
-        CLI_params = 0;
-        return;
-      }
-
-      CLI_commandSet    = CLI_MODEL_SET;
-      CLI_commandCoreId = modelCliCommands[i].coreId;
-      CLI_commandIdx    = i;
-      CLI_params        = 0;
-      CLI_commandReady  = true;
-      return;
-    }
-  }
-
-  CLI_params = 0;
   cliSerial->println("Unknown command.");
 }
 

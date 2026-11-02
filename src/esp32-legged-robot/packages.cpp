@@ -10,14 +10,21 @@ void pMove(uint8_t* data, size_t len) {
   if (len < 14) {
     return;   // malformed package
   }
-  if (data[1] == 0) setFailsafe();
-  
-  vector.move.x       = float(bytesToInt16( data[2],  data[3]))/10000-1;
-  vector.move.y       = float(bytesToInt16( data[4],  data[5]))/10000-1;
-  vector.move.z       = float(bytesToInt16( data[6],  data[7]))/10000-1;
-  vector.rotate.pitch = float(bytesToInt16( data[8],  data[9]))/10000-1;
-  vector.rotate.roll  = float(bytesToInt16(data[10], data[11]))/10000-1;
-  vector.rotate.yaw   = float(bytesToInt16(data[12], data[13]))/10000-1;
+  if (data[1] == 0) {
+    // client says "disabled": stop, and ignore the rest of the package
+    setFailsafe();
+    return;
+  }
+
+  LR_moveVector command;
+  command.move.x       = constrain(float(bytesToInt16( data[2],  data[3]))/10000-1, -1.0f, 1.0f);
+  command.move.y       = constrain(float(bytesToInt16( data[4],  data[5]))/10000-1, -1.0f, 1.0f);
+  command.move.z       = constrain(float(bytesToInt16( data[6],  data[7]))/10000-1, -1.0f, 1.0f);
+  command.rotate.pitch = constrain(float(bytesToInt16( data[8],  data[9]))/10000-1, -1.0f, 1.0f);
+  command.rotate.roll  = constrain(float(bytesToInt16(data[10], data[11]))/10000-1, -1.0f, 1.0f);
+  command.rotate.yaw   = constrain(float(bytesToInt16(data[12], data[13]))/10000-1, -1.0f, 1.0f);
+  setMoveCommand(command);
+  failsafeFeed();
 }
 
 void pTelemetry() {

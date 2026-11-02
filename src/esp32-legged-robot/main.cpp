@@ -23,7 +23,6 @@
 /**
  * Shared state, see robot.h
  */
-LR_moveVector vector        = { {0, 0, 0}, {0, 0, 0} };
 LR_angle      IMU_DATA      = {0, 0, 0};
 LR_angle      imuCorrection = {0.0, 0.0, 0.0};
 uint16_t      servoPulse[LEG_NUM][LEG_DOF];
@@ -120,8 +119,6 @@ static void robotLoop()
 			doHAL();
 		#endif
 
-		FS_WS_count++;
-
 		loopTime = micros() - currentTime;
 		if (loopTime > LOOP_TIME) {
 			Serial.print("WARNING! Increase LOOP_TIME: ");
@@ -162,6 +159,7 @@ static void servicesLoop()
 
 		updateCLI();
 		CLI_doCommand();
+		updateWebServer();
 
 		unsigned long serviceLoopTime = micros() - serviceCurrentTime;
 		if (serviceLoopTime > SERVICE_LOOP_TIME) {

@@ -4,17 +4,17 @@
 
 #include "cli_stream.h"
 
-void cliStream::setClient(AsyncWebSocketClient * &wsClient) {
-	_wsClient = wsClient;
-};
+void cliStream::setSocket(AsyncWebSocket *ws) {
+	_ws = ws;
+}
 
 void cliStream::setStreamPrefix(char streamPrefix) {
 	_streamPrefix = streamPrefix;
 }
 
-void cliStream::setClientReady(AsyncWebSocketClient * &wsClient) {
+void cliStream::setClientReady(uint32_t clientId) {
+	_clientId    = clientId;
 	_clientReady = true;
-	_wsClient = wsClient;
 }
 
 void cliStream::setClientDisconnected() {
@@ -23,7 +23,7 @@ void cliStream::setClientDisconnected() {
 
 size_t cliStream::output(const uint8_t *buffer, size_t size)
 {
-	if (!_clientReady) {
+	if (!_clientReady || _ws == nullptr) {
 		Serial.println("Client not ready");
 		return 0;
 	}
@@ -38,20 +38,28 @@ size_t cliStream::output(const uint8_t *buffer, size_t size)
 		_wsClientBuffer[idx+1] = buffer[idx];
 	}
 
-	_wsClient->binary(_wsClientBuffer, size + 1);
+	// by id: the library looks the client up under its own lock, so a client
+	// that disconnected in the meantime is simply skipped
+	_ws->binary(_clientId, _wsClientBuffer, size + 1);
 
 	return size;
 }
 
 uint8_t cliStream::available()
 {
-	return _bufferLen - _bufferPosition;
+	portENTER_CRITICAL(&_lock);
+	uint8_t n = _bufferLen - _bufferPosition;
+	portEXIT_CRITICAL(&_lock);
+	return n;
 }
 
 uint8_t cliStream::read()
 {
+	portENTER_CRITICAL(&_lock);
 	cleanBuffer();
-	return _buffer[_bufferPosition++];
+	uint8_t c = _buffer[_bufferPosition++];
+	portEXIT_CRITICAL(&_lock);
+	return c;
 }
 
 void cliStream::cleanBuffer()
@@ -63,11 +71,13 @@ void cliStream::cleanBuffer()
 }
 
 bool cliStream::input(uint8_t c) {
+	portENTER_CRITICAL(&_lock);
 	cleanBuffer();
-	if (_bufferLen == CLI_STREAM_BUFFER_SIZE) {
-		return false;
+	bool stored = _bufferLen < CLI_STREAM_BUFFER_SIZE;
+	if (stored) {
+		_buffer[_bufferLen++] = c;
 	}
-	_buffer[_bufferLen++] = c;
+	portEXIT_CRITICAL(&_lock);
 
-	return true;
+	return stored;
 }

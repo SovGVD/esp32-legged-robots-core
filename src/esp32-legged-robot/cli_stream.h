@@ -10,17 +10,19 @@
 class cliStream: public Print
 {
 	private:
-		AsyncWebSocketClient *_wsClient;
+		AsyncWebSocket *_ws = nullptr;
+		volatile uint32_t _clientId = 0;
+		portMUX_TYPE _lock = portMUX_INITIALIZER_UNLOCKED;   // input() runs in the AsyncTCP task, read() in the services loop
 		uint8_t _wsClientBuffer[CLI_STREAM_BUFFER_SIZE+1];
 		uint8_t _buffer[CLI_STREAM_BUFFER_SIZE];
 		uint8_t _bufferLen = 0;
 		uint8_t _bufferPosition = 0;
 		char    _streamPrefix;
-		bool    _clientReady = false;
+		volatile bool _clientReady = false;
 	public:
-		void setClient(AsyncWebSocketClient * &wsClient);
+		void setSocket(AsyncWebSocket *ws);
 		void setStreamPrefix(char streamPrefix);
-		void setClientReady(AsyncWebSocketClient * &wsClient);
+		void setClientReady(uint32_t clientId);
 		void setClientDisconnected();
 		size_t output(const uint8_t *buffer, size_t size);
 		uint8_t available(void);

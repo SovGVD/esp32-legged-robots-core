@@ -36,11 +36,12 @@ void updateMotion()
 		return;
 	}
 
-	gaitEngine.update(LOOP_DT, vector);
-	bodyKinematics.update(legs, LEG_NUM, gaitEngine.body(), imuCorrection, vector);
+	LR_moveVector command = getMoveCommand();
+	gaitEngine.update(LOOP_DT, command);
+	bodyKinematics.update(legs, LEG_NUM, gaitEngine.body(), imuCorrection, command);
 
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
-		iksolver solution = MODEL_IK.solve(legs[i], gaitEngine.body(), vector);
+		iksolver solution = MODEL_IK.solve(legs[i], gaitEngine.body(), command);
 		// Out of reach: keep the last valid angles instead of a clamped pose
 		if (solution.isSolved) {
 			legs[i].angle = solution.angle;

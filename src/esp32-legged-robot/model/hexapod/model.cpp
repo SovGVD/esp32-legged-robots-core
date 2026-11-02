@@ -124,7 +124,7 @@ leg legs[LEG_NUM] = {
     {        M_PI_2,         M_PI_2,         M_PI_2 },
     {
       { M_PI_2, M_PI_2, M_PI_2 },
-      {     14,     15,     16 },
+      {     24,     25,     26 },                                 // second board, channels 8-10 (mirrors left rear)
       {      0,      0,      0 },
       {      2,      2,    1.5 }
     },

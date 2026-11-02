@@ -76,6 +76,9 @@
 #define I2C_SCL 13
 
 #define PWM_CONTROLLER_ADDRESS   0x40
+// 18 servos need a second board, channels 16-31. 0x41 is taken by the INA219
+// below, so the second PCA9685 needs another address (A1 jumper -> 0x42).
+#define PWM_CONTROLLER_ADDRESS_2 0x42
 #define PWM_CONTROLLER_TYPE      PCA9685
 
 #define IMU_ADDRESS              0x68

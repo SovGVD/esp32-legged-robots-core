@@ -44,7 +44,6 @@ void modelSettingsSave();
 /**
  * Shared state (main.cpp)
  */
-extern LR_moveVector vector;          // move command from the web client
 extern LR_angle      IMU_DATA;
 extern LR_angle      imuCorrection;
 extern uint16_t      servoPulse[LEG_NUM][LEG_DOF];
@@ -85,6 +84,9 @@ void initServoHAL();
 void doLeg(leg &_leg);
 void disableServos();
 void enableServos();
+#if PWM_CONTROLLER_TYPE == PCA9685
+uint8_t servoChannelLimit();   // channels across all PCA9685 boards
+#endif
 
 /**
  * Sensors (sensors.cpp)
@@ -100,10 +102,16 @@ float getPowerSensorCurrent();
 /**
  * Failsafe (failsafe.cpp)
  */
-extern bool    FS_FAIL;
-extern uint8_t FS_WS_count;
+extern bool FS_FAIL;
+void failsafeFeed();      // call on every package from the controlling client
 void updateFailsafe();
 void setFailsafe();
+
+/**
+ * Move command (command.cpp), safe to use from any task
+ */
+void setMoveCommand(const LR_moveVector &value);
+LR_moveVector getMoveCommand();
 
 /**
  * Network: WiFi AP, web server, websocket packages (wifi.cpp, web_server.cpp, packages.cpp)
@@ -113,6 +121,7 @@ extern uint8_t   telemetryPackage[P_TELEMETRY_LEN];
 void initWiFi();
 void WiFiInfo();
 void initWebServer();
+void updateWebServer();
 void pMove(uint8_t *data, size_t len);
 void int16ToBytes(int value, uint8_t _offset);
 void pTelemetry();

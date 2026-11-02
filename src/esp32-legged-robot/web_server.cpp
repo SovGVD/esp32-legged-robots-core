@@ -10,7 +10,7 @@
 #endif
 
 bool clientOnline = false;
-AsyncWebSocketClient *wsclient = nullptr;
+static volatile uint32_t controllingClientId = 0;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 uint8_t telemetryPackage[P_TELEMETRY_LEN];
@@ -89,25 +89,42 @@ static void initWebServerRoutes()
 	});
 
 	ws.onEvent(onWsEvent);
+	cliSerial->setSocket(&ws);
 	server.addHandler(&ws);
 	server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER);
 
 	server.begin();
 }
 
+/**
+ * One client controls the robot at a time: the newest connection takes over
+ * (a phone that reconnects often leaves a stale connection behind) and the
+ * previous one is closed. Clients are tracked by id, never by pointer, so a
+ * client freed by AsyncTCP is never used afterwards.
+ */
 static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {
-	if(type == WS_EVT_CONNECT) {
-		wsclient = client;
+	if (type == WS_EVT_CONNECT) {
+		uint32_t previous = controllingClientId;
+		controllingClientId = client->id();
+		if (previous != 0 && previous != client->id()) {
+			ws.close(previous, 1000, "Another client took control");
+		}
 		client->text("Ok");
 		clientOnline = true;
-		cliSerial->setClientReady(client);
+		cliSerial->setClientReady(client->id());
 		#ifdef CAMERAENABLED
 			mainCamera.setClientReady(client);
 		#endif
 		cliInitHelp();
-	} else if (clientOnline && type == WS_EVT_DATA) {
-		FS_WS_count = 0;  // zero FS counter
+	} else if (type == WS_EVT_DATA) {
+		if (client->id() != controllingClientId || len == 0) {
+			return;
+		}
+		AwsFrameInfo *info = (AwsFrameInfo *)arg;
+		if (!info->final || info->index != 0 || info->len != len) {
+			return;   // fragmented frames are not used by the web client
+		}
 
 		switch(data[0]) {
 			case P_MOVE:
@@ -135,7 +152,12 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 				cliSerial->println(data[0], DEC);
 		}
 
-	} else if(type == WS_EVT_DISCONNECT) {
+	} else if (type == WS_EVT_DISCONNECT) {
+		if (client->id() != controllingClientId) {
+			return;   // an old, replaced client
+		}
+		controllingClientId = 0;
+		setFailsafe();
 		cliSerial->setClientDisconnected();
 		#ifdef CAMERAENABLED
 			mainCamera.setClientDisconnected();
@@ -143,4 +165,13 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 
 		clientOnline = false;
 	}
+}
+
+/**
+ * Called from the services loop: drops clients over the library limit and
+ * frees closed ones.
+ */
+void updateWebServer()
+{
+	ws.cleanupClients(2);
 }
