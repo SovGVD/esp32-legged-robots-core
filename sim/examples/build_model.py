@@ -5,5 +5,5 @@ from legsim.mjcf import build_xml
 
 out = os.path.join(os.path.dirname(__file__), "..", "models", "dog.xml")
 with open(out, "w") as f:
-    f.write(build_xml())
+    f.write(build_xml(meshdir="meshes"))
 print("wrote", os.path.normpath(out))
