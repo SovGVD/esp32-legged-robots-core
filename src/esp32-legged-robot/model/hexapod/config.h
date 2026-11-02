@@ -75,10 +75,16 @@
 #define I2C_SDA 3
 #define I2C_SCL 13
 
-#define PWM_CONTROLLER_ADDRESS   0x40
+// I2C addresses can be overridden from platformio.ini build_flags,
+// e.g. -DPWM_CONTROLLER_ADDRESS_2=0x44
+#ifndef PWM_CONTROLLER_ADDRESS
+	#define PWM_CONTROLLER_ADDRESS   0x40
+#endif
 // 18 servos need a second board, channels 16-31. 0x41 is taken by the INA219
-// below, so the second PCA9685 needs another address (A1 jumper -> 0x42).
-#define PWM_CONTROLLER_ADDRESS_2 0x42
+// below, so the default for the second PCA9685 is 0x42 (A1 jumper).
+#ifndef PWM_CONTROLLER_ADDRESS_2
+	#define PWM_CONTROLLER_ADDRESS_2 0x42
+#endif
 #define PWM_CONTROLLER_TYPE      PCA9685
 
 #define IMU_ADDRESS              0x68

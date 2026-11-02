@@ -78,6 +78,19 @@ time based (open loop); set `useContactSensors` to `true` once a robot has foot 
 Servos on plain ESP32 boards (`PWM_CONTROLLER_TYPE ESP32PWM`) are driven by the LEDC hardware PWM
 peripheral (up to 16 servos, 50Hz by default, override with `ESP32PWM_SERVO_FREQ`).
 
+### Hardware notes
+
+- **Dog servo pins.** The dog drives servos from GPIO 12, 2 and 15, which are
+  ESP32 strapping pins (GPIO 12 high at reset selects 1.8 V flash). The real
+  dog boots and works fine with this wiring, so it stays as is; the boot pin
+  check prints a warning for them, which is expected. Keep it in mind if you
+  build a new board or use other servos that pull the line high at power on.
+- **Hexapod PCA9685 boards.** 18 servos need two boards: servo pins 0-15 go to
+  `PWM_CONTROLLER_ADDRESS` (default 0x40) and 16-31 to
+  `PWM_CONTROLLER_ADDRESS_2` (default 0x42, since 0x41 is the INA219). Override
+  either in `platformio.ini`, e.g. `build_flags = ${esp32.build_flags} -DROBOT_MODEL=MODEL_HEXAPOD -DPWM_CONTROLLER_ADDRESS_2=0x44`.
+  Remove `PWM_CONTROLLER_ADDRESS_2` from `model/hexapod/config.h` for a single board.
+
 ## Purposouse of the project
 This my attempt to make building legged robots as simple as possible (inspired by ArduPilot project).
 This code mostly based on [ESP32 robot dog](https://github.com/SovGVD/esp32-robot-dog-code) code, but is not hardcoded to four legged robots. Also licence has been changed.
