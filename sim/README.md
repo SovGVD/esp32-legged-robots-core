@@ -3,6 +3,13 @@
 A MuJoCo model of the ESP32 small robot dog for testing motion code before it
 goes on the real robot. Python, `pip install -r requirements.txt`.
 
+| | |
+|---|---|
+| ![Standing](docs/standing.png) | ![Walking with the firmware gait](docs/walking.gif) |
+| Standing in the neutral pose, built from the printed STL parts | Trotting forward, driven by the firmware's own gait and IK (`lib/robot_core`) |
+| ![Side view](docs/side.png) | ![Shoulder close-up](docs/shoulder.png) |
+| Side view | Front holder: alpha servo gear and the 2:1 shoulder gear sector, hip-pitch servo in its bracket |
+
 ## Quick start
 
 Needs Python 3.9+, a display for the viewer, and a C++17 compiler for the
