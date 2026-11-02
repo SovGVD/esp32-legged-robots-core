@@ -12,22 +12,36 @@
 #include "gait_engine.h"
 #include "body_kinematics.h"
 #include "ik.h"
+#include "servo_hal.h"
 
 class MotionController
 {
 	public:
-		void begin(const GaitParams &params, leg *legs, uint8_t legCount, LegIK &ik);
+		/**
+		 * @param dof     joints per leg checked against limits
+		 * @param profile servo calibration; when given, joints are clamped to
+		 *                what the servos can reach. nullptr: no servo check (tank)
+		 */
+		void begin(const GaitParams &params, leg *legs, uint8_t legCount, LegIK &ik,
+		           uint8_t dof = 3, const servoProfile *profile = nullptr);
 
 		/**
 		 * @param dt         seconds since the previous update
 		 * @param command    normalized move command, see LR_moveVector
 		 * @param correction body tilt correction (balance), rad
-		 * @return number of legs that had no IK solution and kept their previous angles
+		 * @return number of legs without an IK solution (out of reach); they
+		 *         keep their previous angles. Joints beyond `leg.min/max` or the
+		 *         servo range are clamped to the limit and counted separately.
 		 */
 		uint8_t update(float dt, const LR_moveVector &command, const LR_angle &correction);
 
 		const LR_figure &body() const { return _gait.body(); }
 		GaitEngine &gait() { return _gait; }
+
+		/** Since begin(): legs out of reach (kept), legs clamped to joint limits / servo range. */
+		uint32_t unreachableCount() const { return _unreachable; }
+		uint32_t jointLimitCount()  const { return _jointLimit; }
+		uint32_t servoRangeCount()  const { return _servoRange; }
 
 	private:
 		GaitEngine     _gait;
@@ -35,6 +49,11 @@ class MotionController
 		leg           *_legs     = nullptr;
 		uint8_t        _legCount = 0;
 		LegIK         *_ik       = nullptr;
+		uint8_t        _dof      = 3;
+		const servoProfile *_profile = nullptr;
+		uint32_t       _unreachable = 0;
+		uint32_t       _jointLimit  = 0;
+		uint32_t       _servoRange  = 0;
 };
 
 #endif

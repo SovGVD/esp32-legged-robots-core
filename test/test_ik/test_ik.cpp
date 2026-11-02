@@ -113,7 +113,8 @@ void test_hexapod_knee_angle_matches_foot_distance()
 	// Law of cosines: the tibia angle must reproduce the femur-joint-to-foot distance.
 	// (Catches the old `2 * l2 + l3` typo.)
 	HexapodLegIK ik;
-	leg l = { { 0, "" }, {}, {}, { 35, 55, 110, 0, 0, 0 } };
+	// leg mounted along +x: coxa angle is pi/2 (servo middle) when the foot is straight out
+	leg l = { { 0, "" }, { 0, 0, 0 }, { 150, 0, -70 }, { 35, 55, 110, 0, 0, 0 } };
 	l.body = { 0, 0, 0 };
 	l.foot = { 150, 40, -70 };
 	iksolver s = ik.solve(l, ORIGIN, NO_MOVE);
@@ -124,7 +125,7 @@ void test_hexapod_knee_angle_matches_foot_distance()
 	float f = l.size.l2, t = l.size.l3;
 	float fromKnee = sqrtf(f*f + t*t - 2*f*t*cosf(s.angle.gamma));
 	TEST_ASSERT_FLOAT_WITHIN(0.1f, expected, fromKnee);
-	TEST_ASSERT_FLOAT_WITHIN(1e-4f, atan2f(40, 150), s.angle.alpha);
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, (float)M_PI_2 + atan2f(40, 150), s.angle.alpha);
 }
 
 void test_tank_drive_forward_and_turn()

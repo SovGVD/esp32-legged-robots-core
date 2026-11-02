@@ -61,7 +61,7 @@ RC_API void rc_init()
 	#ifdef HORIZON_LEVEL
 		imuCorrectionPID = AnglePID(PID_LEVEL_P, PID_LEVEL_I / BRIDGE_LOOP_DT, PID_LEVEL_D * BRIDGE_LOOP_DT, -0.2, 0.2);
 	#endif
-	motion.begin(*gaitParams, legs, LEG_NUM, modelIK);
+	motion.begin(*gaitParams, legs, LEG_NUM, modelIK, LEG_DOF, &servoMainProfile);
 	LR_moveVector zero = {};
 	motion.update(0.0f, zero, imuCorrection);
 }
@@ -195,4 +195,12 @@ RC_API void rc_tune_gait(float cycleTime, float dutyFactor, float maxSpeed, floa
 		p.dutyFactor = dutyFactor;
 	}
 	motion.gait().setParams(p);
+}
+
+/** Rejected leg poses since rc_init(): out[0] out of reach, out[1] joint limits, out[2] servo range. */
+RC_API void rc_reject_counts(uint32_t *out)
+{
+	out[0] = motion.unreachableCount();
+	out[1] = motion.jointLimitCount();
+	out[2] = motion.servoRangeCount();
 }

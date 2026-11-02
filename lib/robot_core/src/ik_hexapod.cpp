@@ -59,8 +59,17 @@ iksolver HexapodLegIK::solve(const leg &l, const LR_figure &body, const LR_moveV
 	float tmpAngle1   = ikAcos(lz/lTibia);                                                 // see tA1
 	float tmpAngle2   = ikAcos((femurSq + lTibiaSq - tibiaSq) / (2 * l.size.l2 * lTibia)); // see tA2
 
-	// Coxa Angle
-	angle.alpha = atan2f(ly, lx);
+	// Coxa angle, relative to the leg's neutral direction: pi/2 (servo middle)
+	// when the foot is on its default position, whatever direction the leg
+	// is mounted in. It used to be the absolute atan2, so legs mounted at an
+	// angle started far off the servo middle (or past its end).
+	LR_point n = { l.defaultFoot.x - l.defaultBody.x, l.defaultFoot.y - l.defaultBody.y, 0 };
+	if (l.inverse.x) n.x = -n.x;
+	if (l.inverse.y) n.y = -n.y;
+	float d = atan2f(ly, lx) - atan2f(n.y, n.x);
+	if (d >  (float)M_PI) d -= 2.0f * (float)M_PI;
+	if (d < -(float)M_PI) d += 2.0f * (float)M_PI;
+	angle.alpha = (float)M_PI_2 + d;
 	// Femur Angle
 	angle.beta  = M_PI - (tmpAngle1 + tmpAngle2);
 	// Tibia Angle

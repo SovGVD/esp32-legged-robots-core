@@ -124,8 +124,8 @@ def test_static_walk_is_steadier_than_without_shift(fw, dog, command):
     d.step(0.3)
     moved, tilt, margin = _walk(fw, d, command, 6.0)
     assert fw.unsolved == 0
-    assert margin > 4.0            # centre of mass inside the three-foot triangle
-    assert tilt < 3.0, tilt
+    assert margin > 3.0            # centre of mass inside the three-foot triangle
+    assert tilt < 4.5, tilt
     if command[1]:
         assert moved[1] > 80.0, moved  # 20 mm/s minus slip
     if command[0]:

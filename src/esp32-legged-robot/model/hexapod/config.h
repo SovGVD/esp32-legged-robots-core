@@ -9,14 +9,18 @@
 #define LEG_BODY_X      46.0
 #define LEG_BODY_Y      80.0
 #define LEG_BODY_Z       0.0
-#define LEG_FOOT_X    222.67
-#define LEG_FOOT_Y    173.75
+// Neutral feet 160 mm from the coxa joint (same direction as before). The old
+// values (222.67, 173.75 and 267.5) put every foot 200 mm out, which is the
+// whole leg stretched flat (coxa + femur + tibia), so with the body 67 mm up
+// no foot could be reached and the IK only ever produced NaN.
+#define LEG_FOOT_X    187.34
+#define LEG_FOOT_Y    155.00
 #define LEG_FOOT_Z     67.31
 
 #define LEG_MIDDLE_BODY_X    57.5
 #define LEG_MIDDLE_BODY_Y     0.0
 #define LEG_MIDDLE_BODY_Z     0.0
-#define LEG_MIDDLE_FOOT_X   267.5
+#define LEG_MIDDLE_FOOT_X   217.5
 #define LEG_MIDDLE_FOOT_Y     0.0
 #define LEG_MIDDLE_FOOT_Z    67.31
 

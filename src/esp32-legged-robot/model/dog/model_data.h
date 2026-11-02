@@ -138,14 +138,15 @@ const GaitParams GAIT_PARAMS_WALK = {
 	{ 0.65, 0.15, 0.9, 0.4, 0, 0 },   // phase offsets LF, RF, LH, RH: swing order LH, LF, RH, RF
 	25,       // step height, mm
 	20,       // max speed, mm/s (stride ~22 mm: the legs also have to reach the shift)
-	0.35,     // max yaw rate, rad/s
+	0.25,     // max yaw rate, rad/s
 	300,      // max acceleration, mm/s^2
 	2,        // max yaw acceleration, rad/s^2
 	3,        // idle tolerance, mm
 	false,    // no foot contact sensors
 	true,     // keep the centre of mass over the supporting feet
 	0.15,     // support weights ramp over the four-foot phases
-	{ 1, 0, 0 },  // shift sideways only, all the way to the support centroid (~15 mm margin)
+	{ 0.7, 0, 0 },  // shift sideways only, 70 % of the way to the support centroid (~11 mm margin):
+	              // the hip roll servos (2:1 gear, 20-160 deg) leave about +-23 deg of leg roll
 	{ 0, 0, 0 }   // centre of mass, mm from the body origin (battery is centred)
 };
 

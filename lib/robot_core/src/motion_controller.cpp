@@ -1,10 +1,14 @@
 #include "motion_controller.h"
 
-void MotionController::begin(const GaitParams &params, leg *legs, uint8_t legCount, LegIK &ik)
+void MotionController::begin(const GaitParams &params, leg *legs, uint8_t legCount, LegIK &ik,
+                             uint8_t dof, const servoProfile *profile)
 {
 	_legs     = legs;
 	_legCount = legCount;
 	_ik       = &ik;
+	_dof      = dof;
+	_profile  = profile;
+	_unreachable = _jointLimit = _servoRange = 0;
 	_gait.begin(params, legs, legCount);
 }
 
@@ -16,12 +20,23 @@ uint8_t MotionController::update(float dt, const LR_moveVector &command, const L
 	uint8_t unsolved = 0;
 	for (uint8_t i = 0; i < _legCount; i++) {
 		iksolver solution = _ik->solve(_legs[i], _gait.body(), command);
-		// Out of reach: keep the last valid angles instead of a clamped pose
-		if (solution.isSolved) {
-			_legs[i].angle = solution.angle;
-		} else {
+		// Out of reach: keep the last valid angles instead of a pose bent by
+		// the solver's clamping
+		if (!solution.isSolved) {
+			_unreachable++;
 			unsolved++;
+			continue;
 		}
+		// Joint and servo limits: clamp here, where it is counted, so the
+		// angles are what the leg really does (the pulse is no longer
+		// clamped silently later)
+		if (lrClampJointLimits(_legs[i], solution.angle, _dof)) {
+			_jointLimit++;
+		}
+		if (_profile && lrClampServoRange(_legs[i], solution.angle, _dof, *_profile)) {
+			_servoRange++;
+		}
+		_legs[i].angle = solution.angle;
 	}
 	return unsolved;
 }

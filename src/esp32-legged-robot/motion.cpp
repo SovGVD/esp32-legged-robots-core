@@ -5,6 +5,13 @@
  */
 #include "robot.h"
 
+// tracks have no servos to range check
+#if PWM_CONTROLLER_TYPE == DCMOTOR
+	#define MOTION_SERVO_PROFILE nullptr
+#else
+	#define MOTION_SERVO_PROFILE (&servoMainProfile)
+#endif
+
 static MotionController motion;
 static const GaitParams * volatile pendingGait = nullptr;   // set from the CLI (core 0)
 
@@ -17,7 +24,7 @@ static const GaitParams * volatile pendingGait = nullptr;   // set from the CLI 
 void initMotion()
 {
 	Serial.println("Init gait");
-	motion.begin(GAIT_PARAMS, legs, LEG_NUM, MODEL_IK);
+	motion.begin(GAIT_PARAMS, legs, LEG_NUM, MODEL_IK, LEG_DOF, MOTION_SERVO_PROFILE);
 }
 
 void requestGait(const GaitParams &params)

@@ -262,8 +262,8 @@ void test_static_walk_keeps_center_of_mass_over_three_feet()
 	for (int c = 0; c < 4; c++) {
 		float maxStep = 0;
 		float margin = minThreeLegMargin(dogWalk(), cmds[c], 8.0f, &maxStep);
-		// about 16 mm in steady state; the first step and turning a bit less
-		TEST_ASSERT_GREATER_THAN_FLOAT(4.0f, margin);
+		// about 11 mm in steady state; the first step and turning less
+		TEST_ASSERT_GREATER_THAN_FLOAT(3.0f, margin);
 		// the shift is smooth: well under 2 mm per tick (450 mm/s)
 		TEST_ASSERT_LESS_THAN_FLOAT(2.0f, maxStep);
 	}
@@ -287,7 +287,7 @@ void test_static_walk_forward_steady_margin()
 			if (m < worst) worst = m;
 		}
 	}
-	TEST_ASSERT_GREATER_THAN_FLOAT(12.0f, worst);
+	TEST_ASSERT_GREATER_THAN_FLOAT(10.0f, worst);
 	// odometry still walks at the commanded 20 mm/s (after the ramp)
 	TEST_ASSERT_FLOAT_WITHIN(10.0f, 20.0f * 8.0f, gait.basePosition().y);
 }

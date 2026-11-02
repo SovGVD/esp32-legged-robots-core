@@ -83,6 +83,8 @@ class FirmwareCore:
         L.rc_set_stability_gain.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_tune_gait.restype = None
         L.rc_tune_gait.argtypes = [ctypes.c_float] * 5
+        L.rc_reject_counts.restype = None
+        L.rc_reject_counts.argtypes = [ctypes.POINTER(ctypes.c_uint32)]
         L.rc_shift.restype = None
         L.rc_shift.argtypes = [f32p]
         self.legs = L.rc_leg_count()
@@ -146,6 +148,12 @@ class FirmwareCore:
     def shift(self):
         """Static stability body shift, world x, y, mm."""
         return self._floats(self.lib.rc_shift, 2)
+
+    def reject_counts(self):
+        """Leg poses the firmware rejected since reset(): out of reach, joint limits, servo range."""
+        buf = (ctypes.c_uint32 * 3)()
+        self.lib.rc_reject_counts(buf)
+        return {"reach": buf[0], "joint_limits": buf[1], "servo_range": buf[2]}
 
     def gait_active(self):
         return bool(self.lib.rc_gait_active())
