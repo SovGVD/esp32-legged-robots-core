@@ -1,0 +1,155 @@
+:root {
+  --bg: #f4f5f7;
+  --fg: #1b1e23;
+  --dim: #6b7280;
+  --panel: #fff;
+  --line: #d6d9de;
+  --accent: #2f9e5b;
+  --warn: #c2410c;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c;
+    --fg: #e6e8eb;
+    --dim: #8b929c;
+    --panel: #1d2128;
+    --line: #2e343d;
+    --accent: #4ade80;
+    --warn: #fb923c;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.4 system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.mono,
+pre {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.dim {
+  color: var(--dim);
+}
+.small {
+  font-size: 12px;
+}
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4em 1em;
+  padding: 0.5em 0.75em;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.spacer {
+  flex: 1;
+}
+.conn::before {
+  content: '';
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-right: 0.4em;
+  border-radius: 50%;
+  background: var(--warn);
+}
+[data-state='online'] .conn::before {
+  background: var(--accent);
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button,
+input[type='text'] {
+  padding: 0.4em 0.8em;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+[hidden] {
+  display: none !important;
+}
+main {
+  flex: 1;
+  display: flex;
+  gap: 1px;
+  min-height: 0;
+}
+@media (orientation: portrait) {
+  main {
+    flex-direction: column;
+  }
+}
+.stick {
+  position: relative;
+  flex: 1;
+  touch-action: none;
+  overflow: hidden;
+  background: var(--panel);
+}
+.hint {
+  position: absolute;
+  left: 0.75em;
+  top: 0.5em;
+  color: var(--dim);
+}
+.knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 50%;
+  border: 3px solid var(--fg);
+  background: var(--accent);
+  opacity: 0.15;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.active .knob {
+  opacity: 1;
+}
+#cli {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0.5em;
+  gap: 0.5em;
+}
+#cli-output {
+  flex: 1;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+}
+#cli-form {
+  display: flex;
+  gap: 0.5em;
+}
+#cli-input {
+  flex: 1;
+  min-width: 0;
+}
