@@ -1,0 +1,162 @@
+"""
+Builds the MuJoCo MJCF model of the robot dog from DogParams.
+
+Frames match the firmware: body X right, Y forward, Z up (MPU9250 aligned).
+Lengths in the params are mm and masses g; the MJCF uses m and kg.
+
+Per leg (shoulder at leg.body):
+  <leg>_roll   hip roll  (alpha), axis along Y, + moves the foot outward
+  <leg>_pitch  hip pitch (beta),  axis along -X, + swings the leg backward
+  <leg>_knee   knee      (gamma), axis along +X, 0 = straight leg
+See kinematics.py for the mapping to firmware leg angles.
+
+Only the floor collides with the robot; self-collisions are off (the real
+legs can't reach each other in normal poses, and the link shapes are crude).
+"""
+
+import math
+
+from .params import DogParams
+from .kinematics import hip_position
+
+MM = 0.001
+G = 0.001
+
+
+def _f(*v):
+    return " ".join(f"{x:.6g}" for x in v)
+
+
+def _box_inertia(m, sx, sy, sz):
+    return (m * (sy * sy + sz * sz) / 12, m * (sx * sx + sz * sz) / 12, m * (sx * sx + sy * sy) / 12)
+
+
+def _rod_inertia(m, length, width):
+    """Rod along Z, inertia about its own centre."""
+    return _box_inertia(m, width, width, length)
+
+
+def servo_joint_range(p: DogParams, j):
+    """Joint range (rad, sim q) the servo can reach, symmetric about the middle."""
+    s = p.servo
+    half = math.radians((s.max_angle - s.min_angle) / 2) / p.hal.ratio[j]
+    if j == 2:  # knee: q = pi - gamma, servo middle at gamma = pi/2
+        return (math.pi / 2 - half, math.pi / 2 + half)
+    return (-half, half)
+
+
+def build_xml(p: DogParams = None, fixed_base: bool = False) -> str:
+    """fixed_base: torso welded in the air 0.3 m up (bench tests of the servos)."""
+    p = p or DogParams()
+    geo, m, sv, env = p.geometry, p.masses, p.servo, p.env
+
+    tx, ty, tz = (v * MM for v in geo.torso_size)
+    t_in = _box_inertia(m.torso * G, tx, ty, tz)
+    l2, l3 = geo.l2 * MM, geo.l3 * MM
+    foot_r = geo.foot_radius * MM
+
+    sh_in = _box_inertia(m.shoulder * G, 0.023, 0.032, 0.025)
+    up_in = _rod_inertia(m.upper_leg * G, l2, geo.upper_leg_width * MM)
+    # lower leg: knee servo box (23x12x29 mm) dominates
+    lo_in = _box_inertia(m.lower_leg * G, 0.012, 0.023, 0.030)
+
+    legs_xml = []
+    actuators = []
+    sensors = []
+    for leg in p.legs:
+        n = leg.name
+        hip = hip_position(geo, leg) * MM
+        side = leg.side
+        r_roll = servo_joint_range(p, 0)
+        r_pitch = servo_joint_range(p, 1)
+        r_knee = servo_joint_range(p, 2)
+        margin = math.radians(10)
+
+        def joint(name, axis, rng, j):
+            ratio = p.hal.ratio[j]
+            return (f'<joint name="{name}" type="hinge" axis="{_f(*axis)}" '
+                    f'range="{_f(rng[0] - margin, rng[1] + margin)}" '
+                    f'armature="{sv.armature * ratio * ratio:.6g}" '
+                    f'frictionloss="{sv.friction * ratio:.6g}" damping="0.0005"/>')
+
+        legs_xml.append(f"""
+    <body name="{n}_shoulder" pos="{_f(*hip)}">
+      <inertial pos="{_f(side * 0.006, 0, -0.004)}" mass="{m.shoulder * G:.6g}" diaginertia="{_f(*sh_in)}"/>
+      {joint(n + "_roll", (0, -side, 0), r_roll, 0)}
+      <geom name="{n}_shoulder_vis" type="box" size="{_f(0.0115, 0.016, 0.0125)}" pos="{_f(side * 0.006, 0, -0.004)}" class="visual" rgba="0.25 0.25 0.25 1"/>
+      <body name="{n}_upper" pos="0 0 0">
+        <inertial pos="{_f(0, 0, -l2 / 2)}" mass="{m.upper_leg * G:.6g}" diaginertia="{_f(*up_in)}"/>
+        {joint(n + "_pitch", (-1, 0, 0), r_pitch, 1)}
+        <geom name="{n}_upper_geom" type="capsule" fromto="{_f(0, 0, 0, 0, 0, -l2)}" size="{geo.upper_leg_width * MM / 2:.6g}" class="link"/>
+        <body name="{n}_lower" pos="{_f(0, 0, -l2)}">
+          <inertial pos="{_f(0, 0, -m.lower_leg_com_from_knee * MM)}" mass="{m.lower_leg * G:.6g}" diaginertia="{_f(*lo_in)}"/>
+          {joint(n + "_knee", (1, 0, 0), r_knee, 2)}
+          <geom name="{n}_knee_servo" type="box" size="{_f(0.006, 0.0115, 0.0145)}" pos="{_f(0, 0, -0.012)}" class="visual" rgba="0.5 0.2 0.6 1"/>
+          <geom name="{n}_lower_geom" type="capsule" fromto="{_f(0, 0, 0, 0, 0, -l3)}" size="{geo.lower_leg_width * MM / 2:.6g}" class="link"/>
+          <geom name="{n}_foot" type="sphere" pos="{_f(0, 0, -l3)}" size="{foot_r:.6g}" class="foot"/>
+          <site name="{n}_foot_site" pos="{_f(0, 0, -l3)}" size="{foot_r * 1.15:.6g}" rgba="1 0.5 0 0.3"/>
+        </body>
+      </body>
+    </body>""")
+        for jn, j in (("roll", 0), ("pitch", 1), ("knee", 2)):
+            lim = sv.stall_torque * p.hal.ratio[j]
+            actuators.append(f'<motor name="{n}_{jn}" joint="{n}_{jn}" gear="1" ctrllimited="true" ctrlrange="{_f(-lim, lim)}"/>')
+        sensors.append(f'<touch name="{n}_contact" site="{n}_foot_site"/>')
+
+    imu = tuple(v * MM for v in p.imu_pos)
+    start_z = 0.3 if fixed_base else (geo.foot_z + geo.foot_radius + 2) * MM
+    root = "" if fixed_base else '<freejoint name="root"/>'
+
+    return f"""<mujoco model="esp32_robot_dog">
+  <!-- Generated by sim/legsim/mjcf.py from sim/legsim/params.py. Do not edit by hand. -->
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="{env.timestep:.6g}" integrator="implicitfast" gravity="0 0 -9.81"/>
+
+  <default>
+    <geom contype="2" conaffinity="1" condim="3" friction="{env.foot_friction:.6g} 0.005 0.0001"/>
+    <default class="visual">
+      <geom contype="0" conaffinity="0" group="1" mass="0"/>
+    </default>
+    <default class="link">
+      <geom group="2" rgba="0.92 0.92 0.92 1" mass="0"/>
+    </default>
+    <default class="foot">
+      <geom group="2" rgba="0.2 0.2 0.2 1" mass="0" condim="4" priority="1"/>
+    </default>
+  </default>
+
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+  </visual>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.75 0.75 0.75" rgb2="0.6 0.6 0.6" width="256" height="256"/>
+    <material name="grid" texture="grid" texrepeat="20 20" reflectance="0.05"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" castshadow="false"/>
+    <geom name="floor" type="plane" size="5 5 0.05" material="grid" contype="1" conaffinity="1" friction="{env.floor_friction:.6g} 0.005 0.0001"/>
+    <body name="torso" pos="{_f(0, 0, start_z)}">
+      {root}
+      <inertial pos="{_f(*(v * MM for v in m.torso_com))}" mass="{m.torso * G:.6g}" diaginertia="{_f(*t_in)}"/>
+      <geom name="torso_geom" type="box" size="{_f(tx / 2, ty / 2, tz / 2)}" pos="{_f(0, 0, geo.torso_z_offset * MM)}" group="2" rgba="0.95 0.95 0.95 1" mass="0"/>
+      <geom name="battery" type="box" size="{_f(0.021, 0.04, 0.011)}" pos="{_f(0, 0, -0.008)}" class="visual" rgba="0.15 0.15 0.15 1"/>
+      <geom name="nose" type="box" size="{_f(0.03, 0.004, 0.006)}" pos="{_f(0, ty / 2, geo.torso_z_offset * MM)}" class="visual" rgba="0.9 0.3 0.2 1"/>
+      <site name="imu" pos="{_f(*imu)}" size="0.004" rgba="0 0.6 1 1"/>
+{"".join(legs_xml)}
+    </body>
+  </worldbody>
+
+  <actuator>
+    {chr(10).join("    " + a for a in actuators).strip()}
+  </actuator>
+
+  <sensor>
+    <accelerometer name="imu_accel" site="imu"/>
+    <gyro name="imu_gyro" site="imu"/>
+    <framequat name="imu_quat" objtype="site" objname="imu"/>
+    {chr(10).join("    " + s for s in sensors).strip()}
+  </sensor>
+</mujoco>
+"""
