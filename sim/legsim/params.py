@@ -60,7 +60,7 @@ class Geometry:
     torso_size: tuple = (94.0, 171.0, 31.4)   # legs holders: 94 wide, outer plates 171 apart, z -22..9.4
     torso_z_offset: float = -6.3              # torso box centre relative to the roll axes
     battery_size: tuple = (42.0, 80.0, 21.0)  # 2x18650 holder under the middle frame [est]
-    battery_z: float = -19.0                  # battery box centre [est]
+    battery_z: float = -24.0                  # battery box centre, right under the middle frame [est]
     foot_radius: float = 6.0                  # TPU shoe around the foot ring [stl]
     upper_leg_width: float = 6.5              # leg_top thickness [stl]
     lower_leg_width: float = 5.8              # leg_bottom thickness [stl]
@@ -146,4 +146,4 @@ class DogParams:
     hal: HalParams = field(default_factory=HalParams)
     env: Environment = field(default_factory=Environment)
     legs: tuple = LEGS
-    imu_pos: tuple = (0.0, 0.0, 6.0)    # mm, MPU9250 on the perfboard in the middle frame [est]
+    imu_pos: tuple = (0.0, 0.0, 1.0)    # mm, MPU9250 on the perfboard in the middle frame [est]

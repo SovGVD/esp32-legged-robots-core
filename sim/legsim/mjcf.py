@@ -126,7 +126,7 @@ def build_xml(p: DogParams = None, fixed_base: bool = False, meshdir: str = None
         torso.add(it)
     torso.add(("box", "battery", np.eye(3), (0, 0, geo.battery_z), tuple(v / 2 for v in geo.battery_size)),
               mass=m.battery, rgba="0.1 0.1 0.1 1")
-    torso.add(("box", "electronics", np.eye(3), (0, 0, 4.0), (25, 35, 4)), mass=m.electronics, rgba="0.1 0.4 0.2 1")
+    torso.add(("box", "electronics", np.eye(3), (0, 0, assembly.BODY_Z + 6), (25, 35, 4)), mass=m.electronics, rgba="0.1 0.4 0.2 1")
     torso.lump(m.torso, (0, 0, -2), "torso_misc")
 
     visual_drop = assembly.HIP_PITCH_DROP - geo.hip_pitch_drop

@@ -50,7 +50,7 @@
     <body name="torso" pos="0 0 0.0971">
       <freejoint name="root"/>
       <geom name="torso_geom" type="box" size="0.047 0.0855 0.0157" pos="0 0 -0.0063" group="3" rgba="0.95 0.95 0.95 0.3" mass="0"/>
-      <geom name="battery_geom" type="box" size="0.021 0.04 0.0105" pos="0 0 -0.019" group="3" rgba="0.1 0.1 0.1 0.3" mass="0"/>
+      <geom name="battery_geom" type="box" size="0.021 0.04 0.0105" pos="0 0 -0.024" group="3" rgba="0.1 0.1 0.1 0.3" mass="0"/>
       <geom name="front_legs_holder_part1" type="mesh" mesh="legs_holder_part1" class="part" pos="0 0.0474 0" quat="0 0 0 1" mass="0.0177"/>
 <geom name="front_legs_holder_part2" type="mesh" mesh="legs_holder_part2" class="part" pos="0 0.0894 0" quat="1 0 0 0" mass="0.0075"/>
 <geom name="hind_legs_holder_part1" type="mesh" mesh="legs_holder_part1" class="part" pos="0 -0.0474 0" quat="1 0 0 0" mass="0.0177"/>
@@ -63,11 +63,11 @@
 <geom name="LH_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="0.011 -0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
 <geom name="RH_servo_gear" type="mesh" mesh="servo_gear" class="part" pos="-0.011 -0.0804 0" quat="0 0 -0.707107 0.707107" mass="0.0012"/>
 <geom name="RH_alpha_servo" type="box" class="part" size="0.0061 0.01135 0.0114" pos="-0.011 -0.06505 -0.0055" mass="0.0134" rgba="0.12 0.12 0.12 1"/>
-<geom name="body" type="mesh" mesh="body" class="part" pos="0 0 -0.0026" quat="0.707107 0 0 0.707107" mass="0.0099"/>
-<geom name="battery" type="box" class="part" size="0.021 0.04 0.0105" pos="0 0 -0.019" mass="0.107" rgba="0.1 0.1 0.1 1"/>
-<geom name="electronics" type="box" class="part" size="0.025 0.035 0.004" pos="0 0 0.004" mass="0.03" rgba="0.1 0.4 0.2 1"/>
+<geom name="body" type="mesh" mesh="body" class="part" pos="0 0 -0.0076" quat="0.707107 0 0 0.707107" mass="0.0099"/>
+<geom name="battery" type="box" class="part" size="0.021 0.04 0.0105" pos="0 0 -0.024" mass="0.107" rgba="0.1 0.1 0.1 1"/>
+<geom name="electronics" type="box" class="part" size="0.025 0.035 0.004" pos="0 0 -0.0016" mass="0.03" rgba="0.1 0.4 0.2 1"/>
 <geom name="torso_misc" type="sphere" class="part" size="0.003" pos="0 0 -0.002" mass="0.0243" rgba="0.5 0.5 0.5 0"/>
-      <site name="imu" pos="0 0 0.006" size="0.004" rgba="0 0.6 1 1"/>
+      <site name="imu" pos="0 0 0.001" size="0.004" rgba="0 0.6 1 1"/>
 
     <body name="LF_shoulder" pos="-0.0395 0.0705 0">
       <joint name="LF_roll" type="hinge" axis="0 1 0" range="-0.785398 0.785398" armature="8e-05" frictionloss="0.008" damping="0.0005"/>

@@ -162,7 +162,7 @@ needs `mjpython`, which conflicts with pygame's window.
 * Servo voltage is assumed ~5 V (datasheet 4.8 V values).
 * With the firmware gait the drift is still there: ~13 mm/s backward when
   trotting nearly in place and ~35-45 mm/s backward while strafing at full
-  speed (forward walking hides it). Sideways stepping makes it worse, which
+  speed (~57 mm/s with the STL mass layout) (forward walking hides it). Sideways stepping makes it worse, which
   points at stance-leg compliance rather than the gait timing.
 * **Trotting in place drifts backward** in the sim (about 30 mm/s with the
   Python demo trot, duty 0.5, 15 mm step height). The most likely cause is stance-leg

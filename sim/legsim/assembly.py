@@ -46,6 +46,8 @@ SERVO_SHAFT_FROM_END = 5.9              # shaft centre from one end of the body,
 SHAFT_FROM_GEAR = 10.9                  # hip pitch shaft, mm along the roll axis from the gear end [est]
 HIP_PITCH_DROP = 9.1                    # hip pitch shaft below the roll axis, mm [est]
 
+BODY_Z = -7.6                           # middle frame origin below the roll axes, mm (lowered after photos) [est]
+
 
 def _rot(cols):
     """Rotation from part axes to link axes, given the link-frame images of part x, y, z."""
@@ -86,7 +88,7 @@ def torso_parts(hip_y):
     ]
     once = [
         # middle frame: its long axis (x) along the robot's Y
-        ("mesh", "body", _rot([(0, 1, 0), (-1, 0, 0), (0, 0, 1)]), (0, 0, -2.6)),
+        ("mesh", "body", _rot([(0, 1, 0), (-1, 0, 0), (0, 0, 1)]), (0, 0, BODY_Z)),
     ]
     return per_end, per_leg, once
 
