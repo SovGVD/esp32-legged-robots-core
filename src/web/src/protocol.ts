@@ -21,6 +21,7 @@
  *   'T' telemetry  [0x54, version:u8, statuses:u16, voltage*1000:u16, current*1000:i16, loopTime(us):u16,
  *                  version 2 adds: pitch*100:i16, roll*100:i16 (deg), missedTicks:u16,
  *                  ikReach:u16, ikJointLimit:u16, ikServoRange:u16]  22 bytes
+ *                  version 3 adds: heading*10:u16, headingTarget*10:u16 (deg, compass, 0xFFFF none)  26 bytes
  *   'C' cli        [0x43, ...utf8 output]
  */
 
@@ -64,6 +65,11 @@ export const TS = {
   power: 0x0040,
   sitting: 0x0200,
   overrun: 0x0400,
+  terrain: 0x0800,
+  gapBlocked: 0x1000,
+  headingHold: 0x2000,
+  headingAbsolute: 0x4000,
+  tof: 0x8000,
 } as const;
 const TS_BATTERY_SHIFT = 7;
 
@@ -84,6 +90,9 @@ export interface Telemetry {
   roll?: number;
   missedTicks?: number;
   ik?: { reach: number; jointLimit: number; servoRange: number };
+  /** version 3 firmware only: compass heading and hold target, deg; null = none */
+  heading?: number | null;
+  headingTarget?: number | null;
 }
 
 export type Incoming =
@@ -169,6 +178,11 @@ export function decodeTelemetry(data: Uint8Array): Telemetry | null {
     t.roll = view.getInt16(12) / 100;
     t.missedTicks = view.getUint16(14);
     t.ik = { reach: view.getUint16(16), jointLimit: view.getUint16(18), servoRange: view.getUint16(20) };
+  }
+  if (data[1] >= 3 && data.length >= 26) {
+    const deg = (raw: number) => (raw === 0xffff ? null : raw / 10);
+    t.heading = deg(view.getUint16(22));
+    t.headingTarget = deg(view.getUint16(24));
   }
   return t;
 }

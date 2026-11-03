@@ -10,6 +10,8 @@
 #include "ik.h"
 #include "body_kinematics.h"
 #include "terrain_map.h"
+#include "terrain_tilt.h"
+#include "heading.h"
 #include "gait_engine.h"
 #include "angle_pid.h"
 #include "motion_controller.h"

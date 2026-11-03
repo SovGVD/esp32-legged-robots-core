@@ -104,6 +104,18 @@ function renderTelemetry(): void {
       if (t.statuses & TS.gaitActive) parts.push('stepping');
     } else parts.push('HAL off');
     if (t.statuses & TS.leveling) parts.push('level');
+    if (t.statuses & TS.terrain) parts.push(t.statuses & TS.tof ? 'terrain' : 'terrain (no ToF)');
+    if (t.statuses & TS.gapBlocked) {
+      parts.push('GAP AHEAD: stopped');
+      warn = true;
+    }
+    if (t.heading !== undefined && t.heading !== null) {
+      let h = `${t.statuses & TS.headingAbsolute ? 'heading' : 'turned'} ${Math.round(t.heading)}°`;
+      if (t.statuses & TS.headingHold && t.headingTarget !== undefined && t.headingTarget !== null) {
+        h += ` → ${Math.round(t.headingTarget)}°`;
+      }
+      parts.push(h);
+    }
     if (t.pitch !== undefined && t.roll !== undefined && t.statuses & TS.imu) {
       parts.push(`tilt ${t.pitch.toFixed(1)}° ${t.roll.toFixed(1)}°`);
     }

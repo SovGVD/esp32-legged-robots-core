@@ -233,6 +233,9 @@ const TerrainMapParams TERRAIN_MAP_PARAMS = {
 	8      // a reading 8 mm above a cell replaces it at once (obstacle top)
 };
 
+// body tilt the terrain map places ToF readings with (TerrainTilt): the trot rocks faster than the filter; filtered cost the 20 mm step in the sim
+#define TERRAIN_TILT_MODE TERRAIN_TILT_RAW
+
 const TerrainParams TERRAIN_PARAMS = {
 	12,    // search depth, mm: with foot switches a foot reaches up to 12 mm below its planned touchdown
 	       // (the legs are 80 mm long and reach 102: deeper runs them out of reach)

@@ -24,6 +24,35 @@
 	#define IMU_PITCH_SIGN 1
 #endif
 
+/**
+ * Sensor axes -> body axes (x right, y forward, z up), from the same mounting
+ * settings: pitch is the rotation about the forward axis, roll about the
+ * right axis. Up follows from the two (the frame stays right handed).
+ */
+static void imuToBody(const float s[3], float b[3])
+{
+	if (IMU_SWAP_ROLL_PITCH) {
+		b[0] = IMU_ROLL_SIGN  * s[1];
+		b[1] = IMU_PITCH_SIGN * s[0];
+		b[2] = -IMU_ROLL_SIGN * IMU_PITCH_SIGN * s[2];
+	} else {
+		b[0] = IMU_ROLL_SIGN  * s[0];
+		b[1] = IMU_PITCH_SIGN * s[1];
+		b[2] = IMU_ROLL_SIGN * IMU_PITCH_SIGN * s[2];
+	}
+}
+
+// Heading: how fast it follows the magnetometer, and which readings count as disturbed
+#ifndef HEADING_MAG_TAU
+	#define HEADING_MAG_TAU 2.0f   // s
+#endif
+#ifndef HEADING_FIELD_TOLERANCE
+	#define HEADING_FIELD_TOLERANCE 0.25f
+#endif
+#ifndef MAG_READ_EVERY
+	#define MAG_READ_EVERY 4       // motion ticks per magnetometer read (AK8963 runs at 100 Hz)
+#endif
+
 #if defined(IMU_TYPE) && IMU_TYPE == MPU9250
 #include <MPU9250_WE.h>
 
@@ -32,6 +61,12 @@
  * accelerometer alone is thrown off by the robot's own accelerations).
  * Calibration offsets are kept in NVS (namespace "imu"), so `calib imu`
  * only has to be run once.
+ *
+ * Heading: gyro Z and the AK8963 magnetometer inside the MPU9250 (GY-91),
+ * fused by HeadingEstimator. Many cheap "GY-91" boards carry an MPU6500,
+ * which has no magnetometer: then the heading is the gyro alone (relative
+ * to the start, drifts). Magnetometer calibration (`heading cal`) is kept in
+ * NVS too.
  */
 class Mpu9250Imu : public Imu {
 	public:
@@ -50,6 +85,15 @@ class Mpu9250Imu : public Imu {
 			_dev.enableGyrDLPF();
 			_dev.setGyrDLPF(MPU9250_DLPF_3);
 			loadOffsets();
+			_heading.begin({ HEADING_MAG_TAU, HEADING_FIELD_TOLERANCE });
+			_mag = _dev.initMagnetometer();
+			if (_mag) {
+				_dev.setMagOpMode(AK8963_CONT_MODE_100HZ);
+				Serial.print(", magnetometer");
+				loadMagCalibration();
+			} else {
+				Serial.print(", no magnetometer (MPU6500?): heading from the gyro only");
+			}
 			_ready = true;
 			return true;
 		}
@@ -76,7 +120,63 @@ class Mpu9250Imu : public Imu {
 			float roll  = IMU_SWAP_ROLL_PITCH ? _tilt.aboutY() : _tilt.aboutX();
 			angle.pitch = IMU_PITCH_SIGN * pitch;
 			angle.roll  = IMU_ROLL_SIGN  * roll;
-			angle.yaw   = 0;   // no heading estimate (magnetometer unused)
+			angle.yaw   = 0;   // tilt only; the heading is heading()
+
+			float gyroBody[3];
+			imuToBody(gyro, gyroBody);
+			const float *mag = nullptr;
+			float magBody[3];
+			if (_mag && ++_magTick >= MAG_READ_EVERY) {
+				_magTick = 0;
+				xyzFloat m = _dev.getMagValues();   // uT, AK8963 axes
+				// the AK8963 sits in the MPU9250 with X and Y swapped and Z reversed
+				float s[3] = { m.y, m.x, -m.z };
+				imuToBody(s, magBody);
+				if (_calibrating) {
+					_cal.add(magBody);
+				}
+				mag = magBody;
+			}
+			_yawRate = gyroBody[2];
+			_heading.update(dt, gyroBody[2], angle, mag);
+			return true;
+		}
+
+		bool heading(float &rad) const override
+		{
+			if (!_ready) {
+				return false;
+			}
+			rad = _heading.heading();
+			return true;
+		}
+
+		bool hasMagnetometer() const override { return _mag; }
+		float yawRate() const override { return _yawRate; }
+		bool headingAbsolute() const override { return _heading.absolute(); }
+
+		float magField(bool &accepted) const override
+		{
+			accepted = _heading.magAccepted();
+			return _heading.field();
+		}
+
+		void magCalibrationStart() override
+		{
+			_cal.reset();
+			_calibrating = _mag;
+		}
+
+		bool magCalibrationFinish() override
+		{
+			_calibrating = false;
+			float offset[3], scale[3];
+			if (!_cal.result(offset, scale)) {
+				return false;
+			}
+			float field = _cal.fieldStrength(offset, scale);
+			_heading.setMagCalibration(offset, scale, field);
+			saveMagCalibration(offset, scale, field);
 			return true;
 		}
 
@@ -124,10 +224,43 @@ class Mpu9250Imu : public Imu {
 			Serial.println(ok ? "IMU offsets saved" : "Saving IMU offsets failed");
 		}
 
-		MPU9250_WE    _dev = MPU9250_WE(IMU_ADDRESS);
-		TiltEstimator _tilt;
-		uint32_t      _last  = 0;
-		bool          _ready = false;
+		void loadMagCalibration()
+		{
+			Preferences prefs;
+			if (!prefs.begin("imu", true)) {
+				return;
+			}
+			float c[7];
+			if (prefs.getBytes("mag", c, sizeof(c)) == sizeof(c)) {
+				_heading.setMagCalibration(&c[0], &c[3], c[6]);
+				Serial.print(" (calibrated)");
+			} else {
+				Serial.print(" (not calibrated: `heading cal`)");
+			}
+			prefs.end();
+		}
+
+		void saveMagCalibration(const float offset[3], const float scale[3], float field)
+		{
+			Preferences prefs;
+			if (!prefs.begin("imu", false)) {
+				return;
+			}
+			float c[7] = { offset[0], offset[1], offset[2], scale[0], scale[1], scale[2], field };
+			prefs.putBytes("mag", c, sizeof(c));
+			prefs.end();
+		}
+
+		MPU9250_WE       _dev = MPU9250_WE(IMU_ADDRESS);
+		TiltEstimator    _tilt;
+		HeadingEstimator _heading;
+		MagCalibrator    _cal;
+		uint32_t         _last  = 0;
+		uint8_t          _magTick = 0;
+		float            _yawRate = 0;
+		bool             _ready = false;
+		bool             _mag   = false;
+		volatile bool    _calibrating = false;
 };
 
 Imu &imu()

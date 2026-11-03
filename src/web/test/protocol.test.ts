@@ -117,6 +117,26 @@ test('version 2 telemetry adds tilt, missed ticks, IK counters and battery state
   assert.ok(t.statuses & TS.leveling);
 });
 
+test('version 3 telemetry adds the heading and the hold target', () => {
+  const b = new Uint8Array(26);
+  const view = new DataView(b.buffer);
+  b[0] = P_TELEMETRY;
+  b[1] = 3;
+  view.setUint16(2, TS.hal | TS.terrain | TS.gapBlocked | TS.headingHold | TS.headingAbsolute);
+  view.setUint16(22, 2705);
+  view.setUint16(24, 0xffff);
+  const msg = decode(b);
+  assert.ok(msg && msg.type === 'telemetry');
+  assert.equal(msg.telemetry.heading, 270.5);
+  assert.equal(msg.telemetry.headingTarget, null);
+  assert.ok(msg.telemetry.statuses & TS.gapBlocked);
+  // a version 2 package has no heading
+  b[1] = 2;
+  const v2 = decode(b);
+  assert.ok(v2 && v2.type === 'telemetry');
+  assert.equal(v2.telemetry.heading, undefined);
+});
+
 test('short telemetry package is ignored', () => {
   assert.equal(decode(Uint8Array.of(P_TELEMETRY, 0, 0)), null);
 });

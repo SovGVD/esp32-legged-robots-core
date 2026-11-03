@@ -51,17 +51,12 @@ static bool terrainOn = false;
 static bool mapOn     = false;
 static LR_angle lastImu = { 0, 0, 0 };
 static float tiltGain = 1.0f;
-// slow average of the measured minus the commanded tilt: the IMU's bias while walking
-static LR_angle tiltBias = { 0, 0, 0 };
-// body tilt for the terrain map: 0 = commanded + filtered unplanned (above),
-// 1 = commanded only, 2 = raw IMU. Measured over gaps, steps and the bridge
-// (sim/README): the hexapod maps best filtered, the dog (whose trot rocks
-// faster than the filter) with the raw IMU.
-static int mapTiltMode = LEG_NUM == 4 ? 2 : 0;
+// body tilt for the terrain map and its aging, the same code as motion.cpp
+// (TERRAIN_TILT_MODE in model_data.h; rc_set_map_tilt_mode for experiments)
+static TerrainTilt terrainTilt;
+static TerrainTiltMode mapTiltMode = TERRAIN_TILT_MODE;
 static float biasTau = 1.5f;
 static float unplannedTau = 0.3f;
-// unplanned tilt (measured - commanded - bias), smoothed over ~0.3 s, for the terrain map
-static LR_angle unplannedTilt = { 0, 0, 0 };
 // TERRAIN_PARAMS, tunable from Python (rc_tune_terrain); kept across rc_init()
 static TerrainParams terrainParams = TERRAIN_PARAMS;
 
@@ -101,8 +96,7 @@ RC_API void rc_init()
 	motion.begin(*gaitParams, legs, LEG_NUM, modelIK, LEG_DOF, &servoMainProfile);
 	terrainMap.begin(TERRAIN_MAP_PARAMS);
 	lastImu = { 0, 0, 0 };
-	tiltBias = { 0, 0, 0 };
-	unplannedTilt = { 0, 0, 0 };
+	terrainTilt.begin(mapTiltMode, biasTau, unplannedTau);
 	applyTerrain();
 	LR_moveVector zero = {};
 	motion.update(0.0f, zero, imuCorrection);
@@ -138,19 +132,8 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 		imuCorrection = leveler.update(dt, current, target, hold);
 	}
 
-	if (motion.gait().isActive()) {
-		// over ~1.5 s the body's unplanned tilt averages out, the IMU bias doesn't
-		float k = dt / biasTau;
-		tiltBias.pitch += (lastImu.pitch + imuCorrection.pitch - tiltBias.pitch) * k;
-		tiltBias.roll  += (lastImu.roll  + imuCorrection.roll  - tiltBias.roll)  * k;
-	}
-	{
-		float k = dt / unplannedTau; if (k > 1) k = 1;
-		unplannedTilt.pitch += (lastImu.pitch + imuCorrection.pitch - tiltBias.pitch - unplannedTilt.pitch) * k;
-		unplannedTilt.roll  += (lastImu.roll  + imuCorrection.roll  - tiltBias.roll  - unplannedTilt.roll)  * k;
-	}
-	// cells age only while walking: odometry drifts with the steps, not the time standing
-	if (motion.gait().isActive()) terrainMap.tick(dt);
+	// map tilt filter, and the map ages only while walking
+	terrainTilt.update(dt, lastImu, imuCorrection, motion.gait().isActive(), &terrainMap);
 	// tilt the gait didn't ask for: measured minus commanded (-correction)
 	LR_angle unplanned = { (lastImu.pitch + imuCorrection.pitch) * tiltGain, (lastImu.roll + imuCorrection.roll) * tiltGain, 0 };
 	motion.gait().setTilt(unplanned);
@@ -429,19 +412,8 @@ RC_API void rc_tof_frame(int i, const float *distances)
 	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
 	const TofSensor &t = TOF_SENSORS[i];
 	LR_figure pose = motion.body();
-	// the commanded tilt plus the smoothed tilt the gait didn't plan (a leg
-	// on a step, a foot slipping): the raw IMU while walking is off by a
-	// degree or two (bias from the accelerations, and noise), 5 mm at 150 mm
-	pose.orientation.pitch = -imuCorrection.pitch + unplannedTilt.pitch;
-	pose.orientation.roll  = -imuCorrection.roll  + unplannedTilt.roll;
-	if (mapTiltMode == 1) {
-		pose.orientation.pitch = -imuCorrection.pitch;
-		pose.orientation.roll  = -imuCorrection.roll;
-	}
-	if (mapTiltMode == 2) {
-		pose.orientation.pitch = lastImu.pitch;
-		pose.orientation.roll  = lastImu.roll;
-	}
+	pose.orientation.pitch = terrainTilt.tilt().pitch;
+	pose.orientation.roll  = terrainTilt.tilt().roll;
 	for (uint8_t z = 0; z < t.zones * t.zones; z++) {
 		terrainMap.addReading(t, z, distances[z], pose);
 	}
@@ -498,4 +470,15 @@ RC_API void rc_tune_terrain(int index, float value)
  * 10..999: IMU bias filter time constant m / 10 s; 1000+: unplanned tilt
  * filter time constant (m - 1000) / 1000 s.
  */
-RC_API void rc_set_map_tilt_mode(int m) { if (m >= 1000) unplannedTau = (m - 1000) / 1000.0f; else if (m >= 10) biasTau = m / 10.0f; else mapTiltMode = m; }
+RC_API void rc_set_map_tilt_mode(int m)
+{
+	if (m >= 1000) {
+		unplannedTau = (m - 1000) / 1000.0f;
+	} else if (m >= 10) {
+		biasTau = m / 10.0f;
+	} else {
+		mapTiltMode = (TerrainTiltMode)m;
+	}
+	terrainTilt.setMode(mapTiltMode);
+	terrainTilt.setTimeConstants(biasTau, unplannedTau);
+}

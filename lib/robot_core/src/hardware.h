@@ -41,6 +41,23 @@ class Imu {
 		virtual bool read(LR_angle &angle) = 0;
 		// robot must stand still on a level surface
 		virtual void calibrate() = 0;
+
+		/**
+		 * Heading (gyro + magnetometer, HeadingEstimator): compass heading in
+		 * rad, clockwise from magnetic north, or from the direction at start
+		 * without a magnetometer (then it drifts). false: no heading at all.
+		 */
+		virtual bool heading(float &rad) const { (void)rad; return false; }
+		virtual bool hasMagnetometer() const { return false; }
+		// turn rate about the body's up axis, rad/s, counter-clockwise > 0
+		virtual float yawRate() const { return 0; }
+		// the magnetometer has set the heading (it is a compass heading)
+		virtual bool headingAbsolute() const { return false; }
+		// last magnetometer field strength, uT, and whether it was trusted
+		virtual float magField(bool &accepted) const { accepted = false; return 0; }
+		// collect magnetometer readings while the robot turns, then fit and save the calibration
+		virtual void magCalibrationStart() {}
+		virtual bool magCalibrationFinish() { return false; }
 };
 
 class PowerSensor {

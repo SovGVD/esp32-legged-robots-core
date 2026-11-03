@@ -11,6 +11,10 @@
 static QuadrupedLegIK modelLegIK;
 LegIK &MODEL_IK = modelLegIK;
 
+const ModelTerrain MODEL_TERRAIN = {
+	TOF_SENSORS, TOF_SENSOR_COUNT, &TERRAIN_MAP_PARAMS, &TERRAIN_PARAMS, &GAIT_PARAMS_ROUGH, TERRAIN_TILT_MODE
+};
+
 const GaitParams *const MODEL_WALK_GAIT = &GAIT_PARAMS_WALK;
 
 static void cliGait()

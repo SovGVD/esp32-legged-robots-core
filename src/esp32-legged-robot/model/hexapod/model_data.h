@@ -247,6 +247,9 @@ const TerrainMapParams TERRAIN_MAP_PARAMS = {
 	8      // a reading 8 mm above a cell replaces it at once (obstacle top)
 };
 
+// body tilt the terrain map places ToF readings with (TerrainTilt): with the raw IMU the mapped floor crept up 10-20 mm in 10 s of walking
+#define TERRAIN_TILT_MODE TERRAIN_TILT_FILTERED
+
 const TerrainParams TERRAIN_PARAMS = {
 	30,    // search depth, mm: with foot switches a foot reaches up to 30 mm below its planned touchdown
 	200,   // search speed, mm/s
