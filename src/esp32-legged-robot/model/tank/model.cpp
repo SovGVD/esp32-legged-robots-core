@@ -11,6 +11,8 @@
 static TankDriveIK modelLegIK;
 LegIK &MODEL_IK = modelLegIK;
 
+const GaitParams *const MODEL_WALK_GAIT = nullptr;   // one gait only
+
 const cliCommand *modelCliCommands     = nullptr;
 const uint8_t     modelCliCommandsCount = 0;
 

@@ -11,6 +11,9 @@
  *                  each axis: uint16 = round((value + 1) * 10000), value in [-1, 1]
  *   'T' telemetry  [0x54, 1] request, answered with a telemetry package
  *   'C' cli        [0x43, ...utf8 command, '\n', 0]
+ *   'G' gait       [0x47, walk]  1 = statically stable walk, 0 = default gait (trot);
+ *                  applied once the robot stands still
+ *   'L' level      [0x4C, on]    IMU leveling on/off (ignored without an IMU)
  *   'V' / 'v'      start / stop camera stream (camera builds only)
  *
  * Robot -> client
@@ -24,6 +27,8 @@
 export const P_MOVE = 0x4d; // 'M'
 export const P_TELEMETRY = 0x54; // 'T'
 export const P_CLI = 0x43; // 'C'
+export const P_GAIT = 0x47; // 'G'
+export const P_LEVEL = 0x4c; // 'L'
 export const P_START_VIDEO = 0x56; // 'V'
 export const P_STOP_VIDEO = 0x76; // 'v'
 
@@ -114,6 +119,14 @@ export function encodeMove(v: MoveVector, enabled = true): Uint8Array {
 
 export function encodeTelemetryRequest(): Uint8Array {
   return Uint8Array.of(P_TELEMETRY, 1);
+}
+
+export function encodeGait(walk: boolean): Uint8Array {
+  return Uint8Array.of(P_GAIT, walk ? 1 : 0);
+}
+
+export function encodeLevel(on: boolean): Uint8Array {
+  return Uint8Array.of(P_LEVEL, on ? 1 : 0);
 }
 
 export function encodeVideo(start: boolean): Uint8Array {

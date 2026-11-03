@@ -156,3 +156,9 @@ main {
 .warn {
   color: var(--warn);
 }
+label:has(input:disabled) {
+  color: var(--dim);
+}
+input.pending {
+  opacity: 0.5;
+}

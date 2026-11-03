@@ -4,7 +4,7 @@
  */
 import type { Server as HttpServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { P_CLI, P_MOVE, P_TELEMETRY, TS, decodeAxis } from '../src/protocol.ts';
+import { P_CLI, P_GAIT, P_LEVEL, P_MOVE, P_TELEMETRY, TS, decodeAxis } from '../src/protocol.ts';
 
 const FAILSAFE_MS = 500;
 
@@ -12,11 +12,11 @@ function cliPackage(text: string): Buffer {
   return Buffer.concat([Buffer.of(P_CLI), Buffer.from(text, 'utf8')]);
 }
 
-function telemetryPackage(voltage: number, current: number, loopTime: number): Buffer {
+function telemetryPackage(voltage: number, current: number, loopTime: number, extra = 0): Buffer {
   const b = Buffer.alloc(22);
   b[0] = P_TELEMETRY;
   b[1] = 2; // version
-  b.writeUInt16BE(TS.hal | TS.imu | TS.power | (1 << 7), 2); // battery ok
+  b.writeUInt16BE(TS.hal | TS.imu | TS.power | (1 << 7) | extra, 2); // battery ok
   b.writeUInt16BE(Math.round(voltage * 1000), 4);
   b.writeInt16BE(Math.round(current * 1000), 6);
   b.writeUInt16BE(loopTime, 8);
@@ -43,6 +43,8 @@ export function attachMockRobot(httpServer: HttpServer, log = console.log): void
     ws.send(cliPackage('Mock robot ready. Try "help".\n'));
 
     let lastMove = 0;
+    let walk = false;
+    let level = false;
     let moving = false;
     const watchdog = setInterval(() => {
       if (moving && Date.now() - lastMove > FAILSAFE_MS) {
@@ -65,7 +67,22 @@ export function attachMockRobot(httpServer: HttpServer, log = console.log): void
           break;
         }
         case P_TELEMETRY:
-          ws.send(telemetryPackage(7.4 + Math.random() * 0.1, 1.2 + Math.random() * 0.3, 2000 + Math.round(Math.random() * 300)));
+          ws.send(
+            telemetryPackage(
+              7.4 + Math.random() * 0.1,
+              1.2 + Math.random() * 0.3,
+              2000 + Math.round(Math.random() * 300),
+              (walk ? TS.gaitStatic : 0) | (level ? TS.leveling : 0),
+            ),
+          );
+          break;
+        case P_GAIT:
+          walk = raw[1] === 1;
+          log(`[mock robot] gait ${walk ? 'walk' : 'trot'}`);
+          break;
+        case P_LEVEL:
+          level = raw[1] === 1;
+          log(`[mock robot] leveling ${level ? 'on' : 'off'}`);
           break;
         case P_CLI: {
           const end = raw.indexOf(0);

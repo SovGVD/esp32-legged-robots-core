@@ -59,6 +59,8 @@
 #define P_START_VIDEO  86  //       "V" (capital V)
 #define P_STOP_VIDEO  118  //       "v" (small V)
 #define P_CLI          67  //       "C"
+#define P_GAIT         71  //       "G" [id, walk]: 1 = statically stable walk, 0 = default gait
+#define P_LEVEL        76  //       "L" [id, on]: IMU leveling on/off
 
 /* Telemetry status bits */
 #define TS_HAL          0x0001  // leg calculation on (`hal on`)

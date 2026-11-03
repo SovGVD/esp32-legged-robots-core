@@ -41,7 +41,7 @@ function robotDevServer(): Plugin {
     server.middlewares.use('/c.js', (req, res) => {
       const ws = robot ? `ws://${robot}/ws` : `ws://${req.headers.host}/ws`;
       res.setHeader('Content-Type', 'application/javascript');
-      res.end(`const c={v:'dev',w:'${ws}',c:0};`);
+      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1};`);
     });
   };
   return {

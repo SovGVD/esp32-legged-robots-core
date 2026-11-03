@@ -91,6 +91,31 @@ void pCli(uint8_t* data, size_t len) {
   }
 }
 
+/**
+ * Gait toggle from the web client: [P_GAIT, walk]. Applied once the robot
+ * stands still (requestGait); telemetry TS_GAIT_STATIC shows when it did.
+ */
+void pGait(uint8_t* data, size_t len) {
+  if (len < 2 || MODEL_WALK_GAIT == nullptr) {
+    return;
+  }
+  requestGait(data[1] ? *MODEL_WALK_GAIT : GAIT_PARAMS);
+}
+
+/**
+ * Leveling toggle from the web client: [P_LEVEL, on]. Stays off without an
+ * IMU, same as the `level on` CLI command; telemetry TS_LEVELING shows it.
+ */
+void pLevel(uint8_t* data, size_t len) {
+  if (len < 2) {
+    return;
+  }
+  if (data[1] && !imu().ready()) {
+    return;
+  }
+  setLeveling(data[1] != 0);
+}
+
 void int16ToBytes(int value, uint8_t _offset)
 {
   telemetryPackage[_offset]   = (value >> 8) & 0xFF;
