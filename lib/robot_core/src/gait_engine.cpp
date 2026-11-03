@@ -37,6 +37,10 @@ void GaitEngine::begin(const GaitParams &params, leg *legs, uint8_t legCount)
 	_params   = params;
 	_legs     = legs;
 	_legCount = legCount > LR_MAX_LEGS ? LR_MAX_LEGS : legCount;
+	_sideLever = 0;
+	for (uint8_t i = 0; i < _legCount; i++) {
+		if (fabsf(_legs[i].defaultFoot.y) > _sideLever) _sideLever = fabsf(_legs[i].defaultFoot.y);
+	}
 	computeRamps();
 	reset();
 }
@@ -83,6 +87,16 @@ void GaitEngine::rampVelocity(float dt, const LR_moveVector &command)
 	float targetY   = constrain(command.move.y,     -1.0f, 1.0f) * _params.maxSpeed;
 	// negative to keep the turn direction of the original planner
 	float targetYaw = -constrain(command.rotate.yaw, -1.0f, 1.0f) * _params.maxYawRate;
+
+	if (_params.maxSideSpeed > 0) {
+		// strafing and turning both swing the feet sideways
+		float side = fabsf(targetX) + fabsf(targetYaw) * _sideLever;
+		if (side > _params.maxSideSpeed) {
+			float k = _params.maxSideSpeed / side;
+			targetX   *= k;
+			targetYaw *= k;
+		}
+	}
 
 	_velocity.x = lrApproach(_velocity.x, targetX,   _params.maxAccel * dt);
 	_velocity.y = lrApproach(_velocity.y, targetY,   _params.maxAccel * dt);

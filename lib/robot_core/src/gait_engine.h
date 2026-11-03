@@ -58,6 +58,10 @@ typedef struct {
 	LR_point centerOfMass;            // mm, centre of mass relative to the body origin, body frame (z unused);
 	                                  // without static stability the body is offset by -centerOfMass so the
 	                                  // centre of mass stays over the middle of the neutral stance
+	float maxSideSpeed;               // mm/s, 0 = off: limit on the feet's sideways speed relative to the body
+	                                  // from strafing plus turning (|move.x| + |yaw rate| * foot Y); both are
+	                                  // scaled down together. The hip roll joints do all the sideways work and
+	                                  // may be slower than the others (dog: 2:1 gear, half speed)
 } GaitParams;
 
 class GaitEngine
@@ -128,6 +132,7 @@ class GaitEngine
 		float      _phase    = 0;
 		bool       _active   = false;
 
+		float    _sideLever = 0;   // mm, largest |defaultFoot.y|: sideways foot speed per rad/s of yaw
 		void     rampVelocity(float dt, const LR_moveVector &command);
 		LR_point touchdownTarget(uint8_t legId, float swingProgress) const;
 		bool     isAtNeutral(uint8_t legId) const;
