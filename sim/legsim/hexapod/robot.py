@@ -105,6 +105,12 @@ class SimHexapod(SimDog):
         self.write_pulses(pulses)
         return pulses
 
+    def set_leg_angles_ideal(self, angles):
+        """Firmware leg angles [6][3] straight to the joint servos, skipping the
+        HAL and pulses: for what-if servos and gears the firmware HAL doesn't
+        describe (params.direct_drive). Out-of-travel angles are clamped."""
+        self.set_joint_targets(np.array([leg_angles_to_q(*a) for a in angles]).ravel())
+
     def set_joint_targets(self, q):
         q = np.asarray(q, dtype=float).ravel()
         lo = np.array([servo_joint_range(self.p, j)[0] for _ in self.p.legs for j in range(3)])

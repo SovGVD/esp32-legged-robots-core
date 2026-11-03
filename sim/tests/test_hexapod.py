@@ -198,3 +198,39 @@ def test_leg_test_finds_a_reversed_servo(fw):
     assert {j for r in rf for j in r["wrong_joints"]} == {"femur"}
     assert all(r["ok"] for r in results if r["leg"] == "LM")
     assert "RF: femur (beta)" in legtest.summary(results)
+
+
+# ------------------------------------------------------ what-if servos
+
+def test_ptk_7465mg_preset():
+    from legsim.hexapod import ptk_7465mg, direct_drive
+    s = ptk_7465mg(7.4)
+    assert s.stall_torque == pytest.approx(5.5 * 0.0980665)
+    assert s.no_load_speed == pytest.approx(math.radians(60) / 0.075)
+    assert ptk_7465mg(6.7).stall_torque == pytest.approx(5.0 * 0.0980665)   # halfway 6.0-7.4
+    assert ptk_7465mg(7.4, 333).pwm_period == pytest.approx(1 / 333)
+    p = direct_drive()
+    assert p.hal.ratio == (1.0, 1.0, 1.0)
+    lo, hi = servo_joint_range(p, 0)
+    assert math.degrees(hi - lo) == pytest.approx(180.0)
+    assert p.legs == P.legs and p.masses == P.masses
+
+
+@needs_cxx
+def test_direct_drive_7465mg_walks_by_leg_angles(fw):
+    """Firmware tripod at 400 mm/s on direct-drive 7465MG servos at 333 Hz:
+    the joints keep up within a few degrees (MG90S + gears: ~23)."""
+    from legsim.hexapod import ptk_7465mg, direct_drive
+    fw.reset()
+    fw.tune_gait(cycle_time=0.3, duty_factor=0.5, max_speed=400)
+    h = fw.place(SimHexapod(params=direct_drive(servo=ptk_7465mg(7.4, 333))))
+    h.step(0.3)
+    fw.drive(h, (0, 1, 0, 0, 0, 0), 1.5, ideal_servos=True)
+    p0 = h.body_position_mm().copy()
+    lag = 0.0
+    for _ in range(int(2.0 / fw.loop_dt)):
+        fw.drive(h, (0, 1, 0, 0, 0, 0), ideal_servos=True)
+        lag = max(lag, float(np.max(np.abs(h.servos.target - h.joint_q()))))
+    assert (h.body_position_mm() - p0)[1] / 2.0 > 350
+    assert math.degrees(lag) < 8
+    assert tilt_deg(h) < 3

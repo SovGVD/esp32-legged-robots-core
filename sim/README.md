@@ -38,7 +38,7 @@ on macOS, use `trot.py --view` or a video there).
 ## Commands
 
 ```
-python -m pytest -q tests            # 67 checks, ~30 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 69 checks, ~30 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
@@ -265,6 +265,36 @@ and the femurs on RF, RM, RR; with the flags in this model all 24 moves pass.
 The assumptions it rests on (shaft sides, servo direction) are the
 `SHAFT`/`SERVO_TURNS_CCW` constants in `assembly.py`: if the robot disagrees,
 fix those and the test tells you the flags.
+
+### What-if: other servos
+
+`examples/hexapod_servo_compare.py` runs the firmware tripod on the same legs,
+stance and weight with PTK 7465MG servos driving every joint directly (no
+gears, 180° per joint), next to the current MG90S + gears:
+
+```python
+from legsim.hexapod import SimHexapod, direct_drive, ptk_7465mg
+robot = fw.place(SimHexapod(params=direct_drive(servo=ptk_7465mg(volts=7.4, frame_hz=333))))
+fw.drive(robot, (0, 1, 0, 0, 0, 0), 3.0, ideal_servos=True)
+```
+
+`ptk_7465mg(volts, frame_hz)` takes the datasheet torque and speed at 5.0-8.4 V.
+The firmware HAL still has the geared ratios, so `ideal_servos=True` sends
+its leg angles straight to the joints instead of its pulses; its joint limits
+also stay the geared ones (coxa ±45°), so longer steps and faster turns that
+direct drive would allow aren't used.
+
+Findings (datasheet values, tripod, 0.3 s cycle):
+
+| | MG90S + gears | 7465MG 6 V | 7465MG 7.4 V | 7465MG 7.4 V, 333 Hz |
+|---|---|---|---|---|
+| Standing femur load (of stall) | 30 % | 24 % | 20 % | 20 % |
+| Lag at 400 mm/s forward | 23° | 16° | 15° | 2-3° |
+| Clean top speed forward / sideways, mm/s | ~550 / ~330 | ~700 / ~380 | ~700 / ~400 | ~900 / ~520 |
+
+At 50 Hz frames (the PCA9685 now) the stronger servos jump to each new target
+and the body rocks 3-5°, so a higher voltage gains little. The 7465MG reads
+up to 333 Hz pulses, and the PCA9685 can run that fast (2500 µs fits in 3 ms).
 
 ## Plan
 
