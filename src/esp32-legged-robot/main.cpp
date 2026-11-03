@@ -119,8 +119,8 @@ struct LoopWindow {
 	uint64_t sum[LOOP_STAGE_COUNT];
 	uint64_t sumTotal;
 	uint32_t maxPeriod;                 // longest time between two tick starts, us
-	uint32_t worstTotal;                // slowest tick, us ...
-	uint32_t worst[LOOP_STAGE_COUNT];   // ... and where its time went
+	uint32_t worstTotal;                // slowest tick, us
+	uint32_t worst[LOOP_STAGE_COUNT];   // longest time of each stage, us (not always the same tick)
 };
 
 static portMUX_TYPE profileLock = portMUX_INITIALIZER_UNLOCKED;
@@ -149,9 +149,13 @@ static void loopProfileTick(uint32_t total, uint32_t period, uint32_t missed)
 	if (period > window.maxPeriod) {
 		window.maxPeriod = period;
 	}
-	if (total >= window.worstTotal) {
+	if (total > window.worstTotal) {
 		window.worstTotal = total;
-		memcpy(window.worst, tickStage, sizeof(tickStage));
+	}
+	for (uint8_t i = 0; i < LOOP_STAGE_COUNT; i++) {
+		if (tickStage[i] > window.worst[i]) {
+			window.worst[i] = tickStage[i];
+		}
 	}
 	portEXIT_CRITICAL(&profileLock);
 }
@@ -173,7 +177,7 @@ static void printLoopWindow(Print &out, const LoopWindow &w)
 	if (w.ticks == 0) {
 		return;
 	}
-	out.printf("  %-9s %8s %8s\n", "stage", "avg us", "worst us");
+	out.printf("  %-9s %8s %8s\n", "stage", "avg us", "max us");
 	for (uint8_t i = 0; i < LOOP_STAGE_COUNT; i++) {
 		out.printf("  %-9s %8u %8u\n", loopStageNames[i],
 		           (unsigned)(w.sum[i] / w.ticks), (unsigned)w.worst[i]);
@@ -357,8 +361,8 @@ void setup()
 
 /**
  * Core 1: the motion task does the work. Once a second the profiling window
- * is rolled over; a second that missed ticks is printed with the breakdown of
- * its slowest tick, so a USB serial monitor shows what holds the loop up.
+ * is rolled over; a second that missed ticks is printed with the time of each
+ * stage, so a USB serial monitor shows what holds the loop up.
  */
 void loop()
 {

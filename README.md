@@ -114,7 +114,9 @@ get the real time since the previous tick (capped at 50 ms), so a slow loop make
 and slowest time of each stage (failsafe, power sensor, IMU read, motion pipeline, servo output). Every second
 that misses ticks is also printed on the serial port with the same breakdown. `gait state` prints the gait the
 loop really runs (cycle, step height, speeds, CoM offset). I2C transfers time out after `I2C_TIMEOUT_MS` (10 ms)
-so one stuck read can't hold the loop for long.
+so one stuck read can't hold the loop for long. On the ESP32, `ledcWrite()` waits for the previous duty of
+that channel to reach the output (up to one 20 ms servo period), so the LEDC servo bus skips unchanged pulses
+and leaves a new one for the next tick while the previous is still pending (it cost the dog ~40 ms per tick).
 
 **Tank.** No gait: the move command is mixed into left/right track speeds, slew limited (`TANK_DRIVE_PARAMS` in
 `model/tank/model_data.h`: acceleration, deadband, minimum duty that starts the motors) and written as H-bridge
