@@ -1,0 +1,89 @@
+name: Firmware flasher (GitHub Pages)
+
+# Publishes the browser flasher with firmware for every robot.
+# Runs only for commits on main (a merge into main), never for development
+# or pull requests: only merged code is ever published.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  firmware:
+    # a manual run from another branch must not publish either
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        env: [robot-dog, robot-tank, robot-biped, robot-hexapod]
+    steps:
+      - uses: actions/checkout@v7
+      # rebuild the embedded web UI from main, so the firmware never ships a
+      # stale src/esp32-legged-robot/web/index.html.gz.h
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: src/web
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: pip install -U platformio
+      - run: pio run -e ${{ matrix.env }}
+      - name: Collect flash images
+        run: |
+          mkdir -p out/${{ matrix.env }}
+          cd .pio/build/${{ matrix.env }}
+          cp flash_images.json $(python3 -c "import json; print(' '.join(i['path'] for i in json.load(open('flash_images.json'))['images']))") \
+            "$GITHUB_WORKSPACE/out/${{ matrix.env }}/"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fw-${{ matrix.env }}
+          path: out/${{ matrix.env }}
+          retention-days: 7
+
+  site:
+    needs: firmware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: fw-*
+          path: fw
+      - run: |
+          python3 tools/webflash/build_site.py --out site \
+            --version "$(date -u +%Y-%m-%d)-${GITHUB_SHA::7}" --commit "$GITHUB_SHA" \
+            fw/fw-robot-dog fw/fw-robot-tank fw/fw-robot-biped fw/fw-robot-hexapod
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: site
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
