@@ -1,6 +1,7 @@
 import type { TofMount } from './config.ts';
 import { TOF_ZONES, type TofSensorFrame } from './protocol.ts';
 import { TofSurface } from './tof3d.ts';
+import { TofFirstPerson } from './toffpv.ts';
 
 const CELL = 22; // css px per zone
 const SIDE = 8;
@@ -20,37 +21,49 @@ interface Grid {
   changed: number;
 }
 
-function loadMode(): '3d' | 'grid' {
+type Mode = 'fpv' | '3d' | 'grid';
+const MODES: Mode[] = ['fpv', '3d', 'grid'];
+const MODE_TITLE: Record<Mode, string> = { fpv: 'first person', '3d': '3D', grid: 'grid' };
+
+function loadMode(): Mode {
   try {
-    return localStorage.getItem(MODE_KEY) === 'grid' ? 'grid' : '3d';
+    const m = localStorage.getItem(MODE_KEY) as Mode;
+    return MODES.includes(m) ? m : 'fpv';
   } catch {
-    return '3d';
+    return 'fpv';
   }
 }
 
 /**
- * ToF view, two modes: a 3D surface of what the sensors see around the robot
- * (TofSurface), or one 8x8 heat map per sensor as the sensor looks (row 0 at
+ * ToF view, three modes: first person (TofFirstPerson, full size behind the
+ * sticks), a 3D surface around the robot to orbit (TofSurface), or one 8x8 heat map per sensor as the sensor looks (row 0 at
  * the top, left on the left) with the distance in each zone in cm.
  */
 export class TofPanel {
   private readonly grids: Grid[] = [];
   private readonly range: number;
   private readonly surface: TofSurface | null;
+  private readonly fpv: TofFirstPerson | null;
+  private readonly host: HTMLElement;
   private readonly gridBox: HTMLElement;
   private readonly info: HTMLElement;
   private readonly button: HTMLButtonElement;
-  private mode = loadMode();
+  private mode: Mode = loadMode();
   private last: TofSensorFrame[] = [];
 
-  constructor(root: HTMLElement, count: number, range: number, mounts: TofMount[]) {
+  /** root: the floating panel; host: the drive area the first-person view fills */
+  constructor(root: HTMLElement, host: HTMLElement, count: number, range: number, mounts: TofMount[]) {
     this.range = range;
-    // the 3D view needs to know where each sensor is
-    this.surface = mounts.length >= count && count > 0 ? new TofSurface(mounts.slice(0, count), range) : null;
+    this.host = host;
+    // the 3D views need to know where each sensor is
+    const has3d = mounts.length >= count && count > 0;
+    this.surface = has3d ? new TofSurface(mounts.slice(0, count), range) : null;
+    this.fpv = has3d ? new TofFirstPerson(mounts.slice(0, count)) : null;
+    if (this.fpv) host.prepend(this.fpv.canvas);
     this.button = document.createElement('button');
     this.button.type = 'button';
     this.button.className = 'small';
-    this.button.addEventListener('click', () => this.setMode(this.mode === '3d' ? 'grid' : '3d'));
+    this.button.addEventListener('click', () => this.setMode(MODES[(MODES.indexOf(this.mode) + 1) % MODES.length]));
     this.gridBox = document.createElement('div');
     this.gridBox.className = 'tof-grids';
     this.info = document.createElement('div');
@@ -71,16 +84,23 @@ export class TofPanel {
     this.setMode(this.surface ? this.mode : 'grid');
   }
 
-  private setMode(mode: '3d' | 'grid'): void {
+  /** The panel is open or closed (ToF toggle). */
+  show(on: boolean): void {
+    this.host.classList.toggle('fpv', on && this.mode === 'fpv');
+    this.clear();
+  }
+
+  private setMode(mode: Mode): void {
     this.mode = mode;
     try {
       localStorage.setItem(MODE_KEY, mode);
     } catch {
       /* private mode: not remembered */
     }
-    this.button.textContent = mode === '3d' ? 'grid' : '3D';
+    this.button.textContent = MODE_TITLE[MODES[(MODES.indexOf(mode) + 1) % MODES.length]];
     this.gridBox.hidden = mode !== 'grid';
     if (this.surface) this.surface.canvas.hidden = mode !== '3d';
+    this.host.classList.toggle('fpv', mode === 'fpv' && !this.info.closest('[hidden]'));
     this.render();
   }
 
@@ -121,6 +141,7 @@ export class TofPanel {
     this.info.textContent = texts.join(' · ');
     this.info.classList.toggle('warn', warn);
     if (this.mode === '3d') this.surface?.update(this.last);
+    if (this.mode === 'fpv') this.fpv?.update(this.last, now);
   }
 
   /** Draws one heat map, returns the closest distance (0: none). */
