@@ -278,3 +278,31 @@ RC_API void rc_reject_counts(uint32_t *out)
 	out[1] = motion.jointLimitCount();
 	out[2] = motion.servoRangeCount();
 }
+
+/**
+ * Leg test: pulses for one leg with its foot at defaultFoot + offset (mm, body
+ * frame), body at the origin, through the model's IK and servo HAL (inverse
+ * flags, gear ratios, servo profile). The gait and the other legs are left
+ * alone. Returns 1 if the IK solved it.
+ */
+RC_API int rc_leg_test_pulses(int i, const float *offset, uint16_t *pulses)
+{
+	if (i < 0 || i >= LEG_NUM) return 0;
+	leg l = legs[i];
+	l.body = l.defaultBody;
+	l.foot = { l.defaultFoot.x + offset[0], l.defaultFoot.y + offset[1], l.defaultFoot.z + offset[2] };
+	LR_figure origin = {};
+	LR_moveVector none = {};
+	iksolver s = modelIK.solve(l, origin, none);
+	l.angle = s.angle;
+	lrLegPulses(l, LEG_DOF, servoMainProfile, pulses);
+	return s.isSolved ? 1 : 0;
+}
+
+/** The model's angle inverse flags for leg i: out[0..2] = alpha, beta, gamma (0/1). */
+RC_API void rc_leg_inverse(int i, int *out)
+{
+	out[0] = legs[i].inverse.alpha;
+	out[1] = legs[i].inverse.beta;
+	out[2] = legs[i].inverse.gamma;
+}

@@ -38,7 +38,7 @@ on macOS, use `trot.py --view` or a video there).
 ## Commands
 
 ```
-python -m pytest -q tests            # 63 checks, ~30 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 67 checks, ~30 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
@@ -186,6 +186,8 @@ needs `mjpython`, which conflicts with pygame's window.
 python examples/drive.py --hexapod             # drive it by keyboard / Xbox pad (needs a display)
 python examples/hexapod_walk.py                # scripted walk, prints distance, tilt, servo load
 python examples/hexapod_walk.py --video walk.mp4
+python examples/hexapod_legtest.py             # does every servo turn the way the firmware expects?
+python examples/hexapod_legtest.py --video legtest.mp4   # or --view, --leg RF
 python examples/snapshot.py hexapod.png --hexapod
 python -m pytest -q tests/test_hexapod.py
 ```
@@ -235,11 +237,28 @@ First findings (with the estimated 892 g at ~5 V):
   mass or 6 V on the servos would help most.
 * Strafing and turning occasionally ask for more than the coxa's ±45°
   (2:1 gear on a 180° servo); the firmware clamps those (`servo_range` count).
-* Servo directions: the right legs are mirror images of the left (all gears
-  face forward) and every gear pair reverses the rotation, so the model now
-  inverts the tibia on the left legs and the femur on the right legs. That was
-  worked out from the parts and the dog's servo direction; the sim follows the
-  firmware's HAL either way, so only the robot can confirm it.
+* Servo directions: see below.
+
+### Servo directions (leg test)
+
+The hexapod sim turns each joint the way its servo is mounted, not the way
+the firmware's `inverse` flags say: `legsim/hexapod/assembly.py` knows which
+side each servo shaft points to, that every gear pair reverses the rotation,
+and that a longer pulse turns an MG90 counter-clockwise seen from the shaft
+(taken from the dog's working config). The right legs are mirror images of
+the left (all gears face forward, as in the photos). So a wrong flag in
+`model_data.h` makes a leg move the wrong way in the sim, like on the robot.
+
+`examples/hexapod_legtest.py` hangs the robot in the air and, one leg at a
+time, moves the foot up, out, forward and turns the leg around its coxa
+through the firmware's own IK and HAL (`FirmwareCore.leg_test_pulses`). It
+prints OK/WRONG per move, the joints that turned against the IK's plan and
+the flags to flip. Edit `model_data.h` and run it again; the bridge rebuilds.
+With the original flags (none inverted) it reports the tibias on LF, LM, LR
+and the femurs on RF, RM, RR; with the flags in this model all 24 moves pass.
+The assumptions it rests on (shaft sides, servo direction) are the
+`SHAFT`/`SERVO_TURNS_CCW` constants in `assembly.py`: if the robot disagrees,
+fix those and the test tells you the flags.
 
 ## Plan
 

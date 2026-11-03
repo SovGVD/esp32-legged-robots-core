@@ -139,3 +139,40 @@ def tibia_parts(femur_len=55.0):
         ("mesh", "tibia_side2", I, t, None),
         ("mesh", "tibia_tip", I, (0, FEMUR_Y + 13.8, 0), None),
     ]
+
+
+# ---------------------------------------------------------------- servo directions
+#
+# Which way each joint really turns for a longer pulse, from how the servo is
+# mounted, independent of the firmware's inverse flags. The sim moves the
+# joints this way, so a wrong flag in model_data.h shows up as a leg moving
+# the wrong way in the sim, like on the robot.
+
+# A longer pulse turns the servo output counter-clockwise seen from the shaft
+# end (right-handed about the shaft's outward direction). From the dog's
+# working config: its hip-pitch servos drive the leg directly, shaft pointing
+# outward, and RF (no inverse) / LF (inverse) both come out this way.
+SERVO_TURNS_CCW = True
+
+# Servo shaft directions (outward from the servo body), RM description, link frames:
+# coxa servo upside down in the body bottom (gear under it), femur servo in the
+# coxa and tibia servo in the femur with their gears on the -Y side of the leg
+# (the femur and tibia gears are on that side of the parts) [cad]
+SHAFT = {
+    0: (0.0, 0.0, -1.0),
+    1: (0.0, -1.0, 0.0),
+    2: (0.0, -1.0, 0.0),
+}
+GEAR_STAGES = {0: 1, 1: 1, 2: 1}       # external gear pairs between servo and joint (each reverses)
+JOINT_AXIS = {0: (0, 0, 1), 1: (0, -1, 0), 2: (0, -1, 0)}   # sim joint axes, + q direction (mjcf.py)
+
+
+def servo_direction(leg, j):
+    """+1 if a longer pulse turns joint j of `leg` in its + q direction, -1 if the other way."""
+    s = np.asarray(SHAFT[j], dtype=float)
+    if j != 0:                           # coxa servos sit in the body, the same for every leg
+        s = leg_mirror(leg) @ s          # the mirrored legs have the servo the other way round
+    turn = s if SERVO_TURNS_CCW else -s
+    if GEAR_STAGES[j] % 2:
+        turn = -turn
+    return 1 if float(turn @ np.asarray(JOINT_AXIS[j], dtype=float)) > 0 else -1

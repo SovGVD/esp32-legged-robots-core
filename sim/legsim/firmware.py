@@ -115,6 +115,10 @@ class FirmwareCore:
         L.rc_set_leveling.argtypes = [ctypes.c_int]
         L.rc_level_correction.restype = None
         L.rc_level_correction.argtypes = [f32p]
+        L.rc_leg_test_pulses.restype = ctypes.c_int
+        L.rc_leg_test_pulses.argtypes = [ctypes.c_int, f32p, ctypes.POINTER(ctypes.c_uint16)]
+        L.rc_leg_inverse.restype = None
+        L.rc_leg_inverse.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
         self.legs = L.rc_leg_count()
         self.dof = L.rc_leg_dof()
         self.loop_dt = float(L.rc_loop_dt())
@@ -229,6 +233,19 @@ class FirmwareCore:
         the gait offsets the body over the centre of mass."""
         dog.reset(leg_angles=self.leg_angles())
         return dog
+
+    def leg_test_pulses(self, leg, offset):
+        """Pulses for one leg with its foot at the neutral point + offset (mm, body frame),
+        through the model's own IK and HAL. Returns (pulses[dof], solved)."""
+        out = (ctypes.c_uint16 * self.dof)()
+        ok = self.lib.rc_leg_test_pulses(int(leg), (ctypes.c_float * 3)(*map(float, offset)), out)
+        return np.frombuffer(out, dtype=np.uint16).copy(), bool(ok)
+
+    def leg_inverse(self, leg):
+        """The model's angle inverse flags (alpha, beta, gamma) for one leg."""
+        out = (ctypes.c_int * 3)()
+        self.lib.rc_leg_inverse(int(leg), out)
+        return tuple(bool(v) for v in out)
 
     def gait_active(self):
         return bool(self.lib.rc_gait_active())

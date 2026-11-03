@@ -78,3 +78,13 @@ def forward_kinematics(geo: HexGeometry, leg: HexLegConfig, q):
     z = geo.femur * math.sin(q_femur) - geo.tibia * math.cos(q_femur + q_tibia)
     yaw = leg.yaw + q_coxa
     return np.array([reach * math.cos(yaw), reach * math.sin(yaw), z])
+
+
+# + q per + leg angle: coxa q = alpha - pi/2, femur q = pi/2 - beta, tibia q = gamma - pi/2
+_Q_PER_ANGLE = (1, -1, 1)
+
+
+def hal_direction(leg: HexLegConfig, j):
+    """Which way the firmware expects joint j to turn for a longer pulse: +1 = + q.
+    Servo angle = (leg angle - mid) * ratio + 90 deg, mirrored by the inverse flag."""
+    return _Q_PER_ANGLE[j] * (-1 if leg.inverse_abg[j] else 1)

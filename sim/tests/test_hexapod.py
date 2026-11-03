@@ -158,3 +158,43 @@ def test_firmware_turns_right(fw, hexa):
     assert -90 < turned < -50, turned
     assert np.linalg.norm(hexa.body_position_mm()[:2]) < 30
     assert tilt_deg(hexa) < 5.0
+
+
+# ------------------------------------------------------- servo directions
+
+def test_servo_mounting_matches_model_flags():
+    """Every joint turns the way the HAL expects, given how its servo is mounted
+    (shaft side, gear reversal), with the inverse flags in the params."""
+    from legsim.hexapod.assembly import servo_direction
+    from legsim.hexapod.kinematics import hal_direction
+    for leg in P.legs:
+        for j in range(3):
+            assert servo_direction(leg, j) == hal_direction(leg, j), (leg.name, j)
+
+
+@needs_cxx
+def test_params_flags_match_firmware(fw):
+    for i, leg in enumerate(P.legs):
+        assert fw.leg_inverse(i) == tuple(leg.inverse_abg), leg.name
+
+
+@needs_cxx
+def test_leg_test_passes_with_model_flags(fw):
+    from legsim.hexapod import legtest
+    results = legtest.run(fw, SimHexapod(fixed_base=True))
+    assert len(results) == 24
+    assert all(r["ok"] for r in results), legtest.summary(results)
+
+
+@needs_cxx
+def test_leg_test_finds_a_reversed_servo(fw):
+    """A femur servo turning the other way (as if its inverse flag were wrong) is caught and named."""
+    from legsim.hexapod import legtest
+    robot = SimHexapod(fixed_base=True)
+    robot.direction[3, 1] *= -1          # RF femur
+    results = legtest.run(fw, robot, legs=["RF", "LM"])
+    rf = [r for r in results if r["leg"] == "RF"]
+    assert any(not r["ok"] for r in rf)
+    assert {j for r in rf for j in r["wrong_joints"]} == {"femur"}
+    assert all(r["ok"] for r in results if r["leg"] == "LM")
+    assert "RF: femur (beta)" in legtest.summary(results)

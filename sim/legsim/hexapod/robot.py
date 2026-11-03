@@ -7,6 +7,11 @@ SimHexapod: the simulated hexapod, seen through the same interfaces as SimDog.
   foot_contacts()  (optional, the real robot has no contact sensors)
 
 plus set_leg_angles(), set_feet(), set_joint_targets() and ground truth, like SimDog.
+
+Pulses turn the joints the way the real servos would (assembly.servo_direction:
+shaft side, gear reversal, servo turning direction), not the way the firmware's
+inverse flags say. So a wrong flag in model_data.h makes a leg move the wrong
+way here too; `hal_mapping=True` gives the old behaviour (the sim follows the flags).
 """
 
 import math
@@ -16,6 +21,7 @@ import mujoco
 
 from .params import HexapodParams
 from .mjcf import build_xml, servo_joint_range
+from .assembly import servo_direction
 from .kinematics import leg_angles_to_q, q_to_leg_angles, firmware_ik, default_foot
 from .. import hal
 from ..servo import ServoArray
@@ -25,8 +31,10 @@ JOINT_NAMES = ("coxa", "femur", "tibia")
 
 
 class SimHexapod(SimDog):
-    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False):
+    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False, hal_mapping=False):
         self.p = params or HexapodParams()
+        self.hal_mapping = hal_mapping
+        self.direction = np.array([[servo_direction(leg, j) for j in range(3)] for leg in self.p.legs])
         self.fixed_base = fixed_base
         self.xml = build_xml(self.p, fixed_base=fixed_base)
         self.model = mujoco.MjModel.from_xml_string(self.xml)
@@ -78,10 +86,15 @@ class SimHexapod(SimDog):
             self.servos.pending[channel] = np.nan
             return
         servo_angle = hal.pulse_to_angle(us, self.p.profile)
-        a = hal.servo_angle_to_leg_angle(self.p.hal, leg, j, servo_angle, self.trim[leg_i, j])
-        angles = [math.pi / 2, math.pi / 2, math.pi / 2]
-        angles[j] = a
-        self.servos.pending[channel] = leg_angles_to_q(*angles)[j]
+        if self.hal_mapping:
+            a = hal.servo_angle_to_leg_angle(self.p.hal, leg, j, servo_angle, self.trim[leg_i, j])
+            angles = [math.pi / 2, math.pi / 2, math.pi / 2]
+            angles[j] = a
+            self.servos.pending[channel] = leg_angles_to_q(*angles)[j]
+        else:
+            # servo middle (90 deg) = the CAD pose (q = 0); the joint gear divides the turn
+            turn = servo_angle - math.pi / 2 - self.trim[leg_i, j]
+            self.servos.pending[channel] = self.direction[leg_i, j] * turn / self.p.hal.ratio[j]
 
     def set_leg_angles(self, angles, firmware_trim=None):
         """Firmware leg angles [6][3] -> getHALAngle -> angleToPulse -> servo bus."""
