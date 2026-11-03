@@ -1,7 +1,8 @@
 """
 Drive the simulated dog by hand with the real firmware motion code.
 
-  python examples/drive.py
+  python examples/drive.py             # the dog
+  python examples/drive.py --hexapod   # the hexapod
 
 Opens the MuJoCo viewer and a small "robot control" window. Keyboard and
 Xbox 360 gamepad controls are listed in that window and in legsim/control.py.
@@ -23,16 +24,23 @@ import mujoco.viewer
 from legsim import SimDog, FirmwareCore
 from legsim.control import ManualControl
 
-fw = FirmwareCore()
-dog = fw.place(SimDog())
+if "--hexapod" in sys.argv:
+    from legsim.hexapod import SimHexapod
+    fw = FirmwareCore(model="hexapod")
+    dog = fw.place(SimHexapod())
+    view_distance = 1.1
+else:
+    fw = FirmwareCore()
+    dog = fw.place(SimDog())
+    view_distance = 0.7
 ui = ManualControl()
 
 dt = fw.loop_dt
 paused = False
-gait = "trot"
+gait = "trot" if fw.model == "dog" else "tripod"
 
 with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
-    viewer.cam.distance, viewer.cam.elevation, viewer.cam.azimuth = 0.7, -20, 135
+    viewer.cam.distance, viewer.cam.elevation, viewer.cam.azimuth = view_distance, -20, 135
     wall_start = time.perf_counter()
     sim_start = dog.data.time
     next_draw = 0.0
@@ -45,7 +53,7 @@ with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
             fw.place(dog)
             viewer.sync()
             wall_start, sim_start = time.perf_counter(), dog.data.time
-        if "gait" in events and not fw.gait_active():
+        if "gait" in events and not fw.gait_active() and fw.model == "dog":
             # only while standing: no foot is in the air
             gait = "walk" if gait == "trot" else "trot"
             fw.select_gait(gait)

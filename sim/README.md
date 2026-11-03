@@ -1,7 +1,8 @@
-# Robot dog physics simulation (MuJoCo)
+# Robot dog and hexapod physics simulation (MuJoCo)
 
-A MuJoCo model of the ESP32 small robot dog for testing motion code before it
-goes on the real robot. Python, `pip install -r requirements.txt`.
+MuJoCo models of the ESP32 small robot dog and the hexapod for testing motion
+code before it goes on the real robots. Python, `pip install -r requirements.txt`.
+The hexapod has [its own section](#hexapod) below; everything else is about the dog.
 
 | | |
 |---|---|
@@ -37,7 +38,7 @@ on macOS, use `trot.py --view` or a video there).
 ## Commands
 
 ```
-python -m pytest -q tests            # 42 checks, ~30 s (builds the firmware bridge on first run)
+python -m pytest -q tests            # 63 checks, ~30 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
@@ -173,6 +174,71 @@ control" window (`pip install pygame-ce`; if plain `pygame` is also installed, `
 Keyboard and pad add up. Any pad SDL knows as a game controller works
 (Xbox 360/One, most others). Linux and Windows; on macOS the MuJoCo viewer
 needs `mjpython`, which conflicts with pygame's window.
+
+## Hexapod
+
+| | |
+|---|---|
+| ![Hexapod standing](docs/hexapod_standing.png) | ![Hexapod walking with the firmware gait](docs/hexapod_walking.gif) |
+| Neutral stance, built from Gleb's printed parts | Walking forward, driven by the firmware's own gait and `HexapodLegIK` |
+
+```
+python examples/drive.py --hexapod             # drive it by keyboard / Xbox pad (needs a display)
+python examples/hexapod_walk.py                # scripted walk, prints distance, tilt, servo load
+python examples/hexapod_walk.py --video walk.mp4
+python examples/snapshot.py hexapod.png --hexapod
+python -m pytest -q tests/test_hexapod.py
+```
+
+`models/hexapod.xml` opens in MuJoCo's `simulate` app. In code:
+
+```python
+from legsim import FirmwareCore
+from legsim.hexapod import SimHexapod
+fw = FirmwareCore(model="hexapod")             # builds sim/build/librobot_core_bridge_hexapod.so
+robot = fw.place(SimHexapod())
+fw.drive(robot, (0, 1, 0, 0, 0, 0), duration=3.0)   # forward, full speed (75 mm/s), 3 s
+```
+
+`SimHexapod` has the same interface as `SimDog` (`write_pulses`, `read_imu`,
+`set_leg_angles`, `set_feet`, ground truth) with 18 channels, `leg*3 + joint`
+in the firmware leg order LF, LM, LR, RF, RM, RR (not the PCA9685 channel;
+the second board at 0x42 only matters on hardware). `joint_torque_ratio()`
+says how close each servo is to stall.
+
+| Part | Source | Notes |
+|---|---|---|
+| Coxa axes at (±46, ±80) and (±57.5, 0) mm, coxa 35, femur 55, tibia 110 | `model/hexapod/config.h`, checked on the STLs | Bearing holes in the body, the coxa's yaw and femur axes, the knee axis and tibia tip all land on the firmware numbers |
+| Body origin at the femur axis height, 28.7 mm above the body bottom | STLs | Standing height 67.3 mm (IK), 38.6 mm ground clearance |
+| Gears: coxa 2:1, femur 2:1, tibia 1.5:1 | STLs (tooth tips: 18-tooth servo gears, 36-tooth coxa sector and femur gear, 27-tooth tibia gear, module 1) | Same as the HAL ratios in `model_data.h` |
+| Servos: coxa servos upside down in the body bottom, femur servo in the coxa, tibia servo in the femur | servo screw holes in the STLs | Shafts placed at the gear centre distances (27 and 22.5 mm) |
+| MG90S clone: 0.176 N·m stall, 0.10 s/60° | datasheet at 4.8 V | Same servo model as the dog otherwise |
+| Pulse → angle: hexapod `servoMainProfile` (0-180°, 590-2200 µs) | `model_data.h` | |
+| Masses: ~892 g total | STL volumes + datasheets + estimates | Body halves 124 g, 18 servos 241 g, 2x18650 + holder 106 g, electronics 47 g; per leg coxa 31, femur 29, tibia 19 g |
+| Right legs mirrored, left legs turned | photos | All femur and tibia gears face forward, like on the real robot |
+
+The STLs (`tmp-hexapod-*`, `tmp-Femur`, servo gear) are the ones that match
+the photos; `tools/prepare_hexapod_meshes.py` decimates them into
+`models/meshes/hexapod/`. The `hexapodv2` body in the FreeCAD file is a
+newer, different body and isn't used. Estimated: the electronics and battery
+positions, the IMU at the body centre, and everything that needs a scale.
+
+First findings (with the estimated 892 g at ~5 V):
+
+* The firmware gait walks it as configured: about 270 mm forward in 4 s
+  (75 mm/s), 190 mm strafing in 3 s, turning at 0.75 rad/s, with under 3°
+  of tilt. No IK failures.
+* **Femur servos are at their limit.** Standing on six legs they use ~46 %
+  of stall torque; on three legs (the 2:1 femur gear gives 0.35 N·m) they
+  are saturated about 10 % of the time and the body sags 5-9 mm per step.
+  The real robot's weight and servo voltage decide how bad this is; less
+  mass or 6 V on the servos would help most.
+* Strafing and turning occasionally ask for more than the coxa's ±45°
+  (2:1 gear on a 180° servo); the firmware clamps those (`servo_range` count).
+* Not checked by the sim: servo directions. The model sets no angle
+  `inverse` flags, so a pulse moves the left and right legs' servos the same
+  way. With mirrored legs on the real robot one side may need them; the sim
+  follows the firmware's HAL either way.
 
 ## Plan
 

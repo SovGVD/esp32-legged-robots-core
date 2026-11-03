@@ -5,7 +5,8 @@
  * Everything between the move command and the servo pulse widths is the
  * firmware's own code: MotionController (gait engine, body kinematics, IK)
  * and the servo HAL from lib/robot_core, with the dog's legs, servo profile
- * and gait parameters from src/esp32-legged-robot/model/dog/model_data.h.
+ * and gait parameters from src/esp32-legged-robot/model/<model>/model_data.h
+ * (ROBOT_MODEL: MODEL_DOG or MODEL_HEXAPOD).
  * Only the hardware is replaced: pulses go to SimDog.write_pulses() and the
  * IMU angles come from the sim.
  */
@@ -20,8 +21,13 @@
 	#include "model/dog/config.h"
 	#include "model/dog/model_data.h"
 	static QuadrupedLegIK modelIK;
+	#define BRIDGE_HAS_WALK
+#elif ROBOT_MODEL == MODEL_HEXAPOD
+	#include "model/hexapod/config.h"
+	#include "model/hexapod/model_data.h"
+	static HexapodLegIK modelIK;
 #else
-	#error "The simulator bridge supports the dog model only"
+	#error "The simulator bridge supports the dog and hexapod models only"
 #endif
 
 #define BRIDGE_LOOP_DT (LOOP_TIME / 1000000.0f)
@@ -138,13 +144,15 @@ RC_API int rc_gait_active()
 
 /**
  * Pick the gait for the next rc_init(): 0 = the model default (GAIT_PARAMS),
- * 1 = slow walk with static stability (GAIT_PARAMS_WALK). Returns 0 if unknown.
+ * 1 = slow walk with static stability (GAIT_PARAMS_WALK, dog only). Returns 0 if unknown.
  */
 RC_API int rc_select_gait(int id)
 {
 	switch (id) {
 		case 0: gaitParams = &GAIT_PARAMS; return 1;
+#ifdef BRIDGE_HAS_WALK
 		case 1: gaitParams = &GAIT_PARAMS_WALK; return 1;
+#endif
 	}
 	return 0;
 }
