@@ -231,6 +231,15 @@ RC_API void rc_set_center_of_mass(float x, float y)
 	motion.gait().setParams(p);
 }
 
+/** Override the current gait's sideways foot speed limit (mm/s, 0 = off) and max yaw rate (rad/s, < 0 = keep). */
+RC_API void rc_set_side_limits(float maxSideSpeed, float maxYawRate)
+{
+	GaitParams p = motion.gait().params();
+	p.maxSideSpeed = maxSideSpeed < 0 ? 0 : maxSideSpeed;
+	if (maxYawRate >= 0) p.maxYawRate = maxYawRate;
+	motion.gait().setParams(p);
+}
+
 /**
  * Tune the current gait for experiments (rc_init() restores the model
  * values). Values < 0 are left unchanged.

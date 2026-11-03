@@ -83,6 +83,8 @@ class FirmwareCore:
         L.rc_set_stability_gain.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_tune_gait.restype = None
         L.rc_tune_gait.argtypes = [ctypes.c_float] * 5
+        L.rc_set_side_limits.restype = None
+        L.rc_set_side_limits.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_set_center_of_mass.restype = None
         L.rc_set_center_of_mass.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_reject_counts.restype = None
@@ -158,6 +160,11 @@ class FirmwareCore:
         """Change the current gait's timing for experiments (undone by reset()/select_gait()).
         A new duty factor keeps each leg's swing start."""
         self.lib.rc_tune_gait(cycle_time, duty_factor, max_speed, step_height, stability_blend)
+
+    def set_side_limits(self, max_side_speed, max_yaw_rate=-1):
+        """Override the current gait's sideways foot speed limit (mm/s, 0 = off) and,
+        if >= 0, its max yaw rate (rad/s). Undone by reset()/select_gait()."""
+        self.lib.rc_set_side_limits(max_side_speed, max_yaw_rate)
 
     def set_center_of_mass(self, x, y):
         """Override the current gait's centre of mass, mm in the body frame (undone by reset()/select_gait())."""

@@ -202,10 +202,15 @@ needs `mjpython`, which conflicts with pygame's window.
   `hip_pitch_drop` can model a pitch axis below the roll axis if a build
   differs (the sim then stands that much taller than the IK expects).
 * Servo voltage is assumed ~5 V (datasheet 4.8 V values).
-* With the firmware gait the drift is still there: ~13 mm/s backward when
-  trotting nearly in place and ~35-45 mm/s backward while strafing at full
-  speed (~57 mm/s with the STL mass layout) (forward walking hides it). Sideways stepping makes it worse, which
-  points at stance-leg compliance rather than the gait timing.
+* **Body wobble while trotting** came from the servos, not the gait plan. An
+  MG90D turns ~10 rad/s (the hip roll, with its 2:1 gear, ~5 rad/s) and reads
+  the pulse at 50 Hz. A swing that asks for more lands the foot 50-100 ms late,
+  the body stands on one diagonal that much longer and tips over it. The dog's
+  gait keeps within that: 15 mm step height, and `maxSideSpeed` = 50 mm/s
+  limits strafing plus turning (the hip roll joints do all the sideways work).
+* The firmware trot's backward drift (~13 mm/s in place, ~60 mm/s strafing)
+  came from the centre of mass sitting ~5 mm behind the middle of the feet;
+  `centerOfMass` in the gait params now moves the body over it.
 * **Trotting in place drifts backward** in the sim (about 30 mm/s with the
   Python demo trot, duty 0.5, 15 mm step height). The most likely cause is stance-leg
   compliance: the hobby servos sag under load, and with all knees bending the

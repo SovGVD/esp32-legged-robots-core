@@ -79,12 +79,11 @@ def test_strafes_right(fw, dog):
     p0 = dog.body_position_mm().copy()
     fw.drive(dog, (1, 0, 0, 0, 0, 0), 3.0)
     d = dog.body_position_mm() - p0
-    assert d[0] > 250.0, d
-    # Known: the trot drifts backward, worst when strafing (~40 mm/s with the
-    # box model, ~57 mm/s with the STL mass layout and the lower middle frame;
-    # see "Known limits" in README.md). Loose bound so a regression still shows.
-    assert abs(d[1]) < 0.6 * d[0], d
-    assert tilt_deg(dog) < 8.0
+    # the hip roll servos limit strafing to 50 mm/s (maxSideSpeed)
+    assert d[0] > 120.0, d
+    # no backward drift since the body sits over the centre of mass
+    assert abs(d[1]) < 0.2 * d[0], d
+    assert tilt_deg(dog) < 5.0
 
 
 def test_turn_follows_gait_heading(fw, dog):
@@ -92,7 +91,7 @@ def test_turn_follows_gait_heading(fw, dog):
     fw.drive(dog, (0, 0, 0, 0, 0, 1), 1.5)
     gait_yaw = fw.body()[5]
     sim_yaw = dog.body_orientation()["yaw"]
-    assert gait_yaw < -math.radians(90)
+    assert gait_yaw < -math.radians(45)   # ~0.7 rad/s, limited by maxSideSpeed
     err = math.remainder(sim_yaw - gait_yaw, 2 * math.pi)
     assert abs(err) < math.radians(15), (math.degrees(sim_yaw), math.degrees(gait_yaw))
 

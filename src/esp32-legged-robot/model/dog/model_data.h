@@ -125,10 +125,13 @@ const GaitParams GAIT_PARAMS = {
 	false,    // no static stability shift: a trot is supported by a diagonal line
 	0.1,      // (stability blend)
 	{ 1, 1, 0 },  // (stability gain)
-	{ 0, -8, 0 }  // centre of mass, mm from the body origin: the body is moved this much the other
+	{ 0, -8, 0 }, // centre of mass, mm from the body origin: the body is moved this much the other
 	              // way so it sits over the middle of the feet. The parts put it ~5 mm behind the
 	              // hips' centre; -8 balances best in the simulator (rocking, backward drift).
 	              // Check on the robot: it balances on a ruler edge this far behind the middle.
+	50            // max sideways foot speed, mm/s (strafe + turn): the hip roll servos have the 2:1
+	              // gear, ~5 rad/s at the leg; a 150 mm/s strafe needed 15 rad/s, the feet landed late
+	              // and the body rocked (simulator). Strafe 50 mm/s, turn in place ~0.7 rad/s.
 };
 
 /**
@@ -152,8 +155,9 @@ const GaitParams GAIT_PARAMS_WALK = {
 	0.15,     // support weights ramp over the four-foot phases
 	{ 0.7, 0, 0 },  // shift sideways only, 70 % of the way to the support centroid (~11 mm margin):
 	              // the hip roll servos (2:1 gear, 20-160 deg) leave about +-23 deg of leg roll
-	{ 0, -8, 0 }  // centre of mass, mm from the body origin (see GAIT_PARAMS; the fore-aft
+	{ 0, -8, 0 }, // centre of mass, mm from the body origin (see GAIT_PARAMS; the fore-aft
 	              // part has no effect here with the sideways-only gain)
+	50            // max sideways foot speed, mm/s (see GAIT_PARAMS; this slow walk stays below it)
 };
 
 // IMU leveling (HORIZON_LEVEL or CLI `level on`), tuned in the simulator:

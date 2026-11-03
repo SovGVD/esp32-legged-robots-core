@@ -323,6 +323,29 @@ void test_trot_keeps_center_of_mass_over_stance_centre()
 	}
 }
 
+void test_side_speed_limit_scales_strafe_and_turn()
+{
+	leg legs[4] = DOG_LEGS;
+	GaitParams p = dogTrot();
+	p.maxSideSpeed = 50;
+	GaitEngine gait;
+	gait.begin(p, legs, 4);
+	float lever = fabsf(legs[0].defaultFoot.y);
+	// full strafe and turn together: both scaled so their sideways foot speeds add up to 50 mm/s
+	for (int t = 0; t < 1000; t++) {
+		gait.update(DT, command(1, 1, 1));
+	}
+	float side = fabsf(gait.velocity().x) + fabsf(gait.yawRate()) * lever;
+	TEST_ASSERT_FLOAT_WITHIN(0.5f, 50.0f, side);
+	TEST_ASSERT_FLOAT_WITHIN(0.01f, fabsf(gait.velocity().x) / p.maxSpeed, fabsf(gait.yawRate()) / p.maxYawRate);
+	// walking straight ahead is not limited
+	gait.reset();
+	for (int t = 0; t < 1000; t++) {
+		gait.update(DT, command(0, 1, 0));
+	}
+	TEST_ASSERT_FLOAT_WITHIN(0.1f, p.maxSpeed, gait.velocity().y);
+}
+
 int main()
 {
 	UNITY_BEGIN();
@@ -339,5 +362,6 @@ int main()
 	RUN_TEST(test_static_walk_forward_steady_margin);
 	RUN_TEST(test_no_shift_without_static_stability);
 	RUN_TEST(test_trot_keeps_center_of_mass_over_stance_centre);
+	RUN_TEST(test_side_speed_limit_scales_strafe_and_turn);
 	return UNITY_END();
 }
