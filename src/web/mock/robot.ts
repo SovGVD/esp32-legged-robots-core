@@ -4,7 +4,7 @@
  */
 import type { Server as HttpServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { P_CLI, P_GAIT, P_LEVEL, P_MOVE, P_TELEMETRY, TS, decodeAxis } from '../src/protocol.ts';
+import { P_CLI, P_GAIT, P_LEVEL, P_MOVE, P_TELEMETRY, P_TOF, TOF_ZONES, TS, decodeAxis } from '../src/protocol.ts';
 
 const FAILSAFE_MS = 500;
 
@@ -24,6 +24,31 @@ function telemetryPackage(voltage: number, current: number, loopTime: number, ex
   b.writeInt16BE(Math.round((Math.random() - 0.5) * 200), 12);
   b.writeUInt16BE(Math.round(Math.random() * 3599), 22); // heading
   b.writeUInt16BE(0xffff, 24); // no hold target
+  return b;
+}
+
+/**
+ * Fake ToF frames: floor that gets further away towards the top of the view,
+ * an obstacle sweeping left and right, and a strip with no target.
+ */
+export function tofPackage(count: number, frame: number, t = Date.now() / 1000): Buffer {
+  const b = Buffer.alloc(2 + count * (2 + TOF_ZONES * 2));
+  b[0] = P_TOF;
+  b[1] = count;
+  for (let i = 0; i < count; i++) {
+    const o = 2 + i * (2 + TOF_ZONES * 2);
+    b[o] = 1; // running
+    b[o + 1] = frame & 0xff;
+    const obstacle = 3.5 + 3.5 * Math.sin(t + i);
+    for (let z = 0; z < TOF_ZONES; z++) {
+      const row = Math.floor(z / 8);
+      const col = z % 8;
+      let mm = 150 + (7 - row) * 35 + Math.random() * 6;
+      if (Math.abs(col - obstacle) < 1.2 && row > 2) mm = 110 + Math.random() * 6;
+      if (row === 0) mm = 0; // beyond range
+      b.writeUInt16BE(Math.round(mm), o + 2 + z * 2);
+    }
+  }
   return b;
 }
 
@@ -77,6 +102,9 @@ export function attachMockRobot(httpServer: HttpServer, log = console.log): void
               (walk ? TS.gaitStatic : 0) | (level ? TS.leveling : 0),
             ),
           );
+          break;
+        case P_TOF:
+          ws.send(tofPackage(Number(process.env.TOF ?? 2), Math.floor(Date.now() / 66)));
           break;
         case P_GAIT:
           walk = raw[1] === 1;

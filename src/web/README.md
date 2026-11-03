@@ -14,6 +14,7 @@ Requires Node.js 22.18 or newer.
 | `npm ci` | install dependencies from the lock file |
 | `npm run dev` | dev server with hot reload and a mock robot (no ESP32 needed) |
 | `ROBOT=192.168.4.1 npm run dev` | dev server that talks to a real robot |
+| `TOF=1 npm run dev` | number of ToF views in dev (default 2; dog 1, hexapod 2) |
 | `npm test` | protocol unit tests |
 | `npm run build` | type-check, build and write `index.html.gz.h` for the firmware |
 

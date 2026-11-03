@@ -41,7 +41,9 @@ function robotDevServer(): Plugin {
     server.middlewares.use('/c.js', (req, res) => {
       const ws = robot ? `ws://${robot}/ws` : `ws://${req.headers.host}/ws`;
       res.setHeader('Content-Type', 'application/javascript');
-      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1};`);
+      // TOF=<n> sets the number of ToF views (dog 1, hexapod 2)
+      const tof = Number(process.env.TOF ?? 2);
+      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1,t:${tof},r:450};`);
     });
   };
   return {

@@ -1,7 +1,7 @@
 /**
  * Robot configuration. The firmware serves it as /c.js, a classic script
  * that defines a global `c` before this module runs:
- *   const c={v:'0.0.1',w:'ws://192.168.4.1/ws',c:0,g:1,l:1};
+ *   const c={v:'0.0.1',w:'ws://192.168.4.1/ws',c:0,g:1,l:1,t:1,r:400};
  */
 interface FirmwareConfig {
   v?: string; // web server version
@@ -9,6 +9,8 @@ interface FirmwareConfig {
   c?: number; // camera frame size, 0 = no camera
   g?: number; // 1 = gait can be switched (trot/walk)
   l?: number; // 1 = IMU leveling available
+  t?: number; // number of ToF sensors, 0 = none
+  r?: number; // ToF range, mm (colour scale)
 }
 
 declare const c: FirmwareConfig | undefined;
@@ -19,6 +21,8 @@ export interface Config {
   camera: number;
   gaitToggle: boolean;
   levelToggle: boolean;
+  tofSensors: number;
+  tofRange: number;
 }
 
 export function loadConfig(): Config {
@@ -31,5 +35,7 @@ export function loadConfig(): Config {
     camera: fw.c ?? 0,
     gaitToggle: fw.g === 1,
     levelToggle: fw.l === 1,
+    tofSensors: fw.t ?? 0,
+    tofRange: fw.r || 400,
   };
 }

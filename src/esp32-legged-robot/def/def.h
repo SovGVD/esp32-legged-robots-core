@@ -62,6 +62,11 @@
 #define P_CLI          67  //       "C"
 #define P_GAIT         71  //       "G" [id, walk]: 1 = statically stable walk, 0 = default gait
 #define P_LEVEL        76  //       "L" [id, on]: IMU leveling on/off
+#define P_TOF          68  //       "D" [id] request: newest ToF zone distances (packages.cpp pTof)
+
+#define P_TOF_MAX_SENSORS 2
+#define P_TOF_ZONES       64
+#define P_TOF_LEN(n)      (2 + (n) * (2 + P_TOF_ZONES * 2))
 
 /* Telemetry status bits */
 #define TS_HAL          0x0001  // leg calculation on (`hal on`)

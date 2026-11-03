@@ -11,13 +11,18 @@ import {
   encodeLevel,
   encodeMove,
   encodeTelemetryRequest,
+  encodeTofRequest,
   zeroVector,
   type Telemetry,
 } from './protocol.ts';
 import { RemoteToggle } from './toggle.ts';
+import { TofPanel } from './tof.ts';
 
 const MOVE_INTERVAL_MS = 50; // the firmware failsafe expects a move package at least this often
 const TELEMETRY_INTERVAL_MS = 1000;
+// ToF frames while the ToF view is open: the sensors give 15 frames/s, 8/s is
+// plenty to look at and keeps WiFi traffic at ~1 KB/s per sensor
+const TOF_INTERVAL_MS = 125;
 // how long a toggle waits for telemetry to confirm a switch before showing
 // the robot's state again; a gait change waits until the robot stands still
 const GAIT_CONFIRM_MS = 15000;
@@ -39,6 +44,8 @@ const ui = {
   takeControl: $<HTMLButtonElement>('take-control'),
   control: $('control'),
   cli: $('cli'),
+  tofToggle: $<HTMLInputElement>('tof-toggle'),
+  tof: $('tof'),
 };
 
 const stateText: Record<ConnectionState, string> = {
@@ -53,13 +60,18 @@ const connection = new Connection(config.wsUrl, {
     document.body.dataset.state = state;
     ui.conn.textContent = stateText[state];
     ui.takeControl.hidden = state !== 'replaced';
-    if (state !== 'online') telemetry = null;
+    if (state !== 'online') {
+      telemetry = null;
+      tof.clear();
+    }
     renderTelemetry();
   },
   onMessage(msg) {
     if (msg.type === 'telemetry') {
       telemetry = msg.telemetry;
       renderTelemetry();
+    } else if (msg.type === 'tof') {
+      if (!ui.tof.hidden) tof.update(msg.sensors);
     } else if (msg.type === 'cli') {
       cli.write(msg.text);
     }
@@ -80,6 +92,13 @@ const walk = new RemoteToggle($<HTMLInputElement>('walk'), (on) => sendSetting(e
 const level = new RemoteToggle($<HTMLInputElement>('level'), (on) => sendSetting(encodeLevel(on)), LEVEL_CONFIRM_MS);
 $('walk-label').hidden = !config.gaitToggle;
 $('level-label').hidden = !config.levelToggle;
+
+const tof = new TofPanel(ui.tof, config.tofSensors, config.tofRange);
+$('tof-label').hidden = config.tofSensors === 0;
+ui.tofToggle.addEventListener('change', () => {
+  ui.tof.hidden = !ui.tofToggle.checked;
+  tof.clear();
+});
 
 const batteryText = { unknown: '', ok: '', low: 'battery low', critical: 'battery empty' } as const;
 
@@ -130,6 +149,7 @@ function renderTelemetry(): void {
   walk.sync(t ? (t.statuses & TS.gaitStatic) !== 0 : null, !sitting);
   level.sync(t ? (t.statuses & TS.leveling) !== 0 : null, !!t && (t.statuses & TS.imu) !== 0 && !sitting);
   ui.status.classList.toggle('warn', warn);
+  ui.tof.classList.toggle('gap', !!t && (t.statuses & TS.gapBlocked) !== 0);
 }
 
 function stop(): void {
@@ -176,6 +196,9 @@ setInterval(() => {
   if (document.visibilityState === 'visible') connection.send(encodeMove(vector));
 }, MOVE_INTERVAL_MS);
 setInterval(() => connection.send(encodeTelemetryRequest()), TELEMETRY_INTERVAL_MS);
+setInterval(() => {
+  if (!ui.tof.hidden && document.visibilityState === 'visible') connection.send(encodeTofRequest());
+}, TOF_INTERVAL_MS);
 
 $('version').textContent = `v${config.version}`;
 renderTelemetry();

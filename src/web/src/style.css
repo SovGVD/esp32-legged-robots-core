@@ -89,6 +89,7 @@ input[type='text'] {
   display: none !important;
 }
 main {
+  position: relative;
   flex: 1;
   display: flex;
   gap: 1px;
@@ -161,4 +162,28 @@ label:has(input:disabled) {
 }
 input.pending {
   opacity: 0.5;
+}
+#tof {
+  position: absolute;
+  z-index: 1;
+  top: 0.5em;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5em;
+  padding: 0.4em;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  pointer-events: none; /* the sticks underneath keep working */
+}
+#tof.gap {
+  border-color: var(--warn);
+}
+#tof figure {
+  margin: 0;
+}
+#tof figcaption {
+  max-width: 176px;
+  text-align: center;
 }
