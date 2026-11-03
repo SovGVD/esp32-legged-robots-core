@@ -175,6 +175,30 @@ const GaitParams GAIT_PARAMS = {
 	          // simulator with 60+ deg tibia lag and servo range clamps; 300 keeps clear of that
 };
 
+/**
+ * Rough ground (with TERRAIN_PARAMS): slower tripod with twice the swing
+ * time, so the servos can lift a foot over a 40 mm obstacle (a 150 ms swing
+ * can't: the femur lags and the foot hits the edge). Simulator.
+ */
+const GaitParams GAIT_PARAMS_ROUGH = {
+	true,     // enabled
+	0.6,      // cycle time, s: each leg swings 300 ms
+	0.5,      // duty factor: tripod
+	{ 0.25, 0.75, 0.25, 0.75, 0.25, 0.75 },   // phase offsets LF, LM, LR, RF, RM, RR
+	30,       // step height, mm (over flat ground; obstacles raise it)
+	120,      // max speed, mm/s
+	0.4,      // max yaw rate, rad/s
+	400,      // max acceleration, mm/s^2
+	4,        // max yaw acceleration, rad/s^2
+	3,        // idle tolerance, mm
+	false,    // foot switches: set by the terrain mode
+	false,    // no static stability shift
+	0.1,      // (stability blend)
+	{ 1, 1, 0 },  // (stability gain)
+	{ 0, 0, 0 },  // centre of mass, mm
+	120       // max sideways foot speed, mm/s
+};
+
 // IMU leveling (HORIZON_LEVEL or CLI `level on`), not tuned for this model yet:
 // the dog's values (tuned in the simulator) as a starting point
 const LevelerParams LEVEL_PARAMS = {
@@ -199,5 +223,41 @@ const BatteryParams BATTERY_PARAMS = {
 
 // Body lowered this much (mm) to sit down when the battery is empty
 const float SIT_HEIGHT = -30;
+
+/**
+ * Rough ground (optional, off unless enabled): foot switches and ToF distance
+ * sensors. The real hexapod has neither yet; the simulator uses these to test
+ * the terrain code (sim/examples/terrain_walk.py).
+ *
+ * Two VL53L5CX (8x8 zones, 45 deg field of view) on the front of the body,
+ * turned 20 deg left and right and 35 deg down: together they see the ground
+ * from just ahead of the front feet to ~400 mm ahead, ~300 mm wide.
+ */
+const TofSensor TOF_SENSORS[] = {
+	// position (mm, body frame), yaw (+ = left), tilt down (rad), field of view (rad), zones per side, max range (mm)
+	{ { -25, 90, 10 },  0.35, 0.61, 0.785, 8, 450 },
+	{ {  25, 90, 10 }, -0.35, 0.61, 0.785, 8, 450 },
+};
+#define TOF_SENSOR_COUNT 2
+
+const TerrainMapParams TERRAIN_MAP_PARAMS = {
+	25,    // cell size, mm (the 40x40 map covers 1 m around the robot: it is 400 mm long with legs)
+	6.0,   // cells are forgotten after 6 s (odometry drifts)
+	0.3,   // a lower reading moves a cell 30 % of the way (noise)
+	8      // a reading 8 mm above a cell replaces it at once (obstacle top)
+};
+
+const TerrainParams TERRAIN_PARAMS = {
+	30,    // search depth, mm: with foot switches a foot reaches up to 30 mm below its planned touchdown
+	200,   // search speed, mm/s
+	12,    // clearance, mm above the highest mapped point between lift-off and touchdown
+	45,    // max step, mm: mapped ground further from the leg's own ground is ignored (out of reach)
+	60,    // body height follows the ground under the feet at up to 60 mm/s
+	8,     // edge limit, mm: footholds next to a height change of more than 8 mm move
+	60,    // up to 60 mm along the step
+	0,     // foot radius, mm: the foot point is the tibia tip itself
+	5,     // tolerance, mm: touchdowns closer than this to the plan keep the planned height
+	0.05   // servo latency, s (50 Hz pulses plus travel)
+};
 
 #endif

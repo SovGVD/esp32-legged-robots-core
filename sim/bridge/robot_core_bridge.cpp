@@ -43,6 +43,23 @@ static BodyLeveler      leveler;
 	static bool levelOn = false;
 #endif
 
+// Rough ground: foot switches and ToF terrain map, both off by default and
+// kept across rc_init() (like leveling)
+static TerrainMap terrainMap;
+static bool contactOn = false;
+static bool terrainOn = false;
+static bool mapOn     = false;
+static LR_angle lastImu = { 0, 0, 0 };
+static float tiltGain = 1.0f;
+
+static void applyTerrain()
+{
+	GaitParams p = motion.gait().params();
+	p.useContactSensors = contactOn;
+	motion.gait().setParams(p);
+	motion.gait().setTerrain(terrainOn ? &TERRAIN_PARAMS : nullptr, mapOn ? &terrainMap : nullptr);
+}
+
 // Pristine copy of the model legs, so rc_init() can start over
 alignas(leg) static unsigned char initialLegs[sizeof(legs)];
 static bool initialSaved = false;
@@ -69,6 +86,9 @@ RC_API void rc_init()
 	leveler.begin(LEVEL_PARAMS);
 	leveler.setEnabled(levelOn);
 	motion.begin(*gaitParams, legs, LEG_NUM, modelIK, LEG_DOF, &servoMainProfile);
+	terrainMap.begin(TERRAIN_MAP_PARAMS);
+	lastImu = { 0, 0, 0 };
+	applyTerrain();
 	LR_moveVector zero = {};
 	motion.update(0.0f, zero, imuCorrection);
 }
@@ -94,13 +114,19 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 		LR_angle current = { 0, 0, 0 };
 		if (imu) {
 			current = { imu[0], imu[1], imu[2] };
+			lastImu = current;
 		}
 		LR_angle target = { 0, 0, 0 };
 		// same rule as the firmware (motion.cpp): hold during a dynamic gait
-		bool hold = motion.gait().isActive() && !motion.gait().params().staticStability;
+		// (on rough ground the leveler keeps working: the feet stand at different heights)
+		bool hold = motion.gait().isActive() && !motion.gait().params().staticStability && !terrainOn;
 		imuCorrection = leveler.update(dt, current, target, hold);
 	}
 
+	terrainMap.tick(dt);
+	// tilt the gait didn't ask for: measured minus commanded (-correction)
+	LR_angle unplanned = { (lastImu.pitch + imuCorrection.pitch) * tiltGain, (lastImu.roll + imuCorrection.roll) * tiltGain, 0 };
+	motion.gait().setTilt(unplanned);
 	int unsolved = motion.update(dt, cmd, imuCorrection);
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		lrLegPulses(legs[i], LEG_DOF, servoMainProfile, &pulses[i * LEG_DOF]);
@@ -144,7 +170,8 @@ RC_API int rc_gait_active()
 
 /**
  * Pick the gait for the next rc_init(): 0 = the model default (GAIT_PARAMS),
- * 1 = slow walk with static stability (GAIT_PARAMS_WALK, dog only). Returns 0 if unknown.
+ * 1 = slow walk with static stability (GAIT_PARAMS_WALK, dog only), 2 = rough
+ * ground (GAIT_PARAMS_ROUGH). Returns 0 if unknown.
  */
 RC_API int rc_select_gait(int id)
 {
@@ -153,6 +180,7 @@ RC_API int rc_select_gait(int id)
 #ifdef BRIDGE_HAS_WALK
 		case 1: gaitParams = &GAIT_PARAMS_WALK; return 1;
 #endif
+		case 2: gaitParams = &GAIT_PARAMS_ROUGH; return 1;
 	}
 	return 0;
 }
@@ -306,3 +334,107 @@ RC_API void rc_leg_inverse(int i, int *out)
 	out[1] = legs[i].inverse.beta;
 	out[2] = legs[i].inverse.gamma;
 }
+
+/* ------------------------------------------------------------ rough ground */
+
+/**
+ * Foot contact switches on (1) / off (0): GaitParams.useContactSensors of the
+ * current gait. Kept across rc_init(). Feed the switches with rc_set_contacts().
+ */
+RC_API void rc_set_contact_sensing(int on)
+{
+	contactOn = on != 0;
+	applyTerrain();
+}
+
+/** Switch states before a tick, LEG_NUM ints (1 = pressed), like reading the switch pins. */
+RC_API void rc_set_contacts(const int *on)
+{
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		legs[i].sensor.onGround = on[i] != 0;
+	}
+}
+
+/**
+ * Terrain adaptation (TERRAIN_PARAMS) on/off, and whether it uses the ToF
+ * terrain map. Kept across rc_init().
+ */
+RC_API void rc_set_terrain(int on, int useMap)
+{
+	terrainOn = on != 0;
+	mapOn = useMap != 0;
+	applyTerrain();
+}
+
+RC_API int rc_tof_count() { return TOF_SENSOR_COUNT; }
+
+/**
+ * ToF sensor i: out[0..2] position (mm, body frame), out[3] max range (mm);
+ * returns the number of zones (zones per side squared), 0 if no such sensor.
+ */
+RC_API int rc_tof_sensor(int i, float *out)
+{
+	if (i < 0 || i >= TOF_SENSOR_COUNT) return 0;
+	const TofSensor &t = TOF_SENSORS[i];
+	out[0] = t.position.x; out[1] = t.position.y; out[2] = t.position.z;
+	out[3] = t.maxRange;
+	return t.zones * t.zones;
+}
+
+/** Zone ray directions of sensor i, body frame unit vectors, zones * 3 floats. */
+RC_API void rc_tof_rays(int i, float *out)
+{
+	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
+	const TofSensor &t = TOF_SENSORS[i];
+	for (uint8_t z = 0; z < t.zones * t.zones; z++) {
+		LR_point d = TerrainMap::zoneDirection(t, z);
+		out[z * 3 + 0] = d.x; out[z * 3 + 1] = d.y; out[z * 3 + 2] = d.z;
+	}
+}
+
+/**
+ * One frame of sensor i: a distance per zone (mm, <= 0 = no target), added
+ * to the terrain map with the gait's body pose and the last IMU tilt
+ * (what the firmware would know).
+ */
+RC_API void rc_tof_frame(int i, const float *distances)
+{
+	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
+	const TofSensor &t = TOF_SENSORS[i];
+	LR_figure pose = motion.body();
+	pose.orientation.pitch = lastImu.pitch;
+	pose.orientation.roll  = lastImu.roll;
+	for (uint8_t z = 0; z < t.zones * t.zones; z++) {
+		terrainMap.addReading(t, z, distances[z], pose);
+	}
+}
+
+/** Mapped ground at world (x, y) of the gait frame, mm; returns 0 if unknown. */
+RC_API int rc_terrain_height(float x, float y, float *z)
+{
+	return terrainMap.heightAt(x, y, *z) ? 1 : 0;
+}
+
+/** Number of known map cells. */
+RC_API int rc_terrain_cells()
+{
+	return terrainMap.knownCells();
+}
+
+/**
+ * Per leg: out[i*3] ground height the leg stands on / aims for (mm, gait
+ * frame), out[i*3+1] 1 while reaching down for contact, out[i*3+2] 1 while
+ * swinging. out[LEG_NUM*3] the body's terrain height offset (mm).
+ */
+RC_API void rc_terrain_state(float *out)
+{
+	for (uint8_t i = 0; i < LEG_NUM; i++) {
+		out[i * 3 + 0] = motion.gait().groundHeight(i);
+		out[i * 3 + 1] = motion.gait().isSearching(i) ? 1 : 0;
+		out[i * 3 + 2] = motion.gait().isSwinging(i) ? 1 : 0;
+	}
+	out[LEG_NUM * 3] = motion.gait().terrainHeight();
+}
+
+/** Experiments: scale of the IMU tilt used for contact heights (1 = as measured). */
+RC_API void rc_set_tilt_gain(float g) { tiltGain = g; }

@@ -9,6 +9,7 @@
 #include "leg.h"
 #include "ik.h"
 #include "body_kinematics.h"
+#include "terrain_map.h"
 #include "gait_engine.h"
 #include "angle_pid.h"
 #include "motion_controller.h"

@@ -31,12 +31,15 @@ JOINT_NAMES = ("coxa", "femur", "tibia")
 
 
 class SimHexapod(SimDog):
-    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False, hal_mapping=False):
+    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False, hal_mapping=False, terrain=None):
         self.p = params or HexapodParams()
+        self.terrain = terrain
         self.hal_mapping = hal_mapping
         self.direction = np.array([[servo_direction(leg, j) for j in range(3)] for leg in self.p.legs])
         self.fixed_base = fixed_base
         self.xml = build_xml(self.p, fixed_base=fixed_base)
+        if terrain is not None:
+            self.xml = terrain.inject(self.xml, self.p.env.floor_friction)
         self.model = mujoco.MjModel.from_xml_string(self.xml)
         self.data = mujoco.MjData(self.model)
         n = len(self.p.legs)
@@ -74,6 +77,8 @@ class SimHexapod(SimDog):
                 r = self.p.geometry.foot_radius * 0.001
                 zs = [self.data.geom_xpos[self.model.geom(f"{leg.name}_foot").id][2] for leg in self.p.legs]
                 height = self.data.qpos[2] - (min(zs) - r) + 1e-4
+            if getattr(self, "terrain", None) is not None:
+                height += self.terrain.start_height * 0.001
             self.data.qpos[2] = height
         mujoco.mj_forward(self.model, self.data)
         self.servos.reset(q if powered else None)
@@ -132,6 +137,11 @@ class SimHexapod(SimDog):
         R = self.data.xmat[self._torso].reshape(3, 3)
         p0 = self.data.xpos[self._torso]
         return np.array([R.T @ (self.data.site_xpos[s] - p0) * 1000.0 for s in self._tips])
+
+    LOWER_LEG = "_tibia_geom"
+
+    def _foot_points(self):
+        return [self.data.site_xpos[s] for s in self._tips]
 
     def joint_torque_ratio(self):
         """|servo torque| / stall torque per joint (1 = the servo is at its limit)."""
