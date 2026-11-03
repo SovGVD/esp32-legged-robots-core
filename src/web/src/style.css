@@ -89,6 +89,7 @@ input[type='text'] {
   display: none !important;
 }
 main {
+  position: relative;
   flex: 1;
   display: flex;
   gap: 1px;
@@ -161,4 +162,44 @@ label:has(input:disabled) {
 }
 input.pending {
   opacity: 0.5;
+}
+#tof {
+  position: absolute;
+  z-index: 1;
+  top: 0.5em;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.4em;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  pointer-events: none; /* the sticks underneath keep working around the 3D view */
+}
+#tof.gap {
+  border-color: var(--warn);
+}
+.tof3d {
+  width: min(calc(100vw - 2em), 440px);
+  height: min(42vh, 280px);
+  touch-action: none;
+  pointer-events: auto;
+  cursor: grab;
+}
+.tof-grids {
+  display: flex;
+  gap: 0.5em;
+}
+.tof-info {
+  text-align: center;
+}
+#tof button {
+  position: absolute;
+  top: 0.4em;
+  right: 0.4em;
+  padding: 0.1em 0.6em;
+  pointer-events: auto;
 }

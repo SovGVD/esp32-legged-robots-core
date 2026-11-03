@@ -127,6 +127,47 @@ void pLevel(uint8_t* data, size_t len) {
   setLeveling(data[1] != 0);
 }
 
+/**
+ * ToF zone distances for the web client, answer to [P_TOF]. The client asks a
+ * few times a second only while its ToF view is open, so this costs nothing
+ * otherwise; it runs in the web server task and only copies the newest frame
+ * (tof.cpp), the motion task is not involved.
+ *
+ * offset | type   | length | description
+ * -------|--------|--------|-------------
+ *      0 | char   |      1 | 'D' (P_TOF)
+ *      1 | u8     |      1 | sensor count n
+ *      2 | per sensor, 130 bytes each:
+ *        | u8     |      1 |   1 = running, 0 = starting / not found (zones then 0)
+ *        | u8     |      1 |   frame number (low byte), changes with every new frame
+ *        | u16 x64|    128 |   mm per zone, row 0 = top of the view, col 0 = left, 0 = no target
+ * Big-endian, like telemetry.
+ */
+size_t pTof(uint8_t *out)
+{
+	uint8_t n = tofSensorCount();
+	if (n > P_TOF_MAX_SENSORS) n = P_TOF_MAX_SENSORS;
+	if (n == 0) {
+		return 0;
+	}
+	out[0] = P_TOF;
+	out[1] = n;
+	uint8_t *p = out + 2;
+	for (uint8_t i = 0; i < n; i++) {
+		int16_t  mm[P_TOF_ZONES];
+		uint32_t seq = 0;
+		bool ok = tofPeekFrame(i, seq, mm);
+		*p++ = ok ? 1 : 0;
+		*p++ = seq & 0xFF;
+		for (uint8_t z = 0; z < P_TOF_ZONES; z++) {
+			uint16_t d = ok && mm[z] > 0 ? (uint16_t)mm[z] : 0;
+			*p++ = d >> 8;
+			*p++ = d & 0xFF;
+		}
+	}
+	return p - out;
+}
+
 void int16ToBytes(int value, uint8_t _offset)
 {
   telemetryPackage[_offset]   = (value >> 8) & 0xFF;

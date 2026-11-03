@@ -6,6 +6,7 @@ import {
   P_CLI,
   P_MOVE,
   P_TELEMETRY,
+  P_TOF,
   TS,
   batteryState,
   decode,
@@ -13,6 +14,7 @@ import {
   encodeCli,
   encodeMove,
   encodeTelemetryRequest,
+  encodeTofRequest,
   zeroVector,
 } from '../src/protocol.ts';
 
@@ -157,4 +159,31 @@ test('gait and level packages match the firmware ids', async () => {
   assert.deepEqual([...encodeGait(false)], [0x47, 0]);
   assert.deepEqual([...encodeLevel(true)], [0x4c, 1]);
   assert.deepEqual([...encodeLevel(false)], [0x4c, 0]);
+});
+
+test('tof package decodes like the firmware pTof() writes it', () => {
+  const zones = 64;
+  const count = 2;
+  const buf = new Uint8Array(2 + count * (2 + zones * 2));
+  buf[0] = P_TOF;
+  buf[1] = count;
+  const o1 = 2 + 2 + zones * 2;
+  buf[2] = 1; // sensor 0 running
+  buf[3] = 7; // frame
+  buf[4] = 0x01; // zone 0 = 0x0123 = 291 mm
+  buf[5] = 0x23;
+  buf[o1] = 0; // sensor 1 not running
+  const msg = decode(buf);
+  assert.ok(msg && msg.type === 'tof');
+  assert.equal(msg.sensors.length, 2);
+  assert.equal(msg.sensors[0].running, true);
+  assert.equal(msg.sensors[0].frame, 7);
+  assert.equal(msg.sensors[0].mm[0], 291);
+  assert.equal(msg.sensors[0].mm[1], 0);
+  assert.equal(msg.sensors[1].running, false);
+  assert.deepEqual([...encodeTofRequest()], [P_TOF]);
+});
+
+test('short tof package is rejected', () => {
+  assert.equal(decode(Uint8Array.of(P_TOF, 1, 1, 0, 0)), null);
 });

@@ -76,6 +76,18 @@ static void initWebServerConfig()
 		addIntToWebServerConfig("l", 1);
 	#endif
 
+	// ToF view: t = number of sensors (0 = none), r = range of the colour scale, mm
+	addIntToWebServerConfig("t", tofSensorCount());
+	addIntToWebServerConfig("r", tofMaxRange());
+	// m = ToF mounting for the 3D view, per sensor [x, y, z (mm, body frame), yaw, tilt, fov (rad)]
+	webConfig += ",m:[";
+	for (uint8_t i = 0; i < tofSensorCount(); i++) {
+		const TofSensor &s = MODEL_TERRAIN.tof[i];
+		webConfig += String(i ? ",[" : "[") + String(s.position.x, 0) + "," + String(s.position.y, 0) + "," +
+		             String(s.position.z, 0) + "," + String(s.yaw, 3) + "," + String(s.tilt, 3) + "," + String(s.fov, 3) + "]";
+	}
+	webConfig += "]";
+
 	webConfig += "};";
 }
 
@@ -175,6 +187,15 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 			case P_LEVEL:
 				pLevel(data, len);
 				break;
+			case P_TOF: {
+				// skip while the send queue is full (slow WiFi): the client asks again soon
+				static uint8_t tofPackage[P_TOF_LEN(P_TOF_MAX_SENSORS)];
+				size_t tofLen = pTof(tofPackage);
+				if (tofLen > 0 && client->canSend()) {
+					client->binary(tofPackage, tofLen);
+				}
+				break;
+			}
 			#ifdef CAMERAENABLED
 			case P_START_VIDEO:
 				mainCameraStream = true;

@@ -14,6 +14,7 @@
  *   'G' gait       [0x47, walk]  1 = statically stable walk, 0 = default gait (trot);
  *                  applied once the robot stands still
  *   'L' level      [0x4C, on]    IMU leveling on/off (ignored without an IMU)
+ *   'D' tof        [0x44] request, answered with a ToF package (ToF builds only)
  *   'V' / 'v'      start / stop camera stream (camera builds only)
  *
  * Robot -> client
@@ -22,6 +23,8 @@
  *                  version 2 adds: pitch*100:i16, roll*100:i16 (deg), missedTicks:u16,
  *                  ikReach:u16, ikJointLimit:u16, ikServoRange:u16]  22 bytes
  *                  version 3 adds: heading*10:u16, headingTarget*10:u16 (deg, compass, 0xFFFF none)  26 bytes
+ *   'D' tof        [0x44, count:u8, per sensor: running:u8, frame:u8, 64 x mm:u16]  2 + 130 * count bytes
+ *                  zones row-major, row 0 = top of the sensor's view, col 0 = left; 0 mm = no target
  *   'C' cli        [0x43, ...utf8 output]
  */
 
@@ -30,6 +33,7 @@ export const P_TELEMETRY = 0x54; // 'T'
 export const P_CLI = 0x43; // 'C'
 export const P_GAIT = 0x47; // 'G'
 export const P_LEVEL = 0x4c; // 'L'
+export const P_TOF = 0x44; // 'D'
 export const P_START_VIDEO = 0x56; // 'V'
 export const P_STOP_VIDEO = 0x76; // 'v'
 
@@ -95,8 +99,20 @@ export interface Telemetry {
   headingTarget?: number | null;
 }
 
+export const TOF_ZONES = 64;
+
+export interface TofSensorFrame {
+  /** false while the sensor starts up or when it was not found */
+  running: boolean;
+  /** low byte of the frame counter: unchanged = no new frame */
+  frame: number;
+  /** mm per zone, row-major from the top-left of the view; 0 = no target */
+  mm: Uint16Array;
+}
+
 export type Incoming =
   | { type: 'telemetry'; telemetry: Telemetry }
+  | { type: 'tof'; sensors: TofSensorFrame[] }
   | { type: 'cli'; text: string }
   | { type: 'unknown'; id: number };
 
@@ -136,6 +152,10 @@ export function encodeGait(walk: boolean): Uint8Array {
 
 export function encodeLevel(on: boolean): Uint8Array {
   return Uint8Array.of(P_LEVEL, on ? 1 : 0);
+}
+
+export function encodeTofRequest(): Uint8Array {
+  return Uint8Array.of(P_TOF);
 }
 
 export function encodeVideo(start: boolean): Uint8Array {
@@ -187,12 +207,32 @@ export function decodeTelemetry(data: Uint8Array): Telemetry | null {
   return t;
 }
 
+export function decodeTof(data: Uint8Array): TofSensorFrame[] | null {
+  if (data.length < 2) return null;
+  const count = data[1];
+  const size = 2 + TOF_ZONES * 2;
+  if (data.length < 2 + count * size) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const sensors: TofSensorFrame[] = [];
+  for (let i = 0; i < count; i++) {
+    const o = 2 + i * size;
+    const mm = new Uint16Array(TOF_ZONES);
+    for (let z = 0; z < TOF_ZONES; z++) mm[z] = view.getUint16(o + 2 + z * 2);
+    sensors.push({ running: data[o] === 1, frame: data[o + 1], mm });
+  }
+  return sensors;
+}
+
 export function decode(data: Uint8Array): Incoming | null {
   if (data.length === 0) return null;
   switch (data[0]) {
     case P_TELEMETRY: {
       const telemetry = decodeTelemetry(data);
       return telemetry ? { type: 'telemetry', telemetry } : null;
+    }
+    case P_TOF: {
+      const sensors = decodeTof(data);
+      return sensors ? { type: 'tof', sensors } : null;
     }
     case P_CLI:
       return { type: 'cli', text: decoder.decode(data.subarray(1), { stream: true }) };

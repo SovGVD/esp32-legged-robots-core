@@ -4,7 +4,9 @@
  */
 import type { Server as HttpServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { P_CLI, P_GAIT, P_LEVEL, P_MOVE, P_TELEMETRY, TS, decodeAxis } from '../src/protocol.ts';
+import type { TofMount } from '../src/config.ts';
+import { zoneDirection } from '../src/tofgeom.ts';
+import { P_CLI, P_GAIT, P_LEVEL, P_MOVE, P_TELEMETRY, P_TOF, TOF_ZONES, TS, decodeAxis } from '../src/protocol.ts';
 
 const FAILSAFE_MS = 500;
 
@@ -24,6 +26,46 @@ function telemetryPackage(voltage: number, current: number, loopTime: number, ex
   b.writeInt16BE(Math.round((Math.random() - 0.5) * 200), 12);
   b.writeUInt16BE(Math.round(Math.random() * 3599), 22); // heading
   b.writeUInt16BE(0xffff, 24); // no hold target
+  return b;
+}
+
+/** ToF mounting, same as the dev server's /c.js (model_data.h TOF_SENSORS). */
+export function mockTofMounts(count: number): TofMount[] {
+  const m = (x: number, y: number, z: number, yaw: number, tilt: number) => ({ x, y, z, yaw, tilt, fov: 0.785 });
+  return count === 1 ? [m(0, 88, 0, 0, 0.7)] : [m(-25, 90, 10, 0.35, 0.61), m(25, 90, 10, -0.35, 0.61)];
+}
+
+/** Mock ground: floor 95 mm below the body, a 30 mm box sweeping left and right, a gap further out. */
+function groundAt(x: number, y: number, t: number): number {
+  const boxX = Math.sin(t * 0.8) * 90;
+  if (Math.abs(x - boxX) < 35 && y > 170 && y < 230) return -65;
+  if (y > 290 && y < 340) return -400;
+  return -95;
+}
+
+/** Fake ToF frames: zone rays marched against the mock ground, like the sim's legsim/tof.py. */
+export function tofPackage(count: number, frame: number, t = Date.now() / 1000, range = 450): Buffer {
+  const mounts = mockTofMounts(count);
+  const b = Buffer.alloc(2 + count * (2 + TOF_ZONES * 2));
+  b[0] = P_TOF;
+  b[1] = count;
+  for (let i = 0; i < count; i++) {
+    const o = 2 + i * (2 + TOF_ZONES * 2);
+    b[o] = 1; // running
+    b[o + 1] = frame & 0xff;
+    for (let z = 0; z < TOF_ZONES; z++) {
+      const m = mounts[i];
+      const d = zoneDirection(m, z);
+      let mm = 0;
+      for (let r = 20; r <= range; r += 3) {
+        if (m.z + d[2] * r <= groundAt(m.x + d[0] * r, m.y + d[1] * r, t)) {
+          mm = r + (Math.random() - 0.5) * 6;
+          break;
+        }
+      }
+      b.writeUInt16BE(Math.max(0, Math.round(mm)), o + 2 + z * 2);
+    }
+  }
   return b;
 }
 
@@ -77,6 +119,9 @@ export function attachMockRobot(httpServer: HttpServer, log = console.log): void
               (walk ? TS.gaitStatic : 0) | (level ? TS.leveling : 0),
             ),
           );
+          break;
+        case P_TOF:
+          ws.send(tofPackage(Number(process.env.TOF ?? 2), Math.floor(Date.now() / 66)));
           break;
         case P_GAIT:
           walk = raw[1] === 1;

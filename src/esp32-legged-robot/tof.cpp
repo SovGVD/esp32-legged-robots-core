@@ -199,6 +199,23 @@ bool tofTakeFrame(uint8_t i, uint32_t &seq, float *mm)
 	return fresh;
 }
 
+bool tofPeekFrame(uint8_t i, uint32_t &seq, int16_t *mm)
+{
+	if (!tofReady(i)) {
+		return false;
+	}
+	portENTER_CRITICAL(&frameLock);
+	seq = frames[i].seq;
+	memcpy(mm, frames[i].mm, sizeof(frames[i].mm));
+	portEXIT_CRITICAL(&frameLock);
+	return true;
+}
+
+uint16_t tofMaxRange()
+{
+	return sensorCount() > 0 ? (uint16_t)MODEL_TERRAIN.tof[0].maxRange : 0;
+}
+
 void cliTof()
 {
 	char *mode = CLI_readWord();
@@ -236,6 +253,8 @@ void initTof() {}
 uint8_t tofSensorCount() { return 0; }
 bool tofReady(uint8_t i) { (void)i; return false; }
 bool tofTakeFrame(uint8_t i, uint32_t &seq, float *mm) { (void)i; (void)seq; (void)mm; return false; }
+bool tofPeekFrame(uint8_t i, uint32_t &seq, int16_t *mm) { (void)i; (void)seq; (void)mm; return false; }
+uint16_t tofMaxRange() { return 0; }
 void cliTof() { cliSerial->println("No ToF sensors (TOF_TYPE in config.h)."); }
 
 #endif

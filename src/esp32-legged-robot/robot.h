@@ -165,6 +165,8 @@ void    initTof();
 uint8_t tofSensorCount();
 bool    tofReady(uint8_t i);
 bool    tofTakeFrame(uint8_t i, uint32_t &seq, float *mm);   // true and the 64 zones (mm, 0 = none) if newer than seq
+bool    tofPeekFrame(uint8_t i, uint32_t &seq, int16_t *mm);   // newest frame (mm, 0 = none), any task; false if not running
+uint16_t tofMaxRange();   // mm, sensor 0 (MODEL_TERRAIN.tof), 0 without ToF
 void    cliTof();
 void initPowerSensor();
 void updatePower();
@@ -203,6 +205,7 @@ void pTelemetry();
 void pCli(uint8_t *data, size_t len);
 void pGait(uint8_t *data, size_t len);
 void pLevel(uint8_t *data, size_t len);
+size_t pTof(uint8_t *out);   // fills a P_TOF package, returns its length (0: no ToF on this model)
 
 /**
  * CLI (cli.cpp, cli_commands.cpp)
