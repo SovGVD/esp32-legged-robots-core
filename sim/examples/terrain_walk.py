@@ -5,7 +5,7 @@ firmware's terrain code, with or without foot switches and ToF sensors.
   python examples/terrain_walk.py                              # dog, obstacle course, foot switches + ToF
   python examples/terrain_walk.py --hexapod --terrain bumps --sensing tof
   python examples/terrain_walk.py --compare                    # every sensing mode on every scene, a table
-  python examples/terrain_walk.py --hexapod --video walk.mp4   # render (ToF hits drawn as dots)
+  python examples/terrain_walk.py --hexapod --video walk.mp4   # render: ToF sensors (boxes), view cones, zone hits (dots)
   MUJOCO_GL=glfw xvfb-run -a python examples/terrain_walk.py --video walk.mp4   # headless
 
 Scenes: flat, bumps, rocks, bars, step, drop, course (legsim/terrain.py), sized
@@ -32,7 +32,7 @@ ap.add_argument("--speed", type=float, default=None, help="move command 0..1")
 ap.add_argument("--duration", type=float, default=None, help="s")
 ap.add_argument("--no-level", action="store_true", help="IMU leveling off (on by default with sensing)")
 ap.add_argument("--compare", action="store_true", help="table of every scene x sensing mode")
-ap.add_argument("--video")
+ap.add_argument("--video", help="render to mp4: ToF sensors as boxes with their view cone (orange) and zone hits (blue dots)")
 args = ap.parse_args()
 
 model = "hexapod" if args.hexapod else "dog"
@@ -57,7 +57,6 @@ frames = []
 cb = None
 if args.video:
     import mujoco
-    import numpy as np
     state = {}
 
     def cb(robot, fw, t):
@@ -70,12 +69,7 @@ if args.video:
         cam.lookat[:] = robot.data.xpos[robot._torso]
         r.update_scene(robot.data, cam)
         if fw.tof is not None:
-            # ToF zone hits of the last frame
-            for p in fw.tof.last_hits[: r.scene.maxgeom - r.scene.ngeom]:
-                g = r.scene.geoms[r.scene.ngeom]
-                mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_SPHERE, np.array([0.0025, 0, 0]),
-                                    np.asarray(p, dtype=float), np.eye(3).ravel(), np.array([0.1, 0.6, 1.0, 0.9], dtype=np.float32))
-                r.scene.ngeom += 1
+            fw.tof.draw(robot, r.scene)   # sensor boxes, view cones (orange), zone hits (blue dots)
         frames.append(r.render())
 
 res = scenario.run(model, scene(args.terrain), args.sensing, speed=speed, gait=gait,

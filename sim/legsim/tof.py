@@ -82,6 +82,70 @@ class ToFArray:
         self.last_hits = hits
         return frames
 
+    def _corners(self, rays):
+        """Edge directions of the field of view (body frame), from the corner zone rays."""
+        rays = np.asarray(rays)
+        n = int(round(math.sqrt(len(rays))))
+        centre = rays.mean(axis=0)
+        centre /= np.linalg.norm(centre)
+        if n < 2:
+            return centre, []
+        out = []
+        for c, d in ((0, n + 1), (n - 1, 2 * n - 2), (n * n - 1, n * n - n - 2), (n * n - n, n * n - 2 * n + 1)):
+            # zones are evenly spaced in tangent: the edge is half a zone past the corner zone
+            a = rays[c] / np.dot(rays[c], centre)
+            b = rays[d] / np.dot(rays[d], centre)
+            e = a + 0.5 * (a - b)
+            out.append(e / np.linalg.norm(e))
+        return centre, out
+
+    def draw(self, robot, scene, hits=True, cone=True, box=True):
+        """Add the sensors (small boxes), their view cones (out to the ground or max
+        range) and the last frame's zone hits (dots) to an mjvScene, after
+        renderer.update_scene()."""
+        R = robot.data.xmat[robot._torso].reshape(3, 3)
+        p0 = robot.data.xpos[robot._torso]
+
+        def add():
+            if scene.ngeom >= scene.maxgeom:
+                return None
+            g = scene.geoms[scene.ngeom]
+            scene.ngeom += 1
+            return g
+
+        for s in self.sensors:
+            origin = p0 + R @ (np.asarray(s["position"]) * 0.001)
+            centre, edges = self._corners(s["rays"])
+            fwd = R @ centre
+            if box and (g := add()) is not None:
+                # sensor board: 13 x 13 mm, 3 mm thick, facing along the view direction
+                y = fwd
+                x = np.cross(y, R[:, 2])
+                x = x / np.linalg.norm(x) if np.linalg.norm(x) > 1e-6 else R[:, 0]
+                z = np.cross(x, y)
+                mat = np.column_stack([x, y, z])
+                mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_BOX, np.array([0.0065, 0.0015, 0.0065]),
+                                    origin - y * 0.0015, mat.ravel(), np.array([0.6, 0.15, 0.85, 1], dtype=np.float32))
+            if cone and edges:
+                ends = []
+                for e in edges:
+                    d = R @ e
+                    dist = min(self._cast(robot, origin, d), s["max_range"] * 0.001)
+                    ends.append(origin + d * dist)
+                rgba = np.array([1.0, 0.55, 0.1, 0.9], dtype=np.float32)
+                for k, end in enumerate(ends):
+                    for a, b in ((origin, end), (end, ends[(k + 1) % len(ends)])):
+                        if (g := add()) is None:
+                            break
+                        mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_LINE, np.zeros(3), np.zeros(3), np.eye(3).ravel(), rgba)
+                        mujoco.mjv_connector(g, mujoco.mjtGeom.mjGEOM_LINE, 2.0, a, b)
+        if hits:
+            for p in self.last_hits:
+                if (g := add()) is None:
+                    break
+                mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_SPHERE, np.array([0.0025, 0, 0]),
+                                    np.asarray(p, dtype=float), np.eye(3).ravel(), np.array([0.1, 0.6, 1.0, 0.9], dtype=np.float32))
+
     def poll(self, robot, dt):
         """Call every control tick: a new frame list when the sensors have one, else None."""
         self._clock += dt

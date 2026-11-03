@@ -304,7 +304,7 @@ up to 333 Hz pulses, and the PCA9685 can run that fast (2500 µs fits in 3 ms).
 python examples/terrain_walk.py                              # dog, obstacle course, foot switches + ToF
 python examples/terrain_walk.py --hexapod --terrain step --sensing tof
 python examples/terrain_walk.py --compare                    # every scene x sensing mode, a table
-python examples/terrain_walk.py --hexapod --terrain bars --video bars.mp4   # ToF hits drawn as blue dots
+python examples/terrain_walk.py --hexapod --terrain bars --video bars.mp4   # ToF sensors as purple boxes, view cones orange, zone hits blue dots
 python -m pytest -q tests/test_terrain.py
 ```
 
