@@ -4,7 +4,7 @@ firmware uses on hardware.
 
   ServoBus-like:  write_pulse(channel, us) / write_pulses(us[12])   (channel = leg*3 + joint, firmware order)
   Imu-like:       read_imu() -> accel (m/s^2, body frame, +9.81 on Z at rest), gyro (rad/s)
-  optional:       foot_contacts()  (the real robot has no contact sensors yet)
+  optional:       foot_contacts(), foot_switches()  (the real robot has no contact sensors yet)
 
 Convenience layers on top of that:
   set_leg_angles(angles[4][3])  firmware leg angles -> HAL -> pulses (full firmware chain)
@@ -26,10 +26,14 @@ from .servo import ServoArray
 
 
 class SimDog:
-    def __init__(self, params: DogParams = None, trim=None, fixed_base=False):
+    def __init__(self, params: DogParams = None, trim=None, fixed_base=False, terrain=None):
+        """terrain: legsim.terrain.Terrain (uneven ground, obstacles); None = flat floor."""
         self.p = params or DogParams()
         self.fixed_base = fixed_base
+        self.terrain = terrain
         self.xml = build_xml(self.p, fixed_base=fixed_base)
+        if terrain is not None:
+            self.xml = terrain.inject(self.xml, self.p.env.floor_friction)
         self.model = mujoco.MjModel.from_xml_string(self.xml)
         self.data = mujoco.MjData(self.model)
         # sim servo trim (rad) per leg/joint; 0 = horns mounted perfectly
@@ -68,6 +72,8 @@ class SimDog:
             r = self.p.geometry.foot_radius * 0.001
             zs = [self.data.geom_xpos[self.model.geom(f"{leg.name}_foot").id][2] for leg in self.p.legs]
             height = self.data.qpos[2] - (min(zs) - r) + 1e-4
+            if getattr(self, "terrain", None) is not None:
+                height += self.terrain.start_height * 0.001
         if not self.fixed_base:
             self.data.qpos[2] = height
         mujoco.mj_forward(self.model, self.data)
@@ -134,6 +140,60 @@ class SimDog:
 
     def foot_contacts(self):
         return [self.data.sensordata[a] > 0 for a in self._s_touch]
+
+    def foot_forces(self):
+        """Contact force on each foot, N (touch sensor around the foot)."""
+        return np.array([self.data.sensordata[a] for a in self._s_touch])
+
+    # lower-leg geoms whose contacts near the foot count as foot contacts (the hexapod's
+    # tibia capsule is wider than its tip ball and touches the ground first)
+    LOWER_LEG = "_lower_geom"
+    FOOT_ZONE = 0.012   # m from the foot point
+
+    def _foot_points(self):
+        return [self.data.geom_xpos[self.model.geom(f"{leg.name}_foot").id] for leg in self.p.legs]
+
+    def foot_contact_list(self):
+        """(leg, contact index) for every contact on a foot (or the lower leg right at the foot)."""
+        if not hasattr(self, "_foot_geoms"):
+            self._foot_geoms = {}
+            self._leg_geoms = {}
+            for i, leg in enumerate(self.p.legs):
+                self._foot_geoms[self.model.geom(f"{leg.name}_foot").id] = i
+                try:
+                    self._leg_geoms[self.model.geom(leg.name + self.LOWER_LEG).id] = i
+                except KeyError:
+                    pass
+        out = []
+        feet = None
+        for k in range(self.data.ncon):
+            c = self.data.contact[k]
+            for g in (c.geom1, c.geom2):
+                if g in self._foot_geoms:
+                    out.append((self._foot_geoms[g], k))
+                    break
+                if g in self._leg_geoms:
+                    i = self._leg_geoms[g]
+                    feet = feet if feet is not None else self._foot_points()
+                    if np.linalg.norm(c.pos - feet[i]) < self.FOOT_ZONE:
+                        out.append((i, k))
+                    break
+        return out
+
+    def foot_vertical_forces(self):
+        """Upward ground force on each foot, N: only the vertical part, so a foot
+        pushing against the side of an obstacle reads ~0."""
+        out = np.zeros(len(self.p.legs))
+        f6 = np.zeros(6)
+        for i, k in self.foot_contact_list():
+            mujoco.mj_contactForce(self.model, self.data, k, f6)
+            out[i] += abs((self.data.contact[k].frame.reshape(3, 3).T @ f6[:3])[2])
+        return out
+
+    def foot_switches(self, threshold=0.3):
+        """Microswitch under each foot: pressed when the foot is pushed up by more than
+        `threshold` N (a switch in the sole, so a side push against an obstacle doesn't press it)."""
+        return [bool(f > threshold) for f in self.foot_vertical_forces()]
 
     # ------------------------------------------------------------ ground truth
     def body_position_mm(self):

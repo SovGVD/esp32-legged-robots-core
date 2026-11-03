@@ -57,16 +57,17 @@ def build(force=False, cxx=None, model="dog"):
             return path
     os.makedirs(BUILD_DIR, exist_ok=True)
     cxx = cxx or os.environ.get("CXX", "c++")
+    tmp = f"{path}.{os.getpid()}.tmp"   # parallel builds (several processes) must not share it
     cmd = [cxx, "-std=gnu++17", "-O2", "-shared", "-fPIC", "-Wall",
            # the ESP32 build treats float literals as float; keep the numbers identical
            "-fsingle-precision-constant",
            f"-DROBOT_MODEL={MODELS[model]}",
            "-I", CORE_SRC, "-I", FW_SRC,
-           *_sources(), "-o", path + ".tmp"]
+           *_sources(), "-o", tmp]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         raise RuntimeError("robot_core bridge build failed:\n" + " ".join(cmd) + "\n" + res.stderr)
-    os.replace(path + ".tmp", path)
+    os.replace(tmp, path)
     return path
 
 
@@ -97,6 +98,8 @@ class FirmwareCore:
         L.rc_set_stability_gain.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_tune_gait.restype = None
         L.rc_tune_gait.argtypes = [ctypes.c_float] * 5
+        L.rc_tune_terrain.restype = None
+        L.rc_tune_terrain.argtypes = [ctypes.c_int, ctypes.c_float]
         L.rc_set_side_limits.restype = None
         L.rc_set_side_limits.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_set_center_of_mass.restype = None
@@ -119,17 +122,104 @@ class FirmwareCore:
         L.rc_leg_test_pulses.argtypes = [ctypes.c_int, f32p, ctypes.POINTER(ctypes.c_uint16)]
         L.rc_leg_inverse.restype = None
         L.rc_leg_inverse.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
+        i32p = ctypes.POINTER(ctypes.c_int)
+        L.rc_set_contact_sensing.restype = None
+        L.rc_set_contact_sensing.argtypes = [ctypes.c_int]
+        L.rc_set_contacts.restype = None
+        L.rc_set_contacts.argtypes = [i32p]
+        L.rc_set_terrain.restype = None
+        L.rc_set_terrain.argtypes = [ctypes.c_int, ctypes.c_int]
+        L.rc_tof_count.restype = ctypes.c_int
+        L.rc_tof_sensor.restype = ctypes.c_int
+        L.rc_tof_sensor.argtypes = [ctypes.c_int, f32p]
+        L.rc_tof_rays.restype = None
+        L.rc_tof_rays.argtypes = [ctypes.c_int, f32p]
+        L.rc_tof_frame.restype = None
+        L.rc_tof_frame.argtypes = [ctypes.c_int, f32p]
+        L.rc_terrain_height.restype = ctypes.c_int
+        L.rc_terrain_height.argtypes = [ctypes.c_float, ctypes.c_float, f32p]
+        L.rc_terrain_cells.restype = ctypes.c_int
+        L.rc_terrain_state.restype = None
+        L.rc_terrain_state.argtypes = [f32p]
         self.legs = L.rc_leg_count()
         self.dof = L.rc_leg_dof()
         self.loop_dt = float(L.rc_loop_dt())
         self.unsolved = 0
         self.last_imu = (0.0, 0.0, 0.0)
+        self.contacts = None      # foot switch threshold (N) while contact sensing is on
+        self.tof = None           # legsim.tof.ToFArray while the terrain map is fed
         self.reset()
 
     def reset(self):
         self.lib.rc_init()
         self.lib.rc_tilt_reset()
         self.unsolved = 0
+        if self.tof is not None:
+            self.tof.reset()
+
+    # ------------------------------------------------------------ rough ground
+    def tof_sensors(self):
+        """The model's ToF sensors (TOF_SENSORS): position (mm, body frame), zone rays
+        (body frame unit vectors) and max range (mm)."""
+        out = []
+        for i in range(self.lib.rc_tof_count()):
+            buf = (ctypes.c_float * 4)()
+            zones = self.lib.rc_tof_sensor(i, buf)
+            rays = (ctypes.c_float * (zones * 3))()
+            self.lib.rc_tof_rays(i, rays)
+            out.append({"position": np.array(buf[:3]), "max_range": float(buf[3]),
+                        "rays": np.array(rays[:]).reshape(zones, 3)})
+        return out
+
+    def set_terrain(self, contacts=False, tof=False, adapt=None, switch_threshold=0.3, **tof_args):
+        """Rough ground mode (kept across reset()).
+        contacts: foot switches on (GaitParams.useContactSensors), fed from the sim each tick.
+        tof: simulated ToF sensors feed the firmware terrain map (tof_args go to ToFArray:
+             rate_hz, noise_mm, noise_rel, subrays).
+        adapt: TERRAIN_PARAMS on (default: on when contacts or tof).
+        All False: the plain open-loop gait."""
+        from .tof import ToFArray
+        adapt = (contacts or tof) if adapt is None else adapt
+        self.contacts = switch_threshold if contacts else None
+        self.tof = ToFArray(self.tof_sensors(), **tof_args) if tof else None
+        self.lib.rc_set_contact_sensing(1 if contacts else 0)
+        self.lib.rc_set_terrain(1 if adapt else 0, 1 if tof else 0)
+
+    TERRAIN_FIELDS = ("search_depth", "search_speed", "clearance", "max_step", "body_rate", "edge_limit",
+                      "foothold_shift", "foot_radius", "tolerance", "latency")
+
+    def tune_terrain(self, reset=False, **fields):
+        """Change TERRAIN_PARAMS fields for experiments (kept until tune_terrain(reset=True)),
+        e.g. tune_terrain(clearance=15, body_rate=0)."""
+        if reset:
+            self.lib.rc_tune_terrain(-1, 0.0)
+        for k, v in fields.items():
+            self.lib.rc_tune_terrain(self.TERRAIN_FIELDS.index(k), float(v))
+
+    def terrain_height(self, x, y):
+        """Mapped ground (mm, gait frame) at gait-frame (x, y), or None."""
+        z = (ctypes.c_float * 1)()
+        return float(z[0]) if self.lib.rc_terrain_height(float(x), float(y), z) else None
+
+    def terrain_cells(self):
+        return int(self.lib.rc_terrain_cells())
+
+    def terrain_state(self):
+        """Per leg: ground height (mm, gait frame), reaching for contact, swinging; and the body's terrain height."""
+        v = self._floats(self.lib.rc_terrain_state, self.legs * 3 + 1)
+        legs = v[:-1].reshape(self.legs, 3)
+        return {"ground": legs[:, 0], "searching": legs[:, 1] > 0, "swing": legs[:, 2] > 0, "body": float(v[-1])}
+
+    def sense(self, robot, dt=None):
+        """Feed the sensors of the current rough ground mode for one tick (drive() calls this)."""
+        if self.contacts is not None:
+            sw = robot.foot_switches(self.contacts)
+            self.lib.rc_set_contacts((ctypes.c_int * self.legs)(*[1 if c else 0 for c in sw]))
+        if self.tof is not None:
+            frames = self.tof.poll(robot, self.loop_dt if dt is None else dt)
+            if frames is not None:
+                for i, f in enumerate(frames):
+                    self.lib.rc_tof_frame(i, (ctypes.c_float * len(f))(*map(float, f)))
 
     def update(self, command=(0, 0, 0, 0, 0, 0), dt=None, imu=None):
         """One control tick. command: move x, y, z, rotate pitch, roll, yaw, each in [-1, 1]
@@ -157,11 +247,11 @@ class FirmwareCore:
         """Gait body pose: x, y, z (mm), pitch, roll, yaw (rad)."""
         return self._floats(self.lib.rc_body, 6)
 
-    GAITS = {"default": 0, "trot": 0, "walk": 1}
+    GAITS = {"default": 0, "trot": 0, "walk": 1, "rough": 2}
 
     def select_gait(self, name):
-        """'default'/'trot' (model GAIT_PARAMS) or 'walk' (GAIT_PARAMS_WALK, static stability,
-        dog only). Resets the robot."""
+        """'default'/'trot' (model GAIT_PARAMS), 'walk' (GAIT_PARAMS_WALK, static stability,
+        dog only) or 'rough' (GAIT_PARAMS_ROUGH, slower and higher for terrain). Resets the robot."""
         if not self.lib.rc_select_gait(self.GAITS[name]):
             raise ValueError(name)
         self.reset()
@@ -258,6 +348,7 @@ class FirmwareCore:
         ticks = 1 if duration is None else max(1, int(round(duration / self.loop_dt)))
         pulses = None
         for _ in range(ticks):
+            self.sense(dog)
             self.last_imu = self.imu_angles(dog)
             pulses = self.update(command, imu=self.last_imu)
             if ideal_servos:

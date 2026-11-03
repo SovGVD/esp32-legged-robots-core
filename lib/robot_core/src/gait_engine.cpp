@@ -32,6 +32,27 @@ LR_point lrSwingPoint(const LR_point &from, const LR_point &to, float height, fl
 	return p;
 }
 
+LR_point lrSwingPointHigh(const LR_point &from, const LR_point &to, float apex, float s)
+{
+	s = constrain(s, 0.0f, 1.0f);
+	const float pi = LR_TWO_PI * 0.5f;
+	// horizontal: cycloid between 15 % and 85 % of the swing, after the foot has lifted
+	float u = constrain((s - 0.15f) / 0.7f, 0.0f, 1.0f);
+	float k = u - sinf(LR_TWO_PI * u) / LR_TWO_PI;
+	LR_point p;
+	p.x = from.x + (to.x - from.x) * k;
+	p.y = from.y + (to.y - from.y) * k;
+	// vertical: up to the apex in the first 40 %, down in the last 40 %
+	if (s < 0.4f) {
+		p.z = from.z + (apex - from.z) * 0.5f * (1.0f - cosf(pi * s / 0.4f));
+	} else if (s > 0.6f) {
+		p.z = apex + (to.z - apex) * 0.5f * (1.0f - cosf(pi * (s - 0.6f) / 0.4f));
+	} else {
+		p.z = apex;
+	}
+	return p;
+}
+
 void GaitEngine::begin(const GaitParams &params, leg *legs, uint8_t legCount)
 {
 	_params   = params;
@@ -54,12 +75,136 @@ void GaitEngine::reset()
 	_yawRate  = 0;
 	_phase    = 0;
 	_active   = false;
+	_terrainZ = 0;
 	for (uint8_t i = 0; i < _legCount; i++) {
 		_state[i] = {};
+		_state[i].ground = _legs[i].defaultFoot.z;
 		_legs[i].foot = neutralFoot(i, _base, _body.orientation.yaw);
 		_legs[i].sensor.onGround = true;
 	}
 	updateShift(0);
+}
+
+void GaitEngine::setTerrain(const TerrainParams *params, const TerrainMap *map)
+{
+	_terrain = params;
+	_map     = params ? map : nullptr;
+	if (!params) {
+		for (uint8_t i = 0; i < _legCount; i++) {
+			_state[i].ground = _legs[i].defaultFoot.z;
+			_state[i].searching = false;
+		}
+	}
+}
+
+/**
+ * Where a foot at `at` (world XY) should land: the mapped ground if the map
+ * knows it and it is within reach of the leg's own ground, else the ground
+ * the leg stands on now (the terrain goes on as it is).
+ */
+float GaitEngine::plannedGround(uint8_t legId, const LR_point &at) const
+{
+	float own = _state[legId].ground;
+	float z;
+	if (_map && _map->heightAt(at.x, at.y, z)) {
+		z += _terrain->footRadius;
+		if (fabsf(z - own) <= _terrain->maxStep) {
+			return z;
+		}
+	}
+	return own;
+}
+
+/**
+ * At lift-off (terrain on): pick the touchdown height, move the foothold off
+ * an edge, and set how high the foot has to go to clear what lies between.
+ */
+void GaitEngine::planSwing(uint8_t legId)
+{
+	legState &st = _state[legId];
+	LR_point target = touchdownTarget(legId, 0.0f);
+	st.offset = { 0, 0, 0 };
+
+	if (_map && _terrain->edgeLimit > 0 && _terrain->footholdShift > 0) {
+		// along the step: the edge of an obstacle lies across the path
+		float dx = target.x - st.liftOff.x, dy = target.y - st.liftOff.y;
+		float len = sqrtf(dx * dx + dy * dy);
+		if (len < 1.0f) {
+			dx = 0; dy = 1; len = 1;
+		}
+		dx /= len; dy /= len;
+		float cs = _map->params().cellSize;
+		// the foot needs its own radius plus 1.5 cells of flat ground on both sides:
+		// the cell holding an edge reads as high as the top (rays hit the face)
+		float reach = _terrain->footRadius + 1.5f * cs;
+		if (_map->edge(target.x, target.y, dx, dy, reach) > _terrain->edgeLimit) {
+			// nearest flat spot along the step, beyond the edge first (onto the obstacle)
+			for (float d = cs * 0.5f; d <= _terrain->footholdShift + 1e-3f; d += cs * 0.5f) {
+				bool found = false;
+				for (int sign = 1; sign >= -1; sign -= 2) {
+					float ox = dx * d * sign, oy = dy * d * sign;
+					float e = _map->edge(target.x + ox, target.y + oy, dx, dy, reach);
+					if (e >= 0 && e <= _terrain->edgeLimit) {
+						st.offset = { ox, oy, 0 };
+						found = true;
+						break;
+					}
+				}
+				if (found) {
+					break;
+				}
+			}
+		}
+	}
+
+	LR_point at = { target.x + st.offset.x, target.y + st.offset.y, 0 };
+	float ground = plannedGround(legId, at);
+	float top = st.liftOff.z > ground ? st.liftOff.z : ground;
+	st.apex = top + _params.stepHeight;
+	float obstacle;
+	if (_map && _map->maxHeightAlong(st.liftOff, at, _map->params().cellSize * 0.5f, obstacle)) {
+		obstacle += _terrain->footRadius;
+		if (obstacle - top <= _terrain->maxStep && obstacle + _terrain->clearance > st.apex) {
+			st.apex = obstacle + _terrain->clearance;
+		}
+	}
+	st.ground = ground;
+}
+
+/**
+ * Height of a foot that just touched down, in the level gait frame: the leg
+ * put it at leg.foot relative to the body, but the body is tilted by _tilt,
+ * so the foot really is that much higher or lower.
+ */
+float GaitEngine::contactHeight(uint8_t legId) const
+{
+	const LR_point &f = _legs[legId].foot;
+	LR_point rel = { f.x - _body.position.x, f.y - _body.position.y, f.z - _body.position.z };
+	float yaw = _body.orientation.yaw;
+	rel = lrRotateZ(rel, -sinf(yaw), cosf(yaw));
+	LR_angle tilt = { _tilt.pitch, _tilt.roll, 0 };
+	float z = _body.position.z + lrRotateBody(rel, tilt).z;
+	float planned = _state[legId].ground;
+	if (fabsf(z - planned) <= _terrain->tolerance) {
+		return planned;
+	}
+	return z;
+}
+
+/**
+ * Body height follows the average ground under the feet (planned ground for
+ * the swinging ones), so it rises when the robot climbs onto something.
+ */
+void GaitEngine::updateTerrainHeight(float dt)
+{
+	if (!_terrain || _terrain->bodyRate <= 0 || _legCount == 0) {
+		return;
+	}
+	float sum = 0;
+	for (uint8_t i = 0; i < _legCount; i++) {
+		sum += _state[i].ground - _legs[i].defaultFoot.z;
+	}
+	_terrainZ = lrApproach(_terrainZ, sum / _legCount, _terrain->bodyRate * dt);
 }
 
 LR_point GaitEngine::neutralFoot(uint8_t legId, const LR_point &bodyPosition, float bodyYaw) const
@@ -77,7 +222,8 @@ bool GaitEngine::isAtNeutral(uint8_t legId) const
 	LR_point n = neutralFoot(legId, _base, _body.orientation.yaw);
 	float dx = _legs[legId].foot.x - n.x;
 	float dy = _legs[legId].foot.y - n.y;
-	float dz = _legs[legId].foot.z - n.z;
+	// on uneven ground a foot stands where the ground is, only XY counts
+	float dz = _terrain ? 0.0f : _legs[legId].foot.z - n.z;
 	return dx*dx + dy*dy + dz*dz <= _params.idleTolerance * _params.idleTolerance;
 }
 
@@ -169,6 +315,8 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 	}
 
 	if (!_active) {
+		updateSearch(dt);
+		updateTerrainHeight(dt);
 		updateShift(dt);
 		return;
 	}
@@ -187,31 +335,70 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 		float s = inSwingWindow ? (local - _params.dutyFactor) / (1.0f - _params.dutyFactor) : 0.0f;
 
 		if (!inSwingWindow) {
+			if (_terrain && _params.useContactSensors && !st.swing && !st.searching && st.landed) {
+				// a standing foot that lost the ground (slid off an edge): reach down again
+				// (leaky: a foot resting on an edge makes the switch flicker)
+				st.lost = l.sensor.onGround ? (st.lost > dt ? st.lost - dt : 0.0f) : st.lost + dt;
+				if (st.lost > _terrain->latency && local < _params.dutyFactor * 0.8f) {
+					st.searching = true;
+					st.lost = 0;
+				}
+			}
 			if (st.swing) {
 				// swing time is over: put the foot down on its target
 				l.foot = touchdownTarget(i, 1.0f);
 				st.swing = false;
 				st.landed = true;
+				if (_terrain) {
+					l.foot.x += st.offset.x;
+					l.foot.y += st.offset.y;
+					l.foot.z  = st.ground;
+					// not down yet: keep reaching for the ground (updateSearch)
+					st.searching = _params.useContactSensors && !l.sensor.onGround && _terrain->searchDepth > 0;
+				}
 			}
 			st.skipped = false;
 		} else if (!st.swing && !st.skipped) {
 			if (s <= startWindow && (moving || !isAtNeutral(i))) {
-				st.swing   = true;
-				st.liftOff = l.foot;
+				st.swing     = true;
+				st.searching = false;
+				st.released  = false;
+				st.liftOff   = l.foot;
+				if (_terrain) {
+					planSwing(i);
+				}
 			} else {
 				st.skipped = true;
 			}
 		}
 
 		if (st.swing) {
-			if (_params.useContactSensors && s > 0.5f && l.sensor.onGround) {
+			if (!l.sensor.onGround) {
+				st.released = true;
+			}
+			// on rough ground only once the foot is over its foothold and coming
+			// down (the high swing moves until s = 0.85): earlier it is an edge
+			// it brushes on the way, the swing goes on
+			float early = _terrain ? 0.8f : 0.5f;
+			if (_params.useContactSensors && s > early && l.sensor.onGround && st.released) {
 				// touched down early: keep the foot where it is
 				st.swing   = false;
 				st.skipped = true;
+				st.landed  = true;
+				if (_terrain) {
+					st.ground = contactHeight(i);
+				}
 				continue;
 			}
 			LR_point target = touchdownTarget(i, s);
-			l.foot = lrSwingPoint(st.liftOff, target, _params.stepHeight, s);
+			if (_terrain) {
+				target.x += st.offset.x;
+				target.y += st.offset.y;
+				target.z  = st.ground;
+				l.foot = lrSwingPointHigh(st.liftOff, target, st.apex, s);
+			} else {
+				l.foot = lrSwingPoint(st.liftOff, target, _params.stepHeight, s);
+			}
 		}
 
 		if (!_params.useContactSensors) {
@@ -220,7 +407,47 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 		}
 	}
 
+	updateSearch(dt);
+	updateTerrainHeight(dt);
 	updateShift(dt);
+}
+
+/**
+ * Feet past their swing time without contact: lower them until the sensor
+ * says they are down, or `searchDepth` below where they were meant to land
+ * (a hole: stand there anyway).
+ */
+void GaitEngine::updateSearch(float dt)
+{
+	if (!_terrain) {
+		return;
+	}
+	for (uint8_t i = 0; i < _legCount; i++) {
+		legState &st = _state[i];
+		if (!st.searching) {
+			continue;
+		}
+		leg &l = _legs[i];
+		float limit = st.ground - _terrain->searchDepth;   // st.ground: the planned touchdown
+		if (l.sensor.onGround) {
+			// the foot is really where it was commanded `latency` ago:
+			// put it back up by what it has been lowered since
+			st.searching = false;
+			float back = _terrain->searchSpeed * _terrain->latency;
+			if (back > st.ground - l.foot.z) {
+				back = st.ground - l.foot.z;   // not above where the search started
+			}
+			l.foot.z += back > 0 ? back : 0;
+			st.ground = contactHeight(i);
+			continue;
+		}
+		if (l.foot.z <= limit) {
+			st.searching = false;   // nothing there: stand as low as the search goes
+			st.ground = l.foot.z;
+			continue;
+		}
+		l.foot.z = lrApproach(l.foot.z, limit, _terrain->searchSpeed * dt);
+	}
 }
 
 /**
@@ -230,7 +457,7 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 float GaitEngine::supportWeight(uint8_t legId) const
 {
 	const legState &st = _state[legId];
-	if (st.swing) {
+	if (st.swing || st.searching) {
 		return 0.0f;
 	}
 	if (!_active) {
@@ -333,7 +560,7 @@ void GaitEngine::updateShift(float dt)
 	}
 	_body.position.x = _base.x + _shift.x;
 	_body.position.y = _base.y + _shift.y;
-	_body.position.z = _base.z;
+	_body.position.z = _base.z + _terrainZ;
 }
 
 float GaitEngine::supportMargin() const
@@ -341,7 +568,7 @@ float GaitEngine::supportMargin() const
 	LR_point feet[LR_MAX_LEGS];
 	uint8_t n = 0;
 	for (uint8_t i = 0; i < _legCount; i++) {
-		if (!_state[i].swing) {
+		if (!_state[i].swing && !_state[i].searching) {
 			feet[n++] = _legs[i].foot;
 		}
 	}

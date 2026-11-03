@@ -38,7 +38,7 @@ on macOS, use `trot.py --view` or a video there).
 ## Commands
 
 ```
-python -m pytest -q tests            # 69 checks, ~30 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 77 checks, ~60 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
@@ -296,6 +296,97 @@ At 50 Hz frames (the PCA9685 now) the stronger servos jump to each new target
 and the body rocks 3-5°, so a higher voltage gains little. The 7465MG reads
 up to 333 Hz pulses, and the PCA9685 can run that fast (2500 µs fits in 3 ms).
 
+## Rough ground: foot switches and ToF sensors
+
+![Hexapod on a 30 mm step with ToF + foot switches](docs/hexapod_step.png)
+
+```
+python examples/terrain_walk.py                              # dog, obstacle course, foot switches + ToF
+python examples/terrain_walk.py --hexapod --terrain step --sensing tof
+python examples/terrain_walk.py --compare                    # every scene x sensing mode, a table
+python examples/terrain_walk.py --hexapod --terrain bars --video bars.mp4   # ToF sensors as purple boxes, view cones orange, zone hits blue dots
+python -m pytest -q tests/test_terrain.py
+```
+
+The terrain code is firmware code (`lib/robot_core`), off unless enabled,
+so the real robots keep walking open loop until sensors are fitted:
+
+* **Foot switches** (`GaitParams.useContactSensors`, `leg.sensor.onGround`):
+  a foot that hasn't touched down when its swing time is over keeps
+  reaching down (`searchDepth`), a foot that touches down early stays there,
+  and a standing foot whose switch opens (slid off an edge) reaches down
+  again. Each leg remembers the height it stood on and aims its next step there.
+* **ToF terrain map** (`TerrainMap`, `TOF_SENSORS` in `model_data.h`): each
+  zone of a multizone ToF (VL53L5CX 8x8, or a VL53L1X with ROI zones) is a ray
+  from the sensor; its hit goes into a 40x40 height grid around the robot in
+  the gait's odometry frame (dog: 12 mm cells, hexapod: 25 mm). A swing aims
+  at the mapped height of its foothold, goes up first and then across, at
+  least `clearance` above the highest mapped point on its way, and a foothold
+  on an edge moves along the step onto flat ground.
+* The **body height** follows the average ground under the feet, and the
+  **IMU leveler** keeps the body level: in terrain mode the bridge doesn't
+  hold it during a trot, and the scenarios turn leveling on with any sensing.
+  The unplanned body tilt (IMU) also corrects the measured touchdown heights
+  (`GaitEngine::setTilt`).
+* Not wired on the robots yet: `motion.cpp` doesn't read switch pins or a ToF
+  driver, so nothing changes on hardware. When sensors are fitted it needs to
+  set `leg.sensor.onGround`, feed `TerrainMap::addReading`, call
+  `gait().setTerrain(...)` / `setTilt(...)` and not hold the leveler, the
+  way `sim/bridge/robot_core_bridge.cpp` does.
+* `GAIT_PARAMS_ROUGH` (dog and hexapod): a slower gait with a longer swing.
+  The servos can't lift a foot 30-40 mm in the normal 100-150 ms swing; the
+  foot lags and hits the edge.
+
+`TERRAIN_PARAMS` and `TERRAIN_MAP_PARAMS` in each `model_data.h` hold the
+numbers. Sensor mounts (simulated, nothing is fitted yet): dog, one 8x8 ToF on
+the nose looking 40 deg down; hexapod, two on the front turned 20 deg left and
+right, 35 deg down.
+
+In the sim (`legsim/terrain.py`, `legsim/tof.py`): obstacles are static boxes
+(bumps, rocks, rubble, bars, step, drop = walk off a platform); a foot switch is
+pressed when the ground pushes the foot up with more than 0.3 N (vertical
+part only, so pushing against the side of an obstacle doesn't press it); the
+ToF casts one ray per zone at 15 Hz with 2 mm + 1 % noise against the
+terrain (not the robot). `FirmwareCore.set_terrain(contacts, tof)` switches
+the modes, and `legsim.scenario.run()` walks a robot over a scene and
+measures it.
+
+Findings (rough gait, full stick, 8 s dog / 6 s hexapod; `--compare`):
+
+| | open loop | switches | ToF | both |
+|---|---|---|---|---|
+| Dog, 20 mm step | stuck at the edge, 127 mm | 310 mm | **641 mm, up** | **705 mm, up** |
+| Dog, 10 + 20 mm bars | 434 mm | 452 mm | **696 mm** | 425 mm |
+| Dog, 12 mm bumps | 612 mm, tilt 2.1 deg | 683, 4.2 | 678, 3.2 | 659, 2.3 |
+| Hexapod, 30 mm step | 548 mm, tilt 2.8 deg | 414, 3.7 | **686, 0.8** | **690, 0.9** |
+| Hexapod, 15 + 30 mm bars | 462 mm | 500 | **627** | **668** |
+| Hexapod, 18 mm bumps | 674 mm, tilt 1.4 | 677, 1.5 | 701, 1.2 | 703, 1.6 |
+| Hexapod, 22 mm drop | 689 mm, tilt 2.1 | 680, 2.9 | 683, 1.1 | 694, 1.4 |
+| Dog, rubble up to 20 mm | 556 mm, tilt 2.7 | 610, 4.3 | 560, 4.2 | 564, 4.4 |
+| Hexapod, rubble up to 30 mm | 683 mm, tilt 1.4 | 653, 1.2 | 696, 1.4 | 666, 1.4 |
+
+* The ToF map does most of the work: with it the dog climbs a 20 mm step its
+  open-loop trot can't, and the hexapod walks up 30 mm level instead of
+  stumbling up it.
+* Foot switches alone can only feel an obstacle after hitting it. They help
+  on small bumps and holes, not on anything taller than the step height; on
+  the dog's trot (two legs down) they add some rocking.
+* Dense rubble (`rubble()`: overlapping blocks 10-80 mm across, mixed
+  heights, about half the ground covered) gains little from sensing: the
+  rough gait's step height already clears most of it, and the blocks are
+  smaller than the map can resolve well. The hexapod
+  walks it the same in every mode (with fewer leg knocks with ToF); the dog,
+  at its height limit, rocks more with sensing (mean tilt ~4 deg vs 2.7).
+  Lowering the swing on high legs (apex over the mean ground) helped here but
+  broke the step climb, so it is not in.
+  `FirmwareCore.tune_terrain(...)` changes `TERRAIN_PARAMS` for experiments.
+* Limits: the hexapod's femur servos (45 deg each way, 2:1 gear) run out
+  above ~30 mm obstacles, the dog's legs (80 mm, reach 102) around 20 mm.
+  Higher needs a taller stance or longer legs, not more sensing.
+* Odometry: the map lives in the gait's odometry frame. When a foot gets
+  stuck the robot falls behind its odometry and the map slides with it;
+  cells are forgotten after `maxAge` (dog 10 s, hexapod 6 s).
+
 ## Plan
 
 1. **Model (done).** Parametric MJCF, servo and IMU models, tests that
@@ -308,7 +399,7 @@ up to 333 Hz pulses, and the PCA9685 can run that fast (2500 µs fits in 3 ms).
    code, not the Python demo gait. The sim side won't need changes: the C API maps onto
    `write_pulses` / `read_imu`.
 3. **Scenario tests.** Run in CI on the host: stand, trot forward/turn,
-   step over a 5 mm obstacle, push recovery, slope. Check distance, drift,
+   obstacles and steps (done, see "Rough ground"), push recovery, slope. Check distance, drift,
    max tilt, and servo torque saturation (the sim can report how close each
    servo is to stall, which hardware can't).
 4. **Calibrate against the real robot** when convenient: one video of a trot

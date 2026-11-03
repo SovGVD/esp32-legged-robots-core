@@ -15,6 +15,17 @@
  * optional: with `useContactSensors` a swing ends early once the leg reports
  * ground contact in the second half of the swing.
  *
+ * Terrain (optional, setTerrain()): every leg remembers the height of the
+ * ground it last stood on. With contact sensors, a foot that has not touched
+ * down when its swing time is over keeps lowering (up to `searchDepth`) until
+ * it does, and a foot that touches down early stays there; either way the
+ * leg's ground height is where the foot really landed. With a TerrainMap
+ * (ToF sensors) the foot is aimed at the mapped height of its foothold, lifted
+ * over the highest mapped point between lift-off and touchdown, and its
+ * foothold is moved off an edge. The body height follows the average ground
+ * height under the feet. Without a terrain map or contact sensors this
+ * changes nothing: every leg's ground stays at its neutral height.
+ *
  * Static stability (optional, `staticStability`): the body is shifted so the
  * centre of mass stays over the legs that carry it. Every foot gets a support
  * weight: 1 in mid stance, 0 in swing, and a smooth ramp from touchdown and
@@ -39,6 +50,7 @@
 #define LR_GAIT_ENGINE_H
 
 #include "leg.h"
+#include "terrain_map.h"
 
 typedef struct {
 	bool  enabled;                    // false: body and feet never move (e.g. tank)
@@ -64,6 +76,24 @@ typedef struct {
 	                                  // may be slower than the others (dog: 2:1 gear, half speed)
 } GaitParams;
 
+typedef struct {
+	float searchDepth;    // mm: with contact sensors, how far below its planned touchdown a foot keeps
+	                      // reaching for the ground after its swing time is over
+	float searchSpeed;    // mm/s, lowering speed while reaching
+	float clearance;      // mm: a swinging foot passes this far above the highest mapped point on its way
+	float maxStep;        // mm: mapped heights further than this from the leg's own ground are ignored
+	                      // (sensor glitches, steps the leg can't reach anyway)
+	float bodyRate;       // mm/s: body height follows the average ground under the feet (0: fixed height)
+	float edgeLimit;      // mm: a foothold whose mapped surroundings vary more than this is on an edge
+	                      // and is moved along the step (0: never)
+	float footholdShift;  // mm, how far a foothold may move to get off an edge
+	float footRadius;     // mm, foot point (leg.foot) above the surface it stands on (ball foot: its radius)
+	float tolerance;      // mm: a foot touching down closer than this to where it was meant to keeps the
+	                      // planned ground height (servo sag and IMU noise would make it wander)
+	float latency;        // s, how long the servos take to follow: when a reaching foot touches down it is
+	                      // put back up by searchSpeed * latency (else the ground estimate sinks every step)
+} TerrainParams;
+
 class GaitEngine
 {
 	public:
@@ -79,6 +109,27 @@ class GaitEngine
 		 * @param command move.x/move.y [-1, 1] velocity in body frame, rotate.yaw [-1, 1] turn rate
 		 */
 		void update(float dt, const LR_moveVector &command);
+
+		/**
+		 * Terrain adaptation (see the top of this file). params nullptr: off,
+		 * the legs' ground heights go back to neutral. map may be nullptr
+		 * (contact sensors only). Both must outlive the gait.
+		 */
+		void setTerrain(const TerrainParams *params, const TerrainMap *map);
+		const TerrainParams *terrain() const { return _terrain; }
+		/** Ground height (world z, mm) the leg last stood on or is stepping to. */
+		float groundHeight(uint8_t legId) const { return _state[legId].ground; }
+		/** Leg is past its swing time and still reaching down for the ground. */
+		bool  isSearching(uint8_t legId) const { return _state[legId].searching; }
+		/**
+		 * Body tilt the gait didn't plan (IMU tilt minus the commanded body
+		 * tilt, rad; yaw unused). Contact heights are measured with it, so a
+		 * tilted body doesn't read the feet in front as standing higher.
+		 */
+		void  setTilt(const LR_angle &tilt) { _tilt = tilt; }
+
+		/** Body height offset from the terrain, mm. */
+		float terrainHeight() const { return _terrainZ; }
 
 		/** Takes effect immediately; switch gaits while !isActive() for a clean start. */
 		void setParams(const GaitParams &params) { _params = params; computeRamps(); }
@@ -114,7 +165,14 @@ class GaitEngine
 			bool     swing;       // currently in swing
 			bool     skipped;     // swing window skipped this cycle (idle and already at neutral)
 			bool     landed;      // touched down this stance (its support weight ramps in)
+			bool     searching;   // swing time over, lowering until contact (contact sensors)
 			LR_point liftOff;     // foot position at lift off
+			float    ground;      // z the leg stands on / plans to land on, mm
+			float    apex;        // highest z of the current swing, mm (terrain)
+			LR_point offset;      // foothold moved off an edge, world XY, mm
+			float    lost;        // s the switch has been open while standing (slipped off an edge)
+			bool     released;    // contact switch opened during this swing (the servos lag: a foot
+			                      // still reads "down" for a while after its swing has started)
 		} legState;
 
 		GaitParams _params = {};
@@ -131,6 +189,16 @@ class GaitEngine
 		float      _yawRate  = 0;
 		float      _phase    = 0;
 		bool       _active   = false;
+		const TerrainParams *_terrain = nullptr;
+		const TerrainMap    *_map     = nullptr;
+		float      _terrainZ = 0;
+		LR_angle   _tilt     = { 0, 0, 0 };
+		float      contactHeight(uint8_t legId) const;
+
+		void     planSwing(uint8_t legId);
+		float    plannedGround(uint8_t legId, const LR_point &at) const;
+		void     updateTerrainHeight(float dt);
+		void     updateSearch(float dt);
 
 		float    _sideLever = 0;   // mm, largest |defaultFoot.y|: sideways foot speed per rad/s of yaw
 		void     rampVelocity(float dt, const LR_moveVector &command);
@@ -149,6 +217,13 @@ class GaitEngine
  * @param s swing progress [0, 1]
  */
 LR_point lrSwingPoint(const LR_point &from, const LR_point &to, float height, float s);
+
+/**
+ * Swing path for rough ground: straight up to `apex` (world z), across, then
+ * straight down, so the foot doesn't catch the edge of what it steps onto.
+ * Zero velocity at s = 0 and s = 1.
+ */
+LR_point lrSwingPointHigh(const LR_point &from, const LR_point &to, float apex, float s);
 
 /**
  * Signed distance (XY, mm) from `p` to the boundary of the convex hull of
