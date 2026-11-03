@@ -186,7 +186,7 @@ class FirmwareCore:
         self.lib.rc_set_terrain(1 if adapt else 0, 1 if tof else 0)
 
     TERRAIN_FIELDS = ("search_depth", "search_speed", "clearance", "max_step", "body_rate", "edge_limit",
-                      "foothold_shift", "foot_radius", "tolerance", "latency")
+                      "foothold_shift", "foot_radius", "tolerance", "latency", "gap_margin")
 
     def tune_terrain(self, reset=False, **fields):
         """Change TERRAIN_PARAMS fields for experiments (kept until tune_terrain(reset=True)),
@@ -205,10 +205,13 @@ class FirmwareCore:
         return int(self.lib.rc_terrain_cells())
 
     def terrain_state(self):
-        """Per leg: ground height (mm, gait frame), reaching for contact, swinging; and the body's terrain height."""
-        v = self._floats(self.lib.rc_terrain_state, self.legs * 3 + 1)
-        legs = v[:-1].reshape(self.legs, 3)
-        return {"ground": legs[:, 0], "searching": legs[:, 1] > 0, "swing": legs[:, 2] > 0, "body": float(v[-1])}
+        """Per leg: ground height (mm, gait frame), reaching for contact, swinging; the body's
+        terrain height, and whether a gap too wide to step
+        over stops the robot (blocked)."""
+        v = self._floats(self.lib.rc_terrain_state, self.legs * 3 + 2)
+        legs = v[:-2].reshape(self.legs, 3)
+        return {"ground": legs[:, 0], "searching": legs[:, 1] > 0, "swing": legs[:, 2] > 0,
+                "body": float(v[-2]), "blocked": bool(v[-1])}
 
     def sense(self, robot, dt=None):
         """Feed the sensors of the current rough ground mode for one tick (drive() calls this)."""

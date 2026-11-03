@@ -18,6 +18,8 @@ Scenes (each leaves the start area flat):
   bars()      obstacles across the path, one after another
   step()      a platform to climb onto (and off again)
   drop()      start on a platform and walk off its edge (a step down)
+  gaps()      a raised floor with trenches across the path, narrow to too wide
+  bridge()    a ramp up onto a raised deck with gaps in it, and a ramp down
   course()    bars, then bumps, then a step: everything in one run
 """
 
@@ -32,6 +34,7 @@ class Terrain:
     def __init__(self, name="flat"):
         self.name = name
         self.boxes = []   # (cx, cy, height, half_x, half_y, yaw), mm / rad; box from z = 0 to height
+        self.ramps = []   # (cx, y0, y1, h0, h1, half_x), mm: surface from h0 at y0 to h1 at y1 (along +Y)
         self.start_height = 0.0   # mm, ground under the robot at the start (drop())
 
     def add_box(self, cx, cy, height, size_x, size_y, yaw=0.0):
@@ -39,9 +42,15 @@ class Terrain:
             self.boxes.append((float(cx), float(cy), float(height), size_x / 2.0, size_y / 2.0, float(yaw)))
         return self
 
+    def add_ramp(self, cx, y0, y1, h0, h1, size_x):
+        """A slope along +Y: the surface rises (or falls) from h0 at y0 to h1 at y1."""
+        self.ramps.append((float(cx), float(y0), float(y1), float(h0), float(h1), size_x / 2.0))
+        return self
+
     def __add__(self, other):
         t = Terrain(f"{self.name}+{other.name}")
         t.boxes = self.boxes + other.boxes
+        t.ramps = self.ramps + other.ramps
         t.start_height = max(self.start_height, other.start_height)
         return t
 
@@ -54,10 +63,13 @@ class Terrain:
             lx, ly = c * dx + s * dy, -s * dx + c * dy
             if abs(lx) <= hx and abs(ly) <= hy and top > h:
                 h = top
+        for cx, y0, y1, h0, h1, hx in self.ramps:
+            if abs(x - cx) <= hx and min(y0, y1) <= y <= max(y0, y1):
+                h = max(h, h0 + (h1 - h0) * (y - y0) / (y1 - y0))
         return h
 
     def max_height(self):
-        return max((b[2] for b in self.boxes), default=0.0)
+        return max([b[2] for b in self.boxes] + [max(r[3], r[4]) for r in self.ramps], default=0.0)
 
     def geoms_xml(self, friction=0.8):
         out = []
@@ -68,11 +80,23 @@ class Terrain:
                 f'pos="{cx * MM:.6g} {cy * MM:.6g} {top * MM / 2:.6g}" euler="0 0 {yaw:.6g}" '
                 f'group="0" contype="1" conaffinity="1" friction="{friction:.6g} 0.005 0.0001" '
                 f'rgba="{shade:.3f} {shade * 0.85:.3f} {shade * 0.7:.3f} 1"/>')
+        for k, (cx, y0, y1, h0, h1, hx) in enumerate(self.ramps):
+            # a 10 mm slab tilted about X, its top surface on the slope
+            length = math.hypot(y1 - y0, h1 - h0)
+            angle = math.atan2(h1 - h0, y1 - y0)
+            thick = 5.0
+            nx, nz = -math.sin(angle), math.cos(angle)   # surface normal in the YZ plane (y, z)
+            my, mz = (y0 + y1) / 2 - nx * thick, (h0 + h1) / 2 - nz * thick
+            out.append(
+                f'<geom name="ramp_{k}" type="box" size="{hx * MM:.6g} {length * MM / 2:.6g} {thick * MM:.6g}" '
+                f'pos="{cx * MM:.6g} {my * MM:.6g} {mz * MM:.6g}" euler="{angle:.6g} 0 0" '
+                f'group="0" contype="1" conaffinity="1" friction="{friction:.6g} 0.005 0.0001" '
+                f'rgba="0.55 0.6 0.45 1"/>')
         return "\n    ".join(out)
 
     def inject(self, xml, friction=0.8):
         """Put the boxes into an MJCF model next to its floor."""
-        if not self.boxes:
+        if not self.boxes and not self.ramps:
             return xml
         i = xml.index('<geom name="floor"')
         j = xml.index("/>", i) + 2
@@ -142,6 +166,40 @@ def drop(height=20.0, y0=150.0, width=600.0, back=600.0):
     return t
 
 
+def gaps(height=40.0, widths=(25.0, 50.0, 150.0), segment=250.0, y0=150.0, width=600.0, back=600.0):
+    """A raised floor `height` mm high with gaps (trenches down to the floor) across
+    the path, `widths` mm wide, `segment` mm of floor between them. The robot
+    starts on it. A gap it can step over it should cross, one too wide it
+    should stop in front of."""
+    t = Terrain(f"gaps{height:g}")
+    t.add_box(0, y0 - back / 2, height, width, back)
+    y = y0
+    for w in widths:
+        y += w
+        t.add_box(0, y + segment / 2, height, width, segment)
+        y += segment
+    t.start_height = height
+    return t
+
+
+def bridge(height=50.0, ramp=300.0, deck=900.0, gap_widths=(25.0, 40.0), width=300.0, y0=200.0):
+    """A ramp up from the floor onto a raised deck `height` mm high, gaps across
+    the deck (`gap_widths`, spread along it), and a ramp back down."""
+    t = Terrain(f"bridge{height:g}")
+    t.add_ramp(0, y0, y0 + ramp, 0, height, width)
+    y = y0 + ramp
+    end = y + deck
+    n = len(gap_widths)
+    segment = (deck - sum(gap_widths)) / (n + 1)
+    for w in list(gap_widths) + [None]:
+        t.add_box(0, y + segment / 2, height, width, segment)
+        y += segment
+        if w is not None:
+            y += w
+    t.add_ramp(0, end, end + ramp, height, 0, width)
+    return t
+
+
 def course(scale=1.0, y0=250.0):
     """Bars, bumps, a step up and down; scale 1 = dog sizes, ~1.6 suits the hexapod."""
     s = scale
@@ -160,5 +218,7 @@ SCENES = {
     "bars": bars,
     "step": step,
     "drop": drop,
+    "gaps": gaps,
+    "bridge": bridge,
     "course": course,
 }

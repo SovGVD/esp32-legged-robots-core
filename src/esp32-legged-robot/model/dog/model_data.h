@@ -244,7 +244,8 @@ const TerrainParams TERRAIN_PARAMS = {
 	36,    // up to 36 mm along the step
 	6,     // foot radius, mm: the foot point is the centre of the 6 mm TPU shoe ball
 	5,     // tolerance, mm: touchdowns closer than this to the plan keep the planned height
-	0.05   // servo latency, s (50 Hz pulses plus travel)
+	0.05,  // servo latency, s (50 Hz pulses plus travel)
+	20     // gap margin, mm: keep 20 mm from a gap (foot ball radius + a map cell, rounded up)
 };
 
 #endif

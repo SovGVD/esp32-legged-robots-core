@@ -4,11 +4,13 @@ firmware's terrain code, with or without foot switches and ToF sensors.
 
   python examples/terrain_walk.py                              # dog, obstacle course, foot switches + ToF
   python examples/terrain_walk.py --hexapod --terrain bumps --sensing tof
+  python examples/terrain_walk.py --hexapod --terrain bridge --sensing tof   # ramp, deck with gaps, ramp down
   python examples/terrain_walk.py --compare                    # every sensing mode on every scene, a table
   python examples/terrain_walk.py --hexapod --video walk.mp4   # render: ToF sensors (boxes), view cones, zone hits (dots)
   MUJOCO_GL=glfw xvfb-run -a python examples/terrain_walk.py --video walk.mp4   # headless
 
-Scenes: flat, bumps, rocks, rubble, bars, step, drop, course (legsim/terrain.py), sized
+Scenes: flat, bumps, rocks, rubble, bars, step, drop, gaps, bridge, course
+(legsim/terrain.py), sized
 for the robot (the hexapod gets 1.5x higher obstacles). Sensing: none (open loop,
 like the real robots today), contacts (foot switches), tof (ToF terrain map),
 both.
@@ -30,6 +32,7 @@ ap.add_argument("--sensing", default="both", choices=sorted(scenario.SENSING))
 ap.add_argument("--gait", default=None, help="default, rough (slower, higher steps; the default here), walk (dog)")
 ap.add_argument("--speed", type=float, default=None, help="move command 0..1")
 ap.add_argument("--duration", type=float, default=None, help="s")
+ap.add_argument("--seed", type=int, default=0, help="sensor noise seed")
 ap.add_argument("--no-level", action="store_true", help="IMU leveling off (on by default with sensing)")
 ap.add_argument("--compare", action="store_true", help="table of every scene x sensing mode")
 ap.add_argument("--video", help="render to mp4: ToF sensors as boxes with their view cone (orange) and zone hits (blue dots)")
@@ -72,8 +75,12 @@ if args.video:
             fw.tof.draw(robot, r.scene)   # sensor boxes, view cones (orange), zone hits (blue dots)
         frames.append(r.render())
 
-res = scenario.run(model, scene(args.terrain), args.sensing, speed=speed, gait=gait,
-                   duration=args.duration, leveling=False if args.no_level else None, frame_cb=cb)
+duration = args.duration
+if duration is None and args.terrain in ("gaps", "bridge"):
+    duration = {"gaps": 16, "bridge": 24}[args.terrain] if model == "dog" else {"gaps": 12, "bridge": 16}[args.terrain]
+# a long walk curves (no heading sensor): on the narrow bridge steer back to the middle like an operator would
+res = scenario.run(model, scene(args.terrain), args.sensing, speed=speed, gait=gait, duration=duration,
+                   leveling=False if args.no_level else None, frame_cb=cb, steer=args.terrain == "bridge", seed=args.seed)
 print(res.summary())
 
 if frames:

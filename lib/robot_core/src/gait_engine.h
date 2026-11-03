@@ -92,6 +92,9 @@ typedef struct {
 	                      // planned ground height (servo sag and IMU noise would make it wander)
 	float latency;        // s, how long the servos take to follow: when a reaching foot touches down it is
 	                      // put back up by searchSpeed * latency (else the ground estimate sinks every step)
+	float gapMargin;      // mm, a foothold keeps this far from ground that drops away (lower than its own
+	                      // by more than `maxStep`, or unseen between known ground: a gap, a cliff);
+	                      // 0: footRadius + one map cell
 } TerrainParams;
 
 class GaitEngine
@@ -130,6 +133,14 @@ class GaitEngine
 
 		/** Body height offset from the terrain, mm. */
 		float terrainHeight() const { return _terrainZ; }
+		/**
+		 * A leg found a gap ahead it can't step over (the map shows a hole
+		 * deeper than maxStep and no flat foothold within footholdShift):
+		 * the gait won't move further that way (body frame unit vector)
+		 * until the move command stops pushing that way.
+		 */
+		bool  isBlocked() const { return _blocked; }
+		LR_point blockedDirection() const { return _blockedDir; }
 
 		/** Takes effect immediately; switch gaits while !isActive() for a clean start. */
 		void setParams(const GaitParams &params) { _params = params; computeRamps(); }
@@ -171,6 +182,7 @@ class GaitEngine
 			float    apex;        // highest z of the current swing, mm (terrain)
 			LR_point offset;      // foothold moved off an edge, world XY, mm
 			float    lost;        // s the switch has been open while standing (slipped off an edge)
+			bool     hold;        // a gap ahead: this swing puts the foot back where it lifted off
 			bool     released;    // contact switch opened during this swing (the servos lag: a foot
 			                      // still reads "down" for a while after its swing has started)
 		} legState;
@@ -193,6 +205,11 @@ class GaitEngine
 		const TerrainMap    *_map     = nullptr;
 		float      _terrainZ = 0;
 		LR_angle   _tilt     = { 0, 0, 0 };
+		bool       _blocked  = false;
+		LR_point   _blockedDir = { 0, 0, 0 };
+		bool       footholdOk(float x, float y, float dx, float dy, float own) const;
+		bool       dropsAway(float x, float y, float dx, float dy, float own) const;
+		bool       isShadow(float x, float y, float dx, float dy, float own) const;
 		float      contactHeight(uint8_t legId) const;
 
 		void     planSwing(uint8_t legId);

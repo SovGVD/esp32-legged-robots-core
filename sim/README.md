@@ -27,18 +27,18 @@ source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python -m pytest -q tests            # checks everything works, builds the firmware bridge
 python examples/drive.py             # viewer + control window: drive with WASD/arrows or an Xbox pad
+python examples/drive.py --hexapod --terrain bridge   # drive over a ramp and a deck with gaps, ToF on
 ```
 
 `drive.py` runs the real firmware gait (lib/robot_core) on the sim; the
 controls are in the table under "Manual control" below. To just look at the
-model, run `python -m mujoco.viewer --mjcf models/dog.xml` (on macOS use
-`mjpython` instead of `python` for any viewer command; `drive.py` doesn't run
-on macOS, use `trot.py --view` or a video there).
+model, run `python -m mujoco.viewer --mjcf models/dog.xml`. Linux and Windows
+(macOS isn't supported).
 
 ## Commands
 
 ```
-python -m pytest -q tests            # 77 checks, ~60 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 80 checks, ~60 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
@@ -156,6 +156,22 @@ without rocking the robot on flat ground.
 
 ### Manual control
 
+```
+python examples/drive.py                                  # dog, flat floor
+python examples/drive.py --hexapod                        # hexapod
+python examples/drive.py --terrain rubble                 # rough gait, foot switches + ToF map
+python examples/drive.py --hexapod --terrain gaps --sensing tof
+python examples/drive.py --terrain bridge --sensing none  # open loop, like the real robots today
+```
+
+`--terrain` takes any scene from "Rough ground" below (flat, bumps, rocks,
+rubble, bars, step, drop, gaps, bridge, course), `--height` the obstacle
+height, `--sensing` none / contacts / tof / both (default both with a
+terrain), `--gait` the starting gait (rough with a terrain). The ToF sensors
+show as purple boxes with orange view cones and blue zone hits, and the
+control window says "GAP AHEAD: stopped" while the robot waits at a gap it
+can't step over (let go of the stick or steer away).
+
 `python examples/drive.py` opens the MuJoCo viewer and a small "robot
 control" window (`pip install pygame-ce`; if plain `pygame` is also installed, `pip uninstall pygame` first, they share the `pygame` module). Focus that window for the keyboard:
 
@@ -166,14 +182,13 @@ control" window (`pip install pygame-ce`; if plain `pygame` is also installed, `
 | Q / E, Left / Right | right stick X | turn |
 | I / K, J / L | hold LB + right stick | tilt body (pitch, roll) |
 | Shift | | slow (40 %) |
-| G | Y | switch gait: trot / static walk (while standing) |
+| G | Y | switch gait while standing: trot / static walk / rough (hexapod: tripod / rough) |
 | R | Back | reset robot |
 | P | Start | pause |
 | Esc | | quit |
 
 Keyboard and pad add up. Any pad SDL knows as a game controller works
-(Xbox 360/One, most others). Linux and Windows; on macOS the MuJoCo viewer
-needs `mjpython`, which conflicts with pygame's window.
+(Xbox 360/One, most others). Linux and Windows.
 
 ## Hexapod
 
@@ -303,6 +318,7 @@ up to 333 Hz pulses, and the PCA9685 can run that fast (2500 µs fits in 3 ms).
 ```
 python examples/terrain_walk.py                              # dog, obstacle course, foot switches + ToF
 python examples/terrain_walk.py --hexapod --terrain step --sensing tof
+python examples/terrain_walk.py --hexapod --terrain bridge --sensing tof    # ramp, deck with gaps, ramp down
 python examples/terrain_walk.py --compare                    # every scene x sensing mode, a table
 python examples/terrain_walk.py --hexapod --terrain bars --video bars.mp4   # ToF sensors as purple boxes, view cones orange, zone hits blue dots
 python -m pytest -q tests/test_terrain.py
@@ -319,7 +335,7 @@ so the real robots keep walking open loop until sensors are fitted:
 * **ToF terrain map** (`TerrainMap`, `TOF_SENSORS` in `model_data.h`): each
   zone of a multizone ToF (VL53L5CX 8x8, or a VL53L1X with ROI zones) is a ray
   from the sensor; its hit goes into a 40x40 height grid around the robot in
-  the gait's odometry frame (dog: 12 mm cells, hexapod: 25 mm). A swing aims
+  the gait's odometry frame (dog: 12 mm cells, hexapod: 15 mm). A swing aims
   at the mapped height of its foothold, goes up first and then across, at
   least `clearance` above the highest mapped point on its way, and a foothold
   on an edge moves along the step onto flat ground.
@@ -328,11 +344,31 @@ so the real robots keep walking open loop until sensors are fitted:
   hold it during a trot, and the scenarios turn leveling on with any sensing.
   The unplanned body tilt (IMU) also corrects the measured touchdown heights
   (`GaitEngine::setTilt`).
+* **Gaps**: a foothold keeps `gapMargin` (20 mm) away from ground that drops
+  away (lower than its own by more than `maxStep`) and from unseen cells
+  between known ground (the ToF can't see into a narrow trench or under a
+  cliff edge, it sees the far wall). A foothold in a gap moves along the step
+  (`footholdShift`) onto solid ground. When there is none, and none further
+  on within one step either, the gap is too wide: the swing puts the foot back
+  where it lifted off and the gait blocks the command in that direction
+  (`GaitEngine::isBlocked()`, `blockedDirection()`) until the stick stops
+  pushing that way. Turning or walking back works while blocked.
+* **Map pose**: the body tilt the map uses matters at a gap edge (1 deg is
+  4 mm at 250 mm). Hexapod: the leveler's commanded tilt plus the IMU's
+  unplanned tilt with the slow walking bias (1-2 deg, 1.5 s filter) taken
+  out and smoothed over 0.3 s; with the raw IMU its mapped floor crept up
+  10-20 mm in 10 s of walking (the leveler follows the bias) and it stepped
+  onto nothing. Dog: the raw IMU; its trot rocks faster than that filter and
+  the filtered tilt cost it the 20 mm step. Cells age only while walking, so
+  a robot standing at a gap still remembers it. (`rc_set_map_tilt_mode` in the
+  bridge switches it for experiments.)
 * Not wired on the robots yet: `motion.cpp` doesn't read switch pins or a ToF
   driver, so nothing changes on hardware. When sensors are fitted it needs to
-  set `leg.sensor.onGround`, feed `TerrainMap::addReading`, call
-  `gait().setTerrain(...)` / `setTilt(...)` and not hold the leveler, the
-  way `sim/bridge/robot_core_bridge.cpp` does.
+  set `leg.sensor.onGround`, feed `TerrainMap::addReading` with the map pose
+  above, tick the map only while the gait is active, call
+  `gait().setTerrain(...)` / `setTilt(...)`, not hold the leveler, and show
+  `isBlocked()` to the operator (telemetry / web UI), the way
+  `sim/bridge/robot_core_bridge.cpp` does.
 * `GAIT_PARAMS_ROUGH` (dog and hexapod): a slower gait with a longer swing.
   The servos can't lift a foot 30-40 mm in the normal 100-150 ms swing; the
   foot lags and hits the edge.
@@ -383,6 +419,27 @@ Findings (rough gait, full stick, 8 s dog / 6 s hexapod; `--compare`):
 * Limits: the hexapod's femur servos (45 deg each way, 2:1 gear) run out
   above ~30 mm obstacles, the dog's legs (80 mm, reach 102) around 20 mm.
   Higher needs a taller stance or longer legs, not more sensing.
+* **Gaps and the bridge** (`gaps()`: trenches in a raised floor, narrow to
+  too wide; `bridge()`: a ramp up onto a narrow deck with gaps, a ramp down;
+  ToF, 3 runs each, `scenario.run(..., steer=True)` on the bridge):
+
+  | | open loop | ToF |
+  |---|---|---|
+  | Hexapod, 40 mm gap | a foot falls in, tilt ~28 deg | **steps over, tilt 4 deg, 3/3** |
+  | Hexapod, 60 mm gap | falls in | steps over 2/3 (one run tilts 25 deg) |
+  | Hexapod, 90 mm gap | falls in | stops at the edge 1/3, a foot catches the edge the other times |
+  | Hexapod, 250 mm gap | falls in | **stops at the edge** (test) |
+  | Hexapod, bridge (40 + 55 mm gaps) | falls in, tilt 29 deg | crosses, 1170 mm; 2/3 runs tilt over 20 deg once |
+  | Dog, 25 mm gap | falls in | gets across 1/3, tips a leg in 2/3 |
+  | Dog, 40 mm gap | falls in | stops at the edge, tips a leg in 2/3 |
+  | Dog, 60 mm gap | falls in | **stops at the edge, 3/3** |
+  | Dog, bridge (25 + 35 mm gaps) | falls in | gets onto the deck (970 mm), tips over 20 deg in 2/3 |
+
+  The hexapod (three feet down, slow tripod) handles gaps; the dog's trot
+  (two feet down) is fragile at an edge: its odometry slips 20-40 mm per
+  metre, so the map is that far off, and one misplaced foot tips it.
+  Gaps narrower than two map cells (dog 24 mm, hexapod 30 mm) are hard to
+  see; the feet step over them or onto the edge.
 * Odometry: the map lives in the gait's odometry frame. When a foot gets
   stuck the robot falls behind its odometry and the map slides with it;
   cells are forgotten after `maxAge` (dog 10 s, hexapod 6 s).
