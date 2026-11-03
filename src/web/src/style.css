@@ -197,9 +197,29 @@ input.pending {
   text-align: center;
 }
 #tof button {
-  position: absolute;
-  top: 0.4em;
-  right: 0.4em;
   padding: 0.1em 0.6em;
   pointer-events: auto;
+}
+.tof-fpv {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+}
+.fpv .tof-fpv {
+  display: block;
+}
+.fpv .stick {
+  background: transparent;
+  z-index: 1;
+}
+.fpv .hint {
+  color: #94a3b8;
+}
+.fpv #tof {
+  z-index: 2;
+  background: rgba(5, 7, 13, 0.55);
+  color: #e2e8f0;
 }

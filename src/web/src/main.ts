@@ -93,11 +93,11 @@ const level = new RemoteToggle($<HTMLInputElement>('level'), (on) => sendSetting
 $('walk-label').hidden = !config.gaitToggle;
 $('level-label').hidden = !config.levelToggle;
 
-const tof = new TofPanel(ui.tof, config.tofSensors, config.tofRange, config.tofMounts);
+const tof = new TofPanel(ui.tof, ui.control, config.tofSensors, config.tofRange, config.tofMounts);
 $('tof-label').hidden = config.tofSensors === 0;
 ui.tofToggle.addEventListener('change', () => {
   ui.tof.hidden = !ui.tofToggle.checked;
-  tof.clear();
+  tof.show(ui.tofToggle.checked);
 });
 
 const batteryText = { unknown: '', ok: '', low: 'battery low', critical: 'battery empty' } as const;
