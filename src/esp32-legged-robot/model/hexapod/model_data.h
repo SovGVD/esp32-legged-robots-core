@@ -155,16 +155,24 @@ servoProfile servoMainProfile = {
 
 const GaitParams GAIT_PARAMS = {
 	true,     // enabled
-	0.4,      // cycle time, s
-	0.75,     // duty factor
-	{ 0.5, 0.0, 0.5, 0.0, 0.5, 0.0 },   // phase offsets LF, LM, LR, RF, RM, RR (LF, LR, RM swing together)
+	0.3,      // cycle time, s
+	0.5,      // duty factor: tripod, each leg swings 150 ms of every 300 ms. With 0.75 a swing
+	          // had only 100 ms and the femur lagged its target by up to 23 deg at 75 mm/s
+	{ 0.25, 0.75, 0.25, 0.75, 0.25, 0.75 },   // phase offsets LF, LM, LR, RF, RM, RR (LF, LR, RM swing together)
 	30,       // step height, mm
-	75,       // max speed, mm/s (sideways and turning beyond this the 2:1 coxa servos run out of range)
-	0.75,     // max yaw rate, rad/s
+	400,      // max speed, mm/s. Simulator (MG90S datasheet at 4.8 V, ~890 g): 400 forward with
+	          // ~23 deg servo lag and <2 deg tilt; above ~550 forward the servos can't go faster
+	0.75,     // max yaw rate, rad/s (faster turns run the 2:1 coxa servos out of range)
 	600,      // max acceleration, mm/s^2
 	6,        // max yaw acceleration, rad/s^2
 	3,        // idle tolerance, mm
-	false     // no foot contact sensors
+	false,    // no foot contact sensors
+	false,    // no static stability shift: a tripod always stands on three legs
+	0.1,      // (stability blend)
+	{ 1, 1, 0 },  // (stability gain)
+	{ 0, 0, 0 },  // centre of mass, mm from the body origin (not measured)
+	300       // max sideways foot speed, mm/s (strafe + turn): sideways tops out at ~380 in the
+	          // simulator with 60+ deg tibia lag and servo range clamps; 300 keeps clear of that
 };
 
 // IMU leveling (HORIZON_LEVEL or CLI `level on`), not tuned for this model yet:

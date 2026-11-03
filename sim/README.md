@@ -199,7 +199,7 @@ from legsim import FirmwareCore
 from legsim.hexapod import SimHexapod
 fw = FirmwareCore(model="hexapod")             # builds sim/build/librobot_core_bridge_hexapod.so
 robot = fw.place(SimHexapod())
-fw.drive(robot, (0, 1, 0, 0, 0, 0), duration=3.0)   # forward, full speed (75 mm/s), 3 s
+fw.drive(robot, (0, 1, 0, 0, 0, 0), duration=3.0)   # forward, full speed (400 mm/s), 3 s
 ```
 
 `SimHexapod` has the same interface as `SimDog` (`write_pulses`, `read_imu`,
@@ -233,9 +233,13 @@ a lower body or a higher knee (femur more than ~12° up) runs into the femur's
 
 First findings (with the estimated 892 g at ~5 V):
 
-* The firmware gait walks it as configured: about 300 mm forward in 4 s
-  (75 mm/s), 210 mm strafing in 3 s, turning at 0.75 rad/s, with under 1°
-  of tilt. No IK failures, no servo range clamps.
+* The firmware gait walks it as configured (tripod, 0.3 s cycle): about
+  1.1 m forward in 3 s (400 mm/s), ~300 mm/s strafing, turning at 0.75 rad/s,
+  with under 2° of tilt and no IK failures.
+* Top speed with MG90S servos (tripod, duty 0.5): forward tops out at about
+  550 mm/s and sideways at ~380 mm/s; past that the servos only lag more
+  (femur/tibia 23°/23° at 400 mm/s, 38°/62° commanding 800). The old
+  default (duty 0.75, 75 mm/s) gave each swing only 100 ms.
 * Femur servos use ~30 % of stall torque standing and stay below it while
   walking (with the old wide stance: 46 % standing, saturated 10 % of the
   time on three legs, 5-9 mm of sag).
