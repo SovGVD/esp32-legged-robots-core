@@ -250,14 +250,19 @@ class FirmwareCore:
     def gait_active(self):
         return bool(self.lib.rc_gait_active())
 
-    def drive(self, dog, command=(0, 0, 0, 0, 0, 0), duration=None):
+    def drive(self, dog, command=(0, 0, 0, 0, 0, 0), duration=None, ideal_servos=False):
         """Run the firmware on a SimDog (or SimHexapod) for `duration` seconds (default: one tick)
-        at the firmware loop rate, holding `command`. Returns the last pulses."""
+        at the firmware loop rate, holding `command`. Returns the last pulses.
+        ideal_servos: send the firmware's leg angles to the joints instead of its
+        pulses (SimHexapod.set_leg_angles_ideal), for servos/gears the HAL doesn't model."""
         ticks = 1 if duration is None else max(1, int(round(duration / self.loop_dt)))
         pulses = None
         for _ in range(ticks):
             self.last_imu = self.imu_angles(dog)
             pulses = self.update(command, imu=self.last_imu)
-            dog.write_pulses(pulses)
+            if ideal_servos:
+                dog.set_leg_angles_ideal(self.leg_angles())
+            else:
+                dog.write_pulses(pulses)
             dog.step(self.loop_dt)
         return pulses

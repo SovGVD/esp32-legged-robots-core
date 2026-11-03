@@ -144,3 +144,54 @@ class HexapodParams:
     legs: tuple = LEGS
     imu_pos: tuple = (0.0, 0.0, 0.0)    # mm, MPU9250 position unknown: body centre [est]
     profile: tuple = SERVO_PROFILE
+
+
+# ------------------------------------------------------------ other servos
+# PTK 7465MG (Gleb's datasheet): coreless, metal gears, 13 g, 180 deg travel,
+# 500-2500 us, digital (up to 333 Hz frames), 3 us deadband. Stall torque and
+# speed per supply voltage [ds]:
+PTK_7465MG = {
+    # volts: (stall kg*cm, s/60 deg)
+    5.0: (3.8, 0.110),
+    6.0: (4.5, 0.092),
+    7.4: (5.5, 0.075),
+    8.4: (5.8, 0.070),
+}
+_KGCM = 0.0980665   # N*m per kg*cm
+
+
+def ptk_7465mg(volts=7.4, frame_hz=50.0) -> HexServoParams:
+    """7465MG servo at `volts` (5.0-8.4, linear in between) reading a pulse
+    `frame_hz` times a second (the PCA9685 runs at 50 Hz; the servo takes up
+    to 333). The position loop gain saturates at 2 deg of error (digital
+    servo, stiffer than the MG90S's 3.4) [est]; damping and friction scale
+    with the torque like the MG90S's [est]."""
+    vs = sorted(PTK_7465MG)
+    volts = min(max(volts, vs[0]), vs[-1])
+    hi = next(v for v in vs if v >= volts)
+    lo = max(v for v in vs if v <= volts)
+    f = 0.0 if hi == lo else (volts - lo) / (hi - lo)
+    stall_kgcm, s60 = (a + f * (b - a) for a, b in zip(PTK_7465MG[lo], PTK_7465MG[hi]))
+    stall = stall_kgcm * _KGCM
+    mg90s = HexServoParams()
+    k = stall / mg90s.stall_torque
+    return HexServoParams(stall_torque=stall, no_load_speed=math.radians(60) / s60,
+                          kp=stall / math.radians(2.0), kd=mg90s.kd * k,
+                          deadband_us=3.0, pwm_period=1.0 / frame_hz,
+                          armature=mg90s.armature, friction=mg90s.friction * k)
+
+
+# 500-2500 us over 0-180 deg [ds]
+LINEAR_500_2500 = ((0, 180), (500, 2500))
+
+
+def direct_drive(params: HexapodParams = None, servo: HexServoParams = None) -> HexapodParams:
+    """A what-if robot: same legs, stance and weight, but every joint driven
+    straight by its servo (no gears, so 180 deg of travel per joint).
+
+    The firmware HAL still has the geared ratios, so drive it by leg angles,
+    not pulses: FirmwareCore.drive(robot, cmd, ideal_servos=True)."""
+    import dataclasses
+    p = params or HexapodParams()
+    return dataclasses.replace(p, servo=servo or ptk_7465mg(), hal=HexHalParams(ratio=(1.0, 1.0, 1.0)),
+                               profile=LINEAR_500_2500)
