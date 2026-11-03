@@ -18,15 +18,18 @@ static void cliGait()
 		requestGait(GAIT_PARAMS_WALK);
 	} else if (strcmp(name, "trot") == 0) {
 		requestGait(GAIT_PARAMS);
+	} else if (strcmp(name, "state") == 0) {
+		printGaitState();
+		return;
 	} else {
-		cliSerial->println("Usage: gait trot|walk");
+		cliSerial->println("Usage: gait trot|walk|state");
 		return;
 	}
 	cliSerial->printf("Gait: %s (switches when the robot stands still)\n", name);
 }
 
 static const cliCommand dogCliCommands[] = {
-	{ "gait", cliGait, "Gait [trot|walk]", 1, 0 }
+	{ "gait", cliGait, "Gait [trot|walk|state]", 1, 0 }
 };
 
 const cliCommand *modelCliCommands     = dogCliCommands;

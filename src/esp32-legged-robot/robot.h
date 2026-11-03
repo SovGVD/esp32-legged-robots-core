@@ -60,12 +60,29 @@ extern modelSettings settings;
 uint32_t motionOverrunCount();   // motion ticks missed because a tick ran longer than LOOP_TIME
 
 /**
+ * Motion loop profiling (main.cpp): time spent in each part of a motion tick,
+ * to find what makes the loop overrun. CLI `loop` prints it, the serial port
+ * prints the slowest tick of every second that missed ticks.
+ */
+enum LoopStage : uint8_t {
+	LOOP_STAGE_FAILSAFE = 0,
+	LOOP_STAGE_POWER,      // INA219 + battery (I2C, 10 Hz)
+	LOOP_STAGE_IMU,        // MPU9250 read (I2C), part of MOTION
+	LOOP_STAGE_MOTION,     // leveler, gait, body kinematics, IK (includes IMU)
+	LOOP_STAGE_HAL,        // pulses -> servo bus (LEDC / PCA9685 over I2C)
+	LOOP_STAGE_COUNT
+};
+void loopProfileMark(LoopStage stage, uint32_t us);   // from the motion task only
+void cliLoop();
+
+/**
  * Motion (motion.cpp): gait, body kinematics, IK
  */
 void initMotion();
-void updateMotion();
+void updateMotion(float dt);   // dt: seconds since the previous motion tick (wall clock)
 const LR_figure &motionBody();
 void requestGait(const GaitParams &params);   // applied once the robot stands still
+void printGaitState();                        // CLI: active gait parameters
 
 /**
  * HAL (hal.cpp, servo.cpp, hal_*.cpp)
