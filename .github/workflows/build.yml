@@ -24,6 +24,9 @@ jobs:
           python-version: '3.12'
       - run: pip install -U platformio
       - run: pio run -e ${{ matrix.env }}
+      # the browser flasher (pages.yml, main only) needs these; check them on
+      # every build, nothing is published from here
+      - run: python3 tools/webflash/build_site.py --out /tmp/site --version check .pio/build/${{ matrix.env }}
 
   test:
     runs-on: ubuntu-latest

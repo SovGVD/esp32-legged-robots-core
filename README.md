@@ -49,6 +49,16 @@ pio device monitor                   # serial CLI, 115200
 `./build.sh cli [port]`) and still builds the web client (`./build.sh build-client-env`, needs Node.js),
 which regenerates `src/esp32-legged-robot/web/index.html.gz.h`.
 
+### Flash from the browser
+
+Every merge into `main` builds the firmware for all robots and publishes a flasher page on GitHub Pages
+(`.github/workflows/pages.yml`, nothing is published from `development` or pull requests). Open
+<https://sovgvd.github.io/esp32-legged-robots-core/> in Chrome or Edge on a desktop, connect the robot with USB,
+pick the model and press **Connect and install** ([ESP Web Tools](https://esphome.github.io/esp-web-tools/),
+Web Serial). Leave **Erase device** unchecked to keep the servo trims in NVS.
+
+These builds use the WiFi credentials from `config_wifi.example.h`, since `config_wifi.h` is not in git.
+
 ### Tests
 
 The motion core (`lib/robot_core`: geometry, inverse kinematics, body kinematics, gait engine) has no Arduino
