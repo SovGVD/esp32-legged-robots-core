@@ -47,7 +47,7 @@
     <light pos="0 0 1.5" dir="0 0 -1" directional="true" castshadow="false"/>
     <light pos="0.5 -0.5 0.8" dir="-1 1 -1.2" directional="true" castshadow="false" diffuse="0.3 0.3 0.3"/>
     <geom name="floor" type="plane" size="5 5 0.05" material="grid" contype="1" conaffinity="1" friction="0.8 0.005 0.0001"/>
-    <body name="torso" pos="0 0 0.06931">
+    <body name="torso" pos="0 0 0.102">
       <freejoint name="root"/>
       <geom name="torso_geom" type="box" size="0.05 0.088 0.02675" pos="0 0 -0.00195" group="3" rgba="0.95 0.95 0.95 0.3" mass="0"/>
       <geom name="body_bottom" type="mesh" mesh="hx_body_bottom" class="part" pos="0 0 -0.0287" quat="1 0 0 0" mass="0.0622"/>
@@ -72,7 +72,7 @@
 <geom name="torso_misc" type="sphere" class="part" size="0.003" pos="0 0 0" mass="0.0538" rgba="0.5 0.5 0.5 0"/>
       <site name="imu" pos="0 0 0" size="0.004" rgba="0 0.6 1 1"/>
 
-    <body name="LF_coxa" pos="-0.046 0.08 0" euler="0 0 2.65374">
+    <body name="LF_coxa" pos="-0.046 0.08 0" euler="0 0 2.65375">
       <joint name="LF_coxa" type="hinge" axis="0 0 1" range="-0.959931 0.959931" armature="8e-05" frictionloss="0.008" damping="0.0005"/>
       <geom name="LF_coxa" type="mesh" mesh="hx_coxa" class="part" pos="-0.0575 0 -0.0287" quat="1 0 0 0" mass="0.0116"/>
 <geom name="LF_coxa_gear" type="mesh" mesh="hx_coxa_gear" class="part" pos="0.03598 -0.01199 -0.0287" quat="1 0 0 0" mass="0.0033"/>
@@ -126,7 +126,7 @@
         </body>
       </body>
     </body>
-    <body name="LR_coxa" pos="-0.046 -0.08 0" euler="0 0 -2.65374">
+    <body name="LR_coxa" pos="-0.046 -0.08 0" euler="0 0 -2.65375">
       <joint name="LR_coxa" type="hinge" axis="0 0 1" range="-0.959931 0.959931" armature="8e-05" frictionloss="0.008" damping="0.0005"/>
       <geom name="LR_coxa" type="mesh" mesh="hx_coxa" class="part" pos="-0.0575 0 -0.0287" quat="1 0 0 0" mass="0.0116"/>
 <geom name="LR_coxa_gear" type="mesh" mesh="hx_coxa_gear" class="part" pos="0.03598 -0.01199 -0.0287" quat="1 0 0 0" mass="0.0033"/>
@@ -153,7 +153,7 @@
         </body>
       </body>
     </body>
-    <body name="RF_coxa" pos="0.046 0.08 0" euler="0 0 0.487854">
+    <body name="RF_coxa" pos="0.046 0.08 0" euler="0 0 0.48784">
       <joint name="RF_coxa" type="hinge" axis="0 0 1" range="-0.959931 0.959931" armature="8e-05" frictionloss="0.008" damping="0.0005"/>
       <geom name="RF_coxa" type="mesh" mesh="hx_coxa_m" class="part" pos="-0.0575 0 -0.0287" quat="0 0 0 1" mass="0.0116"/>
 <geom name="RF_coxa_gear" type="mesh" mesh="hx_coxa_gear_m" class="part" pos="0.03598 0.01199 -0.0287" quat="0 0 0 1" mass="0.0033"/>
@@ -207,7 +207,7 @@
         </body>
       </body>
     </body>
-    <body name="RR_coxa" pos="0.046 -0.08 0" euler="0 0 -0.487854">
+    <body name="RR_coxa" pos="0.046 -0.08 0" euler="0 0 -0.48784">
       <joint name="RR_coxa" type="hinge" axis="0 0 1" range="-0.959931 0.959931" armature="8e-05" frictionloss="0.008" damping="0.0005"/>
       <geom name="RR_coxa" type="mesh" mesh="hx_coxa_m" class="part" pos="-0.0575 0 -0.0287" quat="0 0 0 1" mass="0.0116"/>
 <geom name="RR_coxa_gear" type="mesh" mesh="hx_coxa_gear_m" class="part" pos="0.03598 0.01199 -0.0287" quat="0 0 0 1" mass="0.0033"/>

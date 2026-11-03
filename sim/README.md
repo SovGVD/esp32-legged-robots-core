@@ -225,18 +225,20 @@ the photos; `tools/prepare_hexapod_meshes.py` decimates them into
 newer, different body and isn't used. Estimated: the electronics and battery
 positions, the IMU at the body centre, and everything that needs a scale.
 
+Stance (`model/hexapod/config.h`): feet 110 mm out from the coxa axis and
+100 mm down, so the femur is 8° up and the tibia ~11° off vertical. The first
+model stance (160 mm out, 67 mm down) put the femur servos at their limit;
+the higher knee look (femur 15-45° up) runs into the femur's 45° range as soon
+as a foot lifts 30 mm or the robot sits down.
+
 First findings (with the estimated 892 g at ~5 V):
 
-* The firmware gait walks it as configured: about 270 mm forward in 4 s
-  (75 mm/s), 190 mm strafing in 3 s, turning at 0.75 rad/s, with under 3°
-  of tilt. No IK failures.
-* **Femur servos are at their limit.** Standing on six legs they use ~46 %
-  of stall torque; on three legs (the 2:1 femur gear gives 0.35 N·m) they
-  are saturated about 10 % of the time and the body sags 5-9 mm per step.
-  The real robot's weight and servo voltage decide how bad this is; less
-  mass or 6 V on the servos would help most.
-* Strafing and turning occasionally ask for more than the coxa's ±45°
-  (2:1 gear on a 180° servo); the firmware clamps those (`servo_range` count).
+* The firmware gait walks it as configured: about 310 mm forward in 4 s
+  (75 mm/s), 210 mm strafing in 3 s, turning at 0.75 rad/s, with under 1°
+  of tilt. No IK failures, no servo range clamps.
+* Femur servos use ~26 % of stall torque standing and stay below it while
+  walking (with the old wide stance: 46 % standing, saturated 10 % of the
+  time on three legs, 5-9 mm of sag).
 * Servo directions: see below.
 
 ### Servo directions (leg test)
