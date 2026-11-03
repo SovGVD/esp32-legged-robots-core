@@ -7,6 +7,12 @@
  * One or two PCA9685 boards. A servo "pin" is the channel number: 0-15 is the
  * first board (PWM_CONTROLLER_ADDRESS), 16-31 the second one
  * (PWM_CONTROLLER_ADDRESS_2, only when defined).
+ *
+ * The servo task writes every servo every tick (18 on the hexapod), but the
+ * boards only output a new pulse every 20 ms. So write() skips a pulse that
+ * hasn't changed, and converts microseconds to PCA9685 ticks itself:
+ * Adafruit's writeMicroseconds() reads the prescale register back over I2C on
+ * every call, which doubled the bus traffic.
  */
 #ifdef PWM_CONTROLLER_ADDRESS_2
 	#define PCA9685_BOARDS 2
@@ -29,6 +35,7 @@ class Pca9685ServoBus : public ServoBus {
 				_boards[i].begin();
 				_boards[i].setOscillatorFrequency(27000000);  // The int.osc. is closer to 27MHz
 				_boards[i].setPWMFreq(SERVO_FREQ);
+				_ticksPerUs[i] = 27000000.0f / (1000000.0f * (_boards[i].readPrescale() + 1));
 			}
 			setEnabled(true);
 			return true;
@@ -44,11 +51,18 @@ class Pca9685ServoBus : public ServoBus {
 			if (board >= PCA9685_BOARDS) {
 				return;   // reported by the pin check at boot
 			}
-			_boards[board].writeMicroseconds(channel % 16, us);
+			if (us == _last[index]) {
+				return;
+			}
+			_last[index] = us;
+			_boards[board].setPWM(channel % 16, 0, (uint16_t)(us * _ticksPerUs[board]));
 		}
 
 		void setEnabled(bool enabled) override
 		{
+			for (uint8_t i = 0; i < _count; i++) {
+				_last[i] = 0;   // write everything again after a sleep
+			}
 			for (uint8_t i = 0; i < PCA9685_BOARDS; i++) {
 				if (enabled) {
 					_boards[i].wakeup();
@@ -69,6 +83,8 @@ class Pca9685ServoBus : public ServoBus {
 		};
 		uint8_t _channels[LEG_NUM * LEG_DOF] = {};
 		uint8_t _count = 0;
+		uint16_t _last[LEG_NUM * LEG_DOF] = {};   // last pulse written per servo, us
+		float _ticksPerUs[PCA9685_BOARDS] = {};
 };
 
 ServoBus &servoBus()

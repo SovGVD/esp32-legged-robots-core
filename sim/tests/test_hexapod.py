@@ -132,20 +132,20 @@ def test_firmware_stands(fw, hexa):
 
 
 @needs_cxx
-@pytest.mark.parametrize("command, axis, sign", [
-    ((0, 1, 0, 0, 0, 0), 1, 1),
-    ((0, -1, 0, 0, 0, 0), 1, -1),
-    ((1, 0, 0, 0, 0, 0), 0, 1),
+@pytest.mark.parametrize("command, axis, sign, distance", [
+    ((0, 1, 0, 0, 0, 0), 1, 1, 900.0),
+    ((0, -1, 0, 0, 0, 0), 1, -1, 900.0),
+    ((1, 0, 0, 0, 0, 0), 0, 1, 700.0),
 ], ids=["forward", "backward", "strafe right"])
-def test_firmware_walks(fw, hexa, command, axis, sign):
+def test_firmware_walks(fw, hexa, command, axis, sign, distance):
     p0 = hexa.body_position_mm().copy()
     fw.drive(hexa, command, 3.0)
     d = hexa.body_position_mm() - p0
-    # 75 mm/s max after a short ramp, minus slip
-    assert sign * d[axis] > 180.0, d
+    # 400 mm/s forward, 300 sideways (maxSideSpeed) after a ~0.6 s ramp, minus slip
+    assert sign * d[axis] > distance, d
     assert abs(d[1 - axis]) < 0.1 * abs(d[axis]), d
     assert tilt_deg(hexa) < 5.0
-    assert hexa.body_position_mm()[2] > 90.0
+    assert hexa.body_position_mm()[2] > 87.0   # servos sag ~6 mm at full speed
     assert fw.unsolved == 0
 
 
