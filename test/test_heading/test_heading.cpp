@@ -103,9 +103,10 @@ void test_estimator_gyro_then_magnetometer()
 	TEST_ASSERT_TRUE(est.absolute());
 	TEST_ASSERT_FLOAT_WITHIN(0.5f, 200, est.heading() / DEG);
 
-	// a gyro that drifts 2 deg/s is held near the magnetometer heading
-	for (int i = 0; i < 2500; i++) est.update(0.004f, 2 * DEG, level, m);
-	TEST_ASSERT_FLOAT_WITHIN(5.0f, 200, est.heading() / DEG);
+	// a gyro that drifts 2 deg/s is held at the magnetometer heading: its bias is learned
+	for (int i = 0; i < 15000; i++) est.update(0.004f, 2 * DEG, level, m);   // 60 s
+	TEST_ASSERT_FLOAT_WITHIN(0.3f, 200, est.heading() / DEG);
+	TEST_ASSERT_FLOAT_WITHIN(0.1f, 2, est.gyroBias() / DEG);
 }
 
 void test_estimator_ignores_disturbed_field()

@@ -77,7 +77,7 @@ void HeadingEstimator::setMagCalibration(const float offset[3], const float scal
 void HeadingEstimator::update(float dt, float yawRate, const LR_angle &tilt, const float *mag)
 {
 	// gyro: counter-clockwise turn lowers the compass heading
-	_heading = lrWrapAngle(_heading - yawRate * dt);
+	_heading = lrWrapAngle(_heading - (yawRate - _bias) * dt);
 	_ready = true;
 	_magOk = false;
 	if (mag == nullptr) {
@@ -101,11 +101,19 @@ void HeadingEstimator::update(float dt, float yawRate, const LR_angle &tilt, con
 		_absolute = true;
 		return;
 	}
-	float k = _params.magTau > 0 ? dt / _params.magTau : 1.0f;
+	float tau = _params.magTau;
+	float err = lrWrapAngle(h - _heading);
+	float k = tau > 0 ? dt / tau : 1.0f;
 	if (k > 1) {
 		k = 1;
 	}
-	_heading = lrWrapAngle(_heading + lrWrapAngle(h - _heading) * k);
+	_heading = lrWrapAngle(_heading + err * k);
+	if (tau > 0) {
+		// integral part (critically damped with the pull above): heading behind the
+		// magnetometer, clockwise = the gyro reads too much counter-clockwise turn
+		_bias += err * dt / (4 * tau * tau);
+		_bias = constrain(_bias, -0.1f, 0.1f);   // MEMS gyros: a few deg/s at most
+	}
 }
 
 float HeadingEstimator::heading() const

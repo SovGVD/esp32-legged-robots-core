@@ -57,6 +57,11 @@ static TerrainTilt terrainTilt;
 static TerrainTiltMode mapTiltMode = TERRAIN_TILT_MODE;
 static float biasTau = 1.5f;
 static float unplannedTau = 0.3f;
+// Heading (gyro + magnetometer) and heading hold, as in sensors.cpp / motion.cpp
+static HeadingEstimator headingEst;
+static HeadingHold      headingHold;
+static bool             headingFed = false;
+static const HeadingHoldParams HEADING_HOLD = { 1.5f, 0.6f, 0.07f, 0.05f };   // motion.cpp HEADING_HOLD_PARAMS
 // TERRAIN_PARAMS, tunable from Python (rc_tune_terrain); kept across rc_init()
 static TerrainParams terrainParams = TERRAIN_PARAMS;
 
@@ -97,6 +102,9 @@ RC_API void rc_init()
 	terrainMap.begin(TERRAIN_MAP_PARAMS);
 	lastImu = { 0, 0, 0 };
 	terrainTilt.begin(mapTiltMode, biasTau, unplannedTau);
+	headingEst.begin({ 2.0f, 0.25f });   // sensors.cpp HEADING_MAG_TAU, HEADING_FIELD_TOLERANCE
+	headingHold.begin(HEADING_HOLD);
+	headingFed = false;
 	applyTerrain();
 	LR_moveVector zero = {};
 	motion.update(0.0f, zero, imuCorrection);
@@ -137,6 +145,11 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 	// tilt the gait didn't ask for: measured minus commanded (-correction)
 	LR_angle unplanned = { (lastImu.pitch + imuCorrection.pitch) * tiltGain, (lastImu.roll + imuCorrection.roll) * tiltGain, 0 };
 	motion.gait().setTilt(unplanned);
+	if (headingFed && headingHold.enabled()) {
+		// motion.cpp steer(): the hold writes the yaw of the command
+		bool moving = fabsf(cmd.move.x) > 0.05f || fabsf(cmd.move.y) > 0.05f;
+		cmd.rotate.yaw = headingHold.update(cmd.rotate.yaw, headingEst.heading(), motion.gait().params().maxYawRate, moving);
+	}
 	int unsolved = motion.update(dt, cmd, imuCorrection);
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		lrLegPulses(legs[i], LEG_DOF, servoMainProfile, &pulses[i * LEG_DOF]);
@@ -235,6 +248,35 @@ RC_API void rc_tilt_estimate(float dt, const float *accel, const float *gyro, fl
 	tilt.update(dt, accel, gyro);
 	out[0] = tilt.aboutY();
 	out[1] = tilt.aboutX();
+}
+
+/**
+ * Heading sensors for one tick, like Mpu9250Imu::read(): gyro rate about the
+ * body's up axis (rad/s, counter-clockwise > 0) and, when there is a new
+ * reading, the magnetometer in the body frame (uT, x right, y forward, z up).
+ */
+RC_API void rc_heading_feed(float dt, float yawRate, const float *mag)
+{
+	headingEst.update(dt, yawRate, lastImu, mag);
+	headingFed = true;
+}
+
+RC_API void rc_heading_hold(int on) { headingHold.setEnabled(on != 0); }
+RC_API void rc_turn_to(float rad)
+{
+	headingHold.setEnabled(true);
+	headingHold.setTarget(rad);
+}
+
+/** heading (rad, compass), target (rad), hold on, has target, absolute (magnetometer), field (uT) */
+RC_API void rc_heading_state(float *out)
+{
+	out[0] = headingEst.heading();
+	out[1] = headingHold.target();
+	out[2] = headingHold.enabled();
+	out[3] = headingHold.hasTarget();
+	out[4] = headingEst.absolute();
+	out[5] = headingEst.field();
 }
 
 RC_API void rc_tilt_reset()

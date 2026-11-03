@@ -224,3 +224,42 @@ def test_battery_sit_down_is_calm(fw, dog):
     assert abs(dz - fw.sit_height()) < 5.0, (dz, fw.sit_height())
     assert tilt < 2.0, tilt
     assert np.linalg.norm(dog.body_position_mm()[:2] - p0) < 5.0
+
+
+def test_heading_hold_turns_back_after_a_push(fw):
+    """The firmware heading code (gyro with 1 deg/s drift + magnetometer) and the hold:
+    a push turns the walking dog ~60 deg; with the hold it turns back to its heading."""
+    ends = {}
+    for hold in (False, True):
+        fw.reset()
+        fw.select_gait("trot")
+        fw.set_heading_sensors(gyro_bias_dps=1.0)
+        dog = fw.place(SimDog())
+        fw.drive(dog, duration=0.5)
+        fw.heading_hold(hold)
+        t = 0.0
+        while t < 9.0:
+            dog.data.xfrc_applied[dog._torso, 5] = -0.12 if 2.5 <= t < 4.0 else 0.0
+            fw.drive(dog, (0, 1, 0, 0, 0, 0))
+            t += fw.loop_dt
+        h = (-math.degrees(dog.body_orientation()["yaw"])) % 360
+        ends[hold] = h - 360 if h > 180 else h
+        # the estimate follows the true heading (within a few degrees)
+        est = fw.heading_state()["heading"]
+        assert abs((est - h + 180) % 360 - 180) < 8
+    fw.set_heading_sensors(None)
+    assert ends[False] > 40
+    assert abs(ends[True]) < 10
+
+
+def test_turn_to_a_compass_heading(fw):
+    fw.reset()
+    fw.select_gait("trot")
+    fw.set_heading_sensors(gyro_bias_dps=1.0)
+    dog = fw.place(SimDog())
+    fw.drive(dog, duration=0.5)
+    fw.turn_to(90)
+    fw.drive(dog, duration=4.0)
+    h = (-math.degrees(dog.body_orientation()["yaw"])) % 360
+    fw.set_heading_sensors(None)
+    assert abs(h - 90) < 8

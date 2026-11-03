@@ -38,7 +38,7 @@ model, run `python -m mujoco.viewer --mjcf models/dog.xml`. Linux and Windows
 ## Commands
 
 ```
-python -m pytest -q tests            # 80 checks, ~60 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 82 checks, ~60 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
@@ -440,6 +440,12 @@ Findings (rough gait, full stick, 8 s dog / 6 s hexapod; `--compare`):
   metre, so the map is that far off, and one misplaced foot tips it.
   Gaps narrower than two map cells (dog 24 mm, hexapod 30 mm) are hard to
   see; the feet step over them or onto the edge.
+* **Heading**: `FirmwareCore.set_heading_sensors(gyro_bias_dps, magnetometer)` feeds the
+  firmware's `HeadingEstimator` (gyro yaw rate with a bias, magnetometer from the sim's
+  orientation and an earth field, world +Y = north); `heading_hold()`, `turn_to(deg)`,
+  `heading_state()` are the CLI's `heading on`, `turnto`, `heading state`. A push that turns
+  the walking dog 60 deg: without the hold it walks off that way, with it it turns back to
+  within 5 deg (`tests/test_firmware.py`). Videos: `examples/sensor_videos.py`.
 * Odometry: the map lives in the gait's odometry frame. When a foot gets
   stuck the robot falls behind its odometry and the map slides with it;
   cells are forgotten after `maxAge` (dog 10 s, hexapod 6 s).

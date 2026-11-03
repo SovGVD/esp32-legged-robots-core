@@ -10,7 +10,10 @@
  * magnetometer gives an absolute one that is noisy and thrown off by the
  * servos' currents and magnets. The estimator integrates the gyro and pulls
  * the result slowly (magTau) toward the magnetometer, ignoring readings whose
- * field strength is far from the calibrated one (a disturbance).
+ * field strength is far from the calibrated one (a disturbance). It also
+ * learns the gyro's bias from the magnetometer (slower still), so a gyro
+ * that drifts doesn't leave the heading lagging, and the heading keeps
+ * better through a disturbance.
  */
 #ifndef LR_HEADING_H
 #define LR_HEADING_H
@@ -59,7 +62,9 @@ typedef struct {
 class HeadingEstimator {
 	public:
 		void begin(const HeadingParams &params) { _params = params; reset(); }
-		void reset() { _heading = 0; _ready = false; _absolute = false; }
+		void reset() { _heading = 0; _bias = 0; _ready = false; _absolute = false; }
+		/** learned gyro bias, rad/s (subtracted from the yaw rate) */
+		float gyroBias() const { return _bias; }
 		/** Calibration from MagCalibrator; field = calibrated field strength (0: unknown, no check) */
 		void setMagCalibration(const float offset[3], const float scale[3], float field);
 		/**
@@ -83,6 +88,7 @@ class HeadingEstimator {
 		float _scale[3]  = { 1, 1, 1 };
 		float _field     = 0;
 		float _heading   = 0;
+		float _bias      = 0;
 		float _lastField = 0;
 		bool  _ready     = false;
 		bool  _absolute  = false;
