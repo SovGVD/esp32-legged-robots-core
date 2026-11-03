@@ -66,7 +66,7 @@ MotionStatus motionStatus()
 	return st;
 }
 
-void updateMotion()
+void updateMotion(float dt)
 {
 	// battery empty: motors off for good (BatteryMonitor latches it)
 	if (!isHALEnabled() || batteryState() == BATTERY_CRITICAL) {
@@ -74,7 +74,7 @@ void updateMotion()
 	} else {
 		LR_moveVector cmd = getMoveCommand();
 		// forward is -1 on the web client
-		drive.update(LOOP_DT, -cmd.move.y, -cmd.rotate.yaw);
+		drive.update(dt, -cmd.move.y, -cmd.rotate.yaw);
 	}
 	writeTrack(TRACKL, drive.leftDuty());
 	writeTrack(TRACKR, drive.rightDuty());
@@ -122,6 +122,24 @@ const LR_figure &motionBody()
 	return motion.body();
 }
 
+/**
+ * CLI `gait state`: the gait the motion loop really runs, to tell whether a
+ * flashed build has the expected parameters.
+ */
+void printGaitState()
+{
+	const GaitParams &p = motion.gait().params();
+	cliSerial->printf("Gait: %s%s, cycle %.2f s, duty %.2f, step height %.0f mm\n",
+	                  p.staticStability ? "walk (static)" : "trot (dynamic)",
+	                  pendingGait != nullptr ? ", switch pending" : "",
+	                  p.cycleTime, p.dutyFactor, p.stepHeight);
+	cliSerial->printf("Max speed %.0f mm/s, side %.0f mm/s, yaw %.2f rad/s, CoM {%.0f, %.0f}\n",
+	                  p.maxSpeed, p.maxSideSpeed, p.maxYawRate, p.centerOfMass.x, p.centerOfMass.y);
+	LR_point v = motion.gait().velocity();
+	cliSerial->printf("Now: %s, velocity {%.0f, %.0f} mm/s, yaw %.2f rad/s\n",
+	                  motion.gait().isActive() ? "stepping" : "standing", v.x, v.y, motion.gait().yawRate());
+}
+
 static volatile bool sitting = false;
 
 MotionStatus motionStatus()
@@ -167,7 +185,7 @@ static LR_moveVector batteryGuard(const LR_moveVector &cmd)
 	return stop;
 }
 
-void updateMotion()
+void updateMotion(float dt)
 {
 	if (!isHALEnabled()) {
 		return;
@@ -177,12 +195,14 @@ void updateMotion()
 	// dynamic gait (trot), where the body rocks every step.
 	// the IMU is read every tick anyway: the gyro integration needs it
 	if (imu().ready()) {
+		uint32_t t = micros();
 		updateIMU();
+		loopProfileMark(LOOP_STAGE_IMU, micros() - t);
 	}
 	leveler.setEnabled(levelRequest && imu().ready());
 	static const LR_angle levelTarget = { 0, 0, 0 };
 	bool hold = motion.gait().isActive() && !motion.gait().params().staticStability;
-	imuCorrection = leveler.update(LOOP_DT, IMU_DATA, levelTarget, hold);
+	imuCorrection = leveler.update(dt, IMU_DATA, levelTarget, hold);
 
 	// switch gaits only while standing, so no leg is in the air
 	const GaitParams *next = pendingGait;
@@ -191,7 +211,7 @@ void updateMotion()
 		pendingGait = nullptr;
 	}
 
-	motion.update(LOOP_DT, batteryGuard(getMoveCommand()), imuCorrection);
+	motion.update(dt, batteryGuard(getMoveCommand()), imuCorrection);
 }
 
 #endif

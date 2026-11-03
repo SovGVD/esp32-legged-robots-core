@@ -82,7 +82,7 @@ time based (open loop); set `useContactSensors` to `true` once a robot has foot 
 it: each foot gets a support weight (0 in swing, ramping in after touchdown and out before lift-off) and the
 centre of mass is steered to the weighted feet centroid, scaled per axis by `stabilityGain`. It is for slow gaits
 with three feet on the ground. The dog has a second gait, `GAIT_PARAMS_WALK` (crawl: LH, LF, RH, RF, 1.2 s cycle,
-20 mm/s, sideways shift only, about 16 mm stability margin); switch with the CLI command `gait walk` / `gait trot`
+20 mm/s, sideways shift only, about 16 mm stability margin); switch with the CLI command `gait walk` / `gait trot` (`gait state` shows the active one)
 (applied once the robot stands still). In the simulator this walk tilts about 2° instead of 3-6° without the shift.
 
 **IMU leveling.** `level on` in the CLI (or `HORIZON_LEVEL` in `config.h` to start with it on) tilts the body
@@ -107,6 +107,14 @@ voltage, current, loop time, status bits (HAL, failsafe, gait and whether it is 
 power sensor found, battery state, resting, missed motion ticks), IMU tilt, missed tick count and the IK
 counters (feet out of reach / joint limit / servo range clamps). The header shows them, e.g.
 `walk · stepping · level · tilt 0.4° -1.2° · IK 0/3/0`.
+
+**Motion loop timing.** The motion task runs every `LOOP_TIME` (dog 4.4 ms). The gait, leveler and tank drive
+get the real time since the previous tick (capped at 50 ms), so a slow loop makes motion coarser, not slower.
+`loop` in the CLI prints the last second: ticks run and missed, the longest gap between ticks, and the average
+and slowest time of each stage (failsafe, power sensor, IMU read, motion pipeline, servo output). Every second
+that misses ticks is also printed on the serial port with the same breakdown. `gait state` prints the gait the
+loop really runs (cycle, step height, speeds, CoM offset). I2C transfers time out after `I2C_TIMEOUT_MS` (10 ms)
+so one stuck read can't hold the loop for long.
 
 **Tank.** No gait: the move command is mixed into left/right track speeds, slew limited (`TANK_DRIVE_PARAMS` in
 `model/tank/model_data.h`: acceleration, deadband, minimum duty that starts the motors) and written as H-bridge
