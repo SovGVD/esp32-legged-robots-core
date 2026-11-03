@@ -42,7 +42,7 @@ class HexLegConfig:
 # config.h: LEG_BODY_X/Y, LEG_FOOT_X/Y/Z, LEG_MIDDLE_* [code]. The STLs put the coxa
 # axes exactly here: bearing holes at (+-46, +-80) and (+-57.5, 0) [cad].
 _BX, _BY, _MX = 46.0, 80.0, 57.5
-_FX, _FY, _FZ, _MFX = 143.17, 131.56, 100.00, 167.5
+_FX, _FY, _FZ, _MFX = 150.24, 135.31, 95.00, 175.5
 
 # Angle inverse flags: left tibia, right femur (right legs are mirrored) [code]
 _INV_L = (False, False, True)

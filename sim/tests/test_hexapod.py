@@ -39,13 +39,13 @@ def test_fk_inverts_firmware_ik(leg):
 
 
 def test_neutral_pose_is_servo_middle_rotated():
-    """Neutral stance: coxa at the servo middle, femur up 8.4 deg, knee nearly square (tibia ~11 deg off vertical)."""
+    """Neutral stance: coxa at the servo middle, femur up 11.6 deg, tibia ~15 deg off vertical."""
     for leg in P.legs:
         a = firmware_ik(GEO, leg, default_foot(leg))
         q = leg_angles_to_q(*a)
         assert q[0] == pytest.approx(0, abs=1e-9)
-        assert math.degrees(q[1]) == pytest.approx(8.4, abs=0.1)
-        assert math.degrees(q[1] + q[2]) == pytest.approx(10.8, abs=0.1)   # tibia off vertical
+        assert math.degrees(q[1]) == pytest.approx(11.6, abs=0.1)
+        assert math.degrees(q[1] + q[2]) == pytest.approx(15.4, abs=0.1)   # tibia off vertical
 
 
 def test_mjcf_matches_fk():
@@ -84,8 +84,8 @@ def test_mass_and_standing_height():
     h = SimHexapod()
     assert sum(h.model.body_mass) * 1000 == pytest.approx(P.masses.total(), abs=0.5)
     h.step(0.5)
-    # IK height 100 mm, minus the servos sagging under the weight
-    assert 97.0 < h.body_position_mm()[2] < 100.5
+    # IK height 95 mm, minus the servos sagging under the weight
+    assert 92.0 < h.body_position_mm()[2] < 95.5
     o = h.body_orientation()
     assert abs(o["pitch"]) < 0.01 and abs(o["roll"]) < 0.01
 
@@ -128,7 +128,7 @@ def test_firmware_stands(fw, hexa):
     fw.drive(hexa, STOP, 1.5)
     assert np.linalg.norm(hexa.body_position_mm()[:2] - p0[:2]) < 2.0
     assert tilt_deg(hexa) < 1.0
-    assert hexa.body_position_mm()[2] > 97.0
+    assert hexa.body_position_mm()[2] > 92.0
 
 
 @needs_cxx
@@ -145,7 +145,7 @@ def test_firmware_walks(fw, hexa, command, axis, sign):
     assert sign * d[axis] > 180.0, d
     assert abs(d[1 - axis]) < 0.1 * abs(d[axis]), d
     assert tilt_deg(hexa) < 5.0
-    assert hexa.body_position_mm()[2] > 95.0
+    assert hexa.body_position_mm()[2] > 90.0
     assert fw.unsolved == 0
 
 
