@@ -170,20 +170,36 @@ input.pending {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 0.5em;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3em;
   padding: 0.4em;
   border: 2px solid transparent;
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 85%, transparent);
-  pointer-events: none; /* the sticks underneath keep working */
+  pointer-events: none; /* the sticks underneath keep working around the 3D view */
 }
 #tof.gap {
   border-color: var(--warn);
 }
-#tof figure {
-  margin: 0;
+.tof3d {
+  width: min(calc(100vw - 2em), 440px);
+  height: min(42vh, 280px);
+  touch-action: none;
+  pointer-events: auto;
+  cursor: grab;
 }
-#tof figcaption {
-  max-width: 176px;
+.tof-grids {
+  display: flex;
+  gap: 0.5em;
+}
+.tof-info {
   text-align: center;
+}
+#tof button {
+  position: absolute;
+  top: 0.4em;
+  right: 0.4em;
+  padding: 0.1em 0.6em;
+  pointer-events: auto;
 }

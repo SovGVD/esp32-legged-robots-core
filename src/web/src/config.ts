@@ -1,7 +1,7 @@
 /**
  * Robot configuration. The firmware serves it as /c.js, a classic script
  * that defines a global `c` before this module runs:
- *   const c={v:'0.0.1',w:'ws://192.168.4.1/ws',c:0,g:1,l:1,t:1,r:400};
+ *   const c={v:'0.0.1',w:'ws://192.168.4.1/ws',c:0,g:1,l:1,t:1,r:400,m:[[0,88,0,0,0.7,0.785]]};
  */
 interface FirmwareConfig {
   v?: string; // web server version
@@ -11,6 +11,17 @@ interface FirmwareConfig {
   l?: number; // 1 = IMU leveling available
   t?: number; // number of ToF sensors, 0 = none
   r?: number; // ToF range, mm (colour scale)
+  m?: number[][]; // ToF mounting per sensor: [x, y, z (mm, body frame), yaw, tilt, fov (rad)]
+}
+
+/** Where a ToF sensor sits on the body (firmware TofSensor). x right, y forward, z up. */
+export interface TofMount {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number; // rad, + = left
+  tilt: number; // rad, + = down
+  fov: number; // rad, full field of view
 }
 
 declare const c: FirmwareConfig | undefined;
@@ -23,6 +34,7 @@ export interface Config {
   levelToggle: boolean;
   tofSensors: number;
   tofRange: number;
+  tofMounts: TofMount[];
 }
 
 export function loadConfig(): Config {
@@ -37,5 +49,6 @@ export function loadConfig(): Config {
     levelToggle: fw.l === 1,
     tofSensors: fw.t ?? 0,
     tofRange: fw.r || 400,
+    tofMounts: (fw.m ?? []).map(([x, y, z, yaw, tilt, fov]) => ({ x, y, z, yaw, tilt, fov })),
   };
 }

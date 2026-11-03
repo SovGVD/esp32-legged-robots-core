@@ -43,7 +43,9 @@ function robotDevServer(): Plugin {
       res.setHeader('Content-Type', 'application/javascript');
       // TOF=<n> sets the number of ToF views (dog 1, hexapod 2)
       const tof = Number(process.env.TOF ?? 2);
-      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1,t:${tof},r:450};`);
+      // mounting as in model_data.h TOF_SENSORS: dog nose, hexapod front left/right
+      const m = tof === 1 ? '[[0,88,0,0,0.7,0.785]]' : '[[-25,90,10,0.35,0.61,0.785],[25,90,10,-0.35,0.61,0.785]]';
+      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1,t:${tof},r:450,m:${m}};`);
     });
   };
   return {

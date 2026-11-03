@@ -79,6 +79,14 @@ static void initWebServerConfig()
 	// ToF view: t = number of sensors (0 = none), r = range of the colour scale, mm
 	addIntToWebServerConfig("t", tofSensorCount());
 	addIntToWebServerConfig("r", tofMaxRange());
+	// m = ToF mounting for the 3D view, per sensor [x, y, z (mm, body frame), yaw, tilt, fov (rad)]
+	webConfig += ",m:[";
+	for (uint8_t i = 0; i < tofSensorCount(); i++) {
+		const TofSensor &s = MODEL_TERRAIN.tof[i];
+		webConfig += String(i ? ",[" : "[") + String(s.position.x, 0) + "," + String(s.position.y, 0) + "," +
+		             String(s.position.z, 0) + "," + String(s.yaw, 3) + "," + String(s.tilt, 3) + "," + String(s.fov, 3) + "]";
+	}
+	webConfig += "]";
 
 	webConfig += "};";
 }
