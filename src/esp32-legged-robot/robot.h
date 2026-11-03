@@ -42,6 +42,7 @@ extern const LevelerParams   LEVEL_PARAMS;
 extern const float           SIT_HEIGHT;
 #endif
 extern const BatteryParams   BATTERY_PARAMS;
+extern const GaitParams *const MODEL_WALK_GAIT;   // statically stable walk, nullptr if the model has only GAIT_PARAMS
 extern const cliCommand *modelCliCommands;
 extern const uint8_t     modelCliCommandsCount;
 void modelSettingsPrint();
@@ -157,6 +158,8 @@ void initCameraStream();   // web_server.cpp, needs the esp32camera library
 void int16ToBytes(int value, uint8_t _offset);
 void pTelemetry();
 void pCli(uint8_t *data, size_t len);
+void pGait(uint8_t *data, size_t len);
+void pLevel(uint8_t *data, size_t len);
 
 /**
  * CLI (cli.cpp, cli_commands.cpp)

@@ -3,10 +3,25 @@ import { Cli } from './cli.ts';
 import { loadConfig } from './config.ts';
 import { Connection, type ConnectionState } from './connection.ts';
 import { Joystick } from './joystick.ts';
-import { TS, batteryState, encodeCli, encodeMove, encodeTelemetryRequest, zeroVector, type Telemetry } from './protocol.ts';
+import {
+  TS,
+  batteryState,
+  encodeCli,
+  encodeGait,
+  encodeLevel,
+  encodeMove,
+  encodeTelemetryRequest,
+  zeroVector,
+  type Telemetry,
+} from './protocol.ts';
+import { RemoteToggle } from './toggle.ts';
 
 const MOVE_INTERVAL_MS = 50; // the firmware failsafe expects a move package at least this often
 const TELEMETRY_INTERVAL_MS = 1000;
+// how long a toggle waits for telemetry to confirm a switch before showing
+// the robot's state again; a gait change waits until the robot stands still
+const GAIT_CONFIRM_MS = 15000;
+const LEVEL_CONFIRM_MS = 2500;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -55,6 +70,17 @@ const cli = new Cli($('cli-output'), $<HTMLInputElement>('cli-input'), $<HTMLFor
   connection.send(encodeCli(cmd)),
 );
 
+// ask for telemetry right away so the toggle confirms without waiting a second
+function sendSetting(data: Uint8Array): void {
+  connection.send(data);
+  connection.send(encodeTelemetryRequest());
+}
+
+const walk = new RemoteToggle($<HTMLInputElement>('walk'), (on) => sendSetting(encodeGait(on)), GAIT_CONFIRM_MS);
+const level = new RemoteToggle($<HTMLInputElement>('level'), (on) => sendSetting(encodeLevel(on)), LEVEL_CONFIRM_MS);
+$('walk-label').hidden = !config.gaitToggle;
+$('level-label').hidden = !config.levelToggle;
+
 const batteryText = { unknown: '', ok: '', low: 'battery low', critical: 'battery empty' } as const;
 
 function renderTelemetry(): void {
@@ -87,6 +113,10 @@ function renderTelemetry(): void {
     }
   }
   ui.status.textContent = parts.join(' · ');
+
+  const sitting = !!t && (t.statuses & TS.sitting) !== 0;
+  walk.sync(t ? (t.statuses & TS.gaitStatic) !== 0 : null, !sitting);
+  level.sync(t ? (t.statuses & TS.leveling) !== 0 : null, !!t && (t.statuses & TS.imu) !== 0 && !sitting);
   ui.status.classList.toggle('warn', warn);
 }
 

@@ -11,6 +11,8 @@
 static QuadrupedLegIK modelLegIK;
 LegIK &MODEL_IK = modelLegIK;
 
+const GaitParams *const MODEL_WALK_GAIT = &GAIT_PARAMS_WALK;
+
 static void cliGait()
 {
 	char *name = CLI_readWord();

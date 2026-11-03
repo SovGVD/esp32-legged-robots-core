@@ -68,6 +68,14 @@ static void initWebServerConfig()
 		addIntToWebServerConfig("c", 0);	// no camera available
 	#endif
 
+	// On-screen toggles: g = gait (trot/walk) can be switched, l = IMU leveling
+	addIntToWebServerConfig("g", MODEL_WALK_GAIT != nullptr ? 1 : 0);
+	#if PWM_CONTROLLER_TYPE == DCMOTOR
+		addIntToWebServerConfig("l", 0);	// tracks don't level
+	#else
+		addIntToWebServerConfig("l", 1);
+	#endif
+
 	webConfig += "};";
 }
 
@@ -160,6 +168,12 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 				break;
 			case P_CLI:
 				pCli(data, len);
+				break;
+			case P_GAIT:
+				pGait(data, len);
+				break;
+			case P_LEVEL:
+				pLevel(data, len);
 				break;
 			#ifdef CAMERAENABLED
 			case P_START_VIDEO:

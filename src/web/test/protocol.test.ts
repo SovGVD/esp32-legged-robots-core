@@ -130,3 +130,11 @@ test('unknown and empty packages', () => {
   assert.deepEqual(decode(Uint8Array.of(0x99)), { type: 'unknown', id: 0x99 });
   assert.equal(decode(new Uint8Array()), null);
 });
+
+test('gait and level packages match the firmware ids', async () => {
+  const { encodeGait, encodeLevel } = await import('../src/protocol.ts');
+  assert.deepEqual([...encodeGait(true)], [0x47, 1]);
+  assert.deepEqual([...encodeGait(false)], [0x47, 0]);
+  assert.deepEqual([...encodeLevel(true)], [0x4c, 1]);
+  assert.deepEqual([...encodeLevel(false)], [0x4c, 0]);
+});
