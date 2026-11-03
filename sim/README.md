@@ -235,10 +235,11 @@ First findings (with the estimated 892 g at ~5 V):
   mass or 6 V on the servos would help most.
 * Strafing and turning occasionally ask for more than the coxa's ±45°
   (2:1 gear on a 180° servo); the firmware clamps those (`servo_range` count).
-* Not checked by the sim: servo directions. The model sets no angle
-  `inverse` flags, so a pulse moves the left and right legs' servos the same
-  way. With mirrored legs on the real robot one side may need them; the sim
-  follows the firmware's HAL either way.
+* Servo directions: the right legs are mirror images of the left (all gears
+  face forward) and every gear pair reverses the rotation, so the model now
+  inverts the tibia on the left legs and the femur on the right legs. That was
+  worked out from the parts and the dog's servo direction; the sim follows the
+  firmware's HAL either way, so only the robot can confirm it.
 
 ## Plan
 

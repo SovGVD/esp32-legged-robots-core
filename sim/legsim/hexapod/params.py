@@ -25,7 +25,7 @@ class HexLegConfig:
     body: tuple          # coxa axis on the body (defaultBody), mm, X right, Y forward
     foot: tuple          # neutral foot point (defaultFoot), mm
     inverse_xyz: tuple = (True, True, True)      # LR_legInverse x, y, z [code]
-    inverse_abg: tuple = (False, False, False)   # LR_legInverse alpha, beta, gamma (not set in the model) [code]
+    inverse_abg: tuple = (False, False, False)   # LR_legInverse alpha, beta, gamma [code]
 
     @property
     def side(self):
@@ -44,14 +44,18 @@ class HexLegConfig:
 _BX, _BY, _MX = 46.0, 80.0, 57.5
 _FX, _FY, _FZ, _MFX = 187.34, 155.0, 67.31, 217.5
 
+# Angle inverse flags: left tibia, right femur (right legs are mirrored) [code]
+_INV_L = (False, False, True)
+_INV_R = (False, True, False)
+
 # Firmware order: LF, LM, LR, RF, RM, RR [code]
 LEGS = (
-    HexLegConfig("LF", (-_BX, _BY, 0.0), (-_FX, _FY, -_FZ)),
-    HexLegConfig("LM", (-_MX, 0.0, 0.0), (-_MFX, 0.0, -_FZ)),
-    HexLegConfig("LR", (-_BX, -_BY, 0.0), (-_FX, -_FY, -_FZ)),
-    HexLegConfig("RF", (_BX, _BY, 0.0), (_FX, _FY, -_FZ)),
-    HexLegConfig("RM", (_MX, 0.0, 0.0), (_MFX, 0.0, -_FZ)),
-    HexLegConfig("RR", (_BX, -_BY, 0.0), (_FX, -_FY, -_FZ)),
+    HexLegConfig("LF", (-_BX, _BY, 0.0), (-_FX, _FY, -_FZ), inverse_abg=_INV_L),
+    HexLegConfig("LM", (-_MX, 0.0, 0.0), (-_MFX, 0.0, -_FZ), inverse_abg=_INV_L),
+    HexLegConfig("LR", (-_BX, -_BY, 0.0), (-_FX, -_FY, -_FZ), inverse_abg=_INV_L),
+    HexLegConfig("RF", (_BX, _BY, 0.0), (_FX, _FY, -_FZ), inverse_abg=_INV_R),
+    HexLegConfig("RM", (_MX, 0.0, 0.0), (_MFX, 0.0, -_FZ), inverse_abg=_INV_R),
+    HexLegConfig("RR", (_BX, -_BY, 0.0), (_FX, -_FY, -_FZ), inverse_abg=_INV_R),
 )
 
 JOINTS = ("coxa", "femur", "tibia")   # alpha, beta, gamma
