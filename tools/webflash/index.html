@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot firmware flasher</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+	:root { --bg: #fafafa; --fg: #1d1d1f; --muted: #6b6b70; --card: #fff; --line: #ddd; --accent: #0b6bcb; }
+	@media (prefers-color-scheme: dark) {
+		:root { --bg: #161618; --fg: #ececf0; --muted: #9a9aa2; --card: #212124; --line: #36363b; --accent: #5aa2f0; }
+	}
+	body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+	main { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+	h1 { font-size: 1.5rem; margin: 0 0 4px; }
+	.muted { color: var(--muted); font-size: .9rem; }
+	.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin: 20px 0; }
+	label { display: block; font-weight: 600; margin-bottom: 8px; }
+	select { font: inherit; padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); width: 100%; margin-bottom: 16px; }
+	esp-web-install-button button { font: inherit; font-weight: 600; padding: 10px 20px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+	ol { padding-left: 20px; }
+	a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+	<h1>Robot firmware flasher</h1>
+	<div class="muted" id="version">Loading firmware list…</div>
+
+	<div class="card">
+		<label for="robot">Robot</label>
+		<select id="robot" disabled></select>
+		<esp-web-install-button id="install">
+			<button slot="activate">Connect and install</button>
+			<span slot="unsupported">This browser can't talk to USB serial ports. Use Chrome or Edge on a desktop computer.</span>
+			<span slot="not-allowed">Open this page over HTTPS to flash.</span>
+		</esp-web-install-button>
+	</div>
+
+	<div class="card">
+		<ol>
+			<li>Connect the robot's ESP32 to this computer with a USB cable (install the CP210x / CH340 driver if no port shows up).</li>
+			<li>Pick the robot model and press <b>Connect and install</b>, then choose the serial port.</li>
+			<li>Leave <b>Erase device</b> unchecked to keep the servo trims and other settings. Erase only for a clean install.</li>
+			<li>Some boards need the BOOT button held while the upload starts.</li>
+		</ol>
+		<p class="muted">The firmware is built from the <code>main</code> branch. The robot starts its own WiFi access point with the SSID and password from <code>config_wifi.example.h</code>; build it yourself with <code>config_wifi.h</code> for your own credentials.</p>
+	</div>
+</main>
+<script>
+	const select = document.getElementById('robot');
+	const install = document.getElementById('install');
+	const version = document.getElementById('version');
+	const remember = (v) => { try { localStorage.setItem('robot', v); } catch (e) {} };
+	const recall = () => { try { return localStorage.getItem('robot'); } catch (e) { return null; } };
+
+	fetch('firmware.json', { cache: 'no-cache' })
+		.then((r) => r.json())
+		.then((data) => {
+			for (const robot of data.robots) {
+				const opt = document.createElement('option');
+				opt.value = robot.manifest;
+				opt.textContent = robot.env.replace(/^robot-/, '') + ' (' + Math.round(robot.size / 1024) + ' KB)';
+				select.appendChild(opt);
+			}
+			const saved = recall();
+			if (saved && data.robots.some((r) => r.manifest === saved)) select.value = saved;
+			select.disabled = false;
+			install.manifest = select.value;
+			const commit = data.commit
+				? ' · <a href="https://github.com/SovGVD/esp32-legged-robots-core/commit/' + data.commit + '">' + data.commit.slice(0, 7) + '</a>'
+				: '';
+			version.innerHTML = 'Firmware ' + data.version + commit;
+		})
+		.catch(() => { version.textContent = 'Could not load the firmware list.'; });
+
+	select.addEventListener('change', () => {
+		install.manifest = select.value;
+		remember(select.value);
+	});
+</script>
+</body>
+</html>
