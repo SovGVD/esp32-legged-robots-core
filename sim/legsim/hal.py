@@ -35,22 +35,28 @@ def limit_servo_angle(a):
     return min(max(a, 0.0), math.pi)
 
 
-def angle_to_pulse(angle_rad):
-    """angleToPulse with servoMainProfile (piecewise linear, truncated to uint16)."""
+DOG_PROFILE = (SERVO_PROFILE_DEG, SERVO_PROFILE_US)
+
+
+def angle_to_pulse(angle_rad, profile=DOG_PROFILE):
+    """angleToPulse with servoMainProfile (piecewise linear, truncated to uint16).
+    profile: (degrees, pulses) of the model's servoMainProfile, default the dog's."""
+    deg_tab, us_tab = profile
     deg = math.degrees(angle_rad)
-    deg = min(max(deg, SERVO_PROFILE_DEG[0]), SERVO_PROFILE_DEG[-1])
-    return int(np.interp(deg, SERVO_PROFILE_DEG, SERVO_PROFILE_US))
+    deg = min(max(deg, deg_tab[0]), deg_tab[-1])
+    return int(np.interp(deg, deg_tab, us_tab))
 
 
-def pulse_to_angle(us):
+def pulse_to_angle(us, profile=DOG_PROFILE):
     """Servo shaft angle (rad) the calibrated servo moves to for a pulse width."""
-    return math.radians(float(np.interp(us, SERVO_PROFILE_US, SERVO_PROFILE_DEG)))
+    deg_tab, us_tab = profile
+    return math.radians(float(np.interp(us, us_tab, deg_tab)))
 
 
-def leg_angles_to_pulses(hal: HalParams, leg: LegConfig, angles, trim=(0.0, 0.0, 0.0)):
+def leg_angles_to_pulses(hal: HalParams, leg: LegConfig, angles, trim=(0.0, 0.0, 0.0), profile=DOG_PROFILE):
     """Three leg angles (alpha, beta, gamma) -> three pulses, like runServoHAL."""
     return [angle_to_pulse(limit_servo_angle(get_hal_angle(
-        angles[j], hal.mid[j], trim[j], hal.ratio[j], leg.inverse_abg[j]))) for j in range(3)]
+        angles[j], hal.mid[j], trim[j], hal.ratio[j], leg.inverse_abg[j])), profile) for j in range(3)]
 
 
 def servo_angle_to_leg_angle(hal: HalParams, leg: LegConfig, j, servo_angle, trim=0.0):

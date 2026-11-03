@@ -7,6 +7,9 @@ any source changes) and calls it through ctypes. Each `update()` is one
 firmware control tick: move command -> GaitEngine -> BodyKinematics ->
 QuadrupedLegIK -> servo HAL -> pulse widths, all from the C++ sources the
 ESP32 runs. `drive()` feeds those pulses to a SimDog.
+
+`FirmwareCore(model="hexapod")` builds the same bridge for the hexapod
+(HexapodLegIK and model/hexapod/model_data.h) and drives a SimHexapod.
 """
 
 import ctypes
@@ -22,48 +25,59 @@ CORE_SRC = os.path.join(REPO_DIR, "lib", "robot_core", "src")
 FW_SRC = os.path.join(REPO_DIR, "src", "esp32-legged-robot")
 BRIDGE = os.path.join(SIM_DIR, "bridge", "robot_core_bridge.cpp")
 BUILD_DIR = os.path.join(SIM_DIR, "build")
+# ROBOT_MODEL values from def/def.h
+MODELS = {"dog": 100, "hexapod": 103}
 LIB_PATH = os.path.join(BUILD_DIR, "librobot_core_bridge.so")
+
+
+def lib_path(model="dog"):
+    return LIB_PATH if model == "dog" else os.path.join(BUILD_DIR, f"librobot_core_bridge_{model}.so")
 
 
 def _sources():
     return sorted(glob.glob(os.path.join(CORE_SRC, "*.cpp"))) + [BRIDGE]
 
 
-def _inputs():
+def _inputs(model="dog"):
     headers = glob.glob(os.path.join(CORE_SRC, "*.h")) + [
         os.path.join(FW_SRC, "def", "def.h"),
-        os.path.join(FW_SRC, "model", "dog", "config.h"),
-        os.path.join(FW_SRC, "model", "dog", "model_data.h"),
+        os.path.join(FW_SRC, "model", model, "config.h"),
+        os.path.join(FW_SRC, "model", model, "model_data.h"),
     ]
     return _sources() + headers
 
 
-def build(force=False, cxx=None):
-    """Compile the bridge if it is missing or older than any source. Returns the library path."""
-    if not force and os.path.exists(LIB_PATH):
-        built = os.path.getmtime(LIB_PATH)
-        if all(os.path.getmtime(f) <= built for f in _inputs()):
-            return LIB_PATH
+def build(force=False, cxx=None, model="dog"):
+    """Compile the bridge for `model` ("dog" or "hexapod") if it is missing or
+    older than any source. Returns the library path."""
+    path = lib_path(model)
+    if not force and os.path.exists(path):
+        built = os.path.getmtime(path)
+        if all(os.path.getmtime(f) <= built for f in _inputs(model)):
+            return path
     os.makedirs(BUILD_DIR, exist_ok=True)
     cxx = cxx or os.environ.get("CXX", "c++")
     cmd = [cxx, "-std=gnu++17", "-O2", "-shared", "-fPIC", "-Wall",
            # the ESP32 build treats float literals as float; keep the numbers identical
            "-fsingle-precision-constant",
-           "-DROBOT_MODEL=100",   # MODEL_DOG
+           f"-DROBOT_MODEL={MODELS[model]}",
            "-I", CORE_SRC, "-I", FW_SRC,
-           *_sources(), "-o", LIB_PATH + ".tmp"]
+           *_sources(), "-o", path + ".tmp"]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         raise RuntimeError("robot_core bridge build failed:\n" + " ".join(cmd) + "\n" + res.stderr)
-    os.replace(LIB_PATH + ".tmp", LIB_PATH)
-    return LIB_PATH
+    os.replace(path + ".tmp", path)
+    return path
 
 
 class FirmwareCore:
-    """Firmware motion pipeline (one instance per process: the C++ side is global state)."""
+    """Firmware motion pipeline (one instance per model and process: the C++ side is global state).
 
-    def __init__(self, lib_path=None):
-        self.lib = ctypes.CDLL(lib_path or build())
+    model: "dog" (default) or "hexapod"."""
+
+    def __init__(self, lib_path=None, model="dog"):
+        self.model = model
+        self.lib = ctypes.CDLL(lib_path or build(model=model))
         L = self.lib
         f32p = ctypes.POINTER(ctypes.c_float)
         L.rc_leg_count.restype = ctypes.c_int
@@ -101,6 +115,10 @@ class FirmwareCore:
         L.rc_set_leveling.argtypes = [ctypes.c_int]
         L.rc_level_correction.restype = None
         L.rc_level_correction.argtypes = [f32p]
+        L.rc_leg_test_pulses.restype = ctypes.c_int
+        L.rc_leg_test_pulses.argtypes = [ctypes.c_int, f32p, ctypes.POINTER(ctypes.c_uint16)]
+        L.rc_leg_inverse.restype = None
+        L.rc_leg_inverse.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
         self.legs = L.rc_leg_count()
         self.dof = L.rc_leg_dof()
         self.loop_dt = float(L.rc_loop_dt())
@@ -116,7 +134,7 @@ class FirmwareCore:
     def update(self, command=(0, 0, 0, 0, 0, 0), dt=None, imu=None):
         """One control tick. command: move x, y, z, rotate pitch, roll, yaw, each in [-1, 1]
         (y = forward, yaw = turn). imu: (pitch, roll, yaw) rad, firmware convention (see imu_angles()), used by the leveler.
-        Returns the servo pulses (us), leg*dof + joint."""
+        Returns the servo pulses (us), leg*dof + joint (not the PCA9685 channel)."""
         cmd = (ctypes.c_float * 6)(*[float(c) for c in command])
         imu_arr = None if imu is None else (ctypes.c_float * 3)(*[float(v) for v in imu])
         out = (ctypes.c_uint16 * (self.legs * self.dof))()
@@ -142,7 +160,8 @@ class FirmwareCore:
     GAITS = {"default": 0, "trot": 0, "walk": 1}
 
     def select_gait(self, name):
-        """'default'/'trot' (model GAIT_PARAMS) or 'walk' (GAIT_PARAMS_WALK, static stability). Resets the robot."""
+        """'default'/'trot' (model GAIT_PARAMS) or 'walk' (GAIT_PARAMS_WALK, static stability,
+        dog only). Resets the robot."""
         if not self.lib.rc_select_gait(self.GAITS[name]):
             raise ValueError(name)
         self.reset()
@@ -215,11 +234,24 @@ class FirmwareCore:
         dog.reset(leg_angles=self.leg_angles())
         return dog
 
+    def leg_test_pulses(self, leg, offset):
+        """Pulses for one leg with its foot at the neutral point + offset (mm, body frame),
+        through the model's own IK and HAL. Returns (pulses[dof], solved)."""
+        out = (ctypes.c_uint16 * self.dof)()
+        ok = self.lib.rc_leg_test_pulses(int(leg), (ctypes.c_float * 3)(*map(float, offset)), out)
+        return np.frombuffer(out, dtype=np.uint16).copy(), bool(ok)
+
+    def leg_inverse(self, leg):
+        """The model's angle inverse flags (alpha, beta, gamma) for one leg."""
+        out = (ctypes.c_int * 3)()
+        self.lib.rc_leg_inverse(int(leg), out)
+        return tuple(bool(v) for v in out)
+
     def gait_active(self):
         return bool(self.lib.rc_gait_active())
 
     def drive(self, dog, command=(0, 0, 0, 0, 0, 0), duration=None):
-        """Run the firmware on a SimDog for `duration` seconds (default: one tick)
+        """Run the firmware on a SimDog (or SimHexapod) for `duration` seconds (default: one tick)
         at the firmware loop rate, holding `command`. Returns the last pulses."""
         ticks = 1 if duration is None else max(1, int(round(duration / self.loop_dt)))
         pulses = None

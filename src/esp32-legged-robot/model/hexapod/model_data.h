@@ -26,7 +26,8 @@ leg legs[LEG_NUM] = {
     {  -LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },                    // initial LEG POSITION ON BODY, same as LEG POSITION ON BODY, not sure why I need it
     {  -LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },                    // initial LEG JOING CLOSED TO THE GROUND, same as above, but at least it make sense
     {       M_PI_2,     M_PI_2,      M_PI_2 },                    // leg angles, will be override by HAL update
-    { true, true, true },                                         // inverse leg calculations (depends on servo, is servo use gear and leg position): x, y, z and 6 angles
+    { true, true, true, false, false, true },                     // inverse x, y, z, alpha, beta, gamma. Right legs are mirror images of the left (gears face forward)
+                                                                  // and every gear pair reverses, so left: tibia inverted, right: femur inverted. Worked out from the parts, check on the robot
     { true, 0, 0 }                                                // FOOT SENSOR: is on ground state, pin, threshold for sensor
   },
   // left middle leg
@@ -47,7 +48,7 @@ leg legs[LEG_NUM] = {
     {  -LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y,  LEG_MIDDLE_BODY_Z },
     {  -LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_MIDDLE_FOOT_Z },
     {              M_PI_2,            M_PI_2,             M_PI_2 },
-    { true, true, true },
+    { true, true, true, false, false, true },                     // inverse x, y, z, alpha, beta, gamma: tibia servo mirrored vs the right legs
     { true, 0, 0 }
   },
   // left rear leg
@@ -68,7 +69,7 @@ leg legs[LEG_NUM] = {
     { -LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },
     { -LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },
     {       M_PI_2,    M_PI_2,      M_PI_2 },
-    { true, true, true },
+    { true, true, true, false, false, true },                     // inverse x, y, z, alpha, beta, gamma: tibia servo mirrored vs the right legs
     { true, 0, 0 }
   },
 
@@ -90,7 +91,7 @@ leg legs[LEG_NUM] = {
     {  LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },
     {  LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },
     {      M_PI_2,     M_PI_2,      M_PI_2 },
-    { true, true, true },
+    { true, true, true, false, true, false },                     // inverse x, y, z, alpha, beta, gamma: femur servo mirrored vs the left legs
     { true, 0, 0 }
   },
   // right middle leg
@@ -111,7 +112,7 @@ leg legs[LEG_NUM] = {
     {  LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y,  LEG_MIDDLE_BODY_Z },
     {  LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_MIDDLE_FOOT_Z },
     {             M_PI_2,            M_PI_2,             M_PI_2 },
-    { true, true, true },
+    { true, true, true, false, true, false },                     // inverse x, y, z, alpha, beta, gamma: femur servo mirrored vs the left legs
     { true, 0, 0 }
   },
   // right rear leg
@@ -132,7 +133,7 @@ leg legs[LEG_NUM] = {
     { LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },
     { LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },
     {      M_PI_2,    M_PI_2,      M_PI_2 },
-    { true, true, true },
+    { true, true, true, false, true, false },                     // inverse x, y, z, alpha, beta, gamma: femur servo mirrored vs the left legs
     { true, 0, 0 }
   },
 };

@@ -5,7 +5,8 @@
  * Everything between the move command and the servo pulse widths is the
  * firmware's own code: MotionController (gait engine, body kinematics, IK)
  * and the servo HAL from lib/robot_core, with the dog's legs, servo profile
- * and gait parameters from src/esp32-legged-robot/model/dog/model_data.h.
+ * and gait parameters from src/esp32-legged-robot/model/<model>/model_data.h
+ * (ROBOT_MODEL: MODEL_DOG or MODEL_HEXAPOD).
  * Only the hardware is replaced: pulses go to SimDog.write_pulses() and the
  * IMU angles come from the sim.
  */
@@ -20,8 +21,13 @@
 	#include "model/dog/config.h"
 	#include "model/dog/model_data.h"
 	static QuadrupedLegIK modelIK;
+	#define BRIDGE_HAS_WALK
+#elif ROBOT_MODEL == MODEL_HEXAPOD
+	#include "model/hexapod/config.h"
+	#include "model/hexapod/model_data.h"
+	static HexapodLegIK modelIK;
 #else
-	#error "The simulator bridge supports the dog model only"
+	#error "The simulator bridge supports the dog and hexapod models only"
 #endif
 
 #define BRIDGE_LOOP_DT (LOOP_TIME / 1000000.0f)
@@ -138,13 +144,15 @@ RC_API int rc_gait_active()
 
 /**
  * Pick the gait for the next rc_init(): 0 = the model default (GAIT_PARAMS),
- * 1 = slow walk with static stability (GAIT_PARAMS_WALK). Returns 0 if unknown.
+ * 1 = slow walk with static stability (GAIT_PARAMS_WALK, dog only). Returns 0 if unknown.
  */
 RC_API int rc_select_gait(int id)
 {
 	switch (id) {
 		case 0: gaitParams = &GAIT_PARAMS; return 1;
+#ifdef BRIDGE_HAS_WALK
 		case 1: gaitParams = &GAIT_PARAMS_WALK; return 1;
+#endif
 	}
 	return 0;
 }
@@ -269,4 +277,32 @@ RC_API void rc_reject_counts(uint32_t *out)
 	out[0] = motion.unreachableCount();
 	out[1] = motion.jointLimitCount();
 	out[2] = motion.servoRangeCount();
+}
+
+/**
+ * Leg test: pulses for one leg with its foot at defaultFoot + offset (mm, body
+ * frame), body at the origin, through the model's IK and servo HAL (inverse
+ * flags, gear ratios, servo profile). The gait and the other legs are left
+ * alone. Returns 1 if the IK solved it.
+ */
+RC_API int rc_leg_test_pulses(int i, const float *offset, uint16_t *pulses)
+{
+	if (i < 0 || i >= LEG_NUM) return 0;
+	leg l = legs[i];
+	l.body = l.defaultBody;
+	l.foot = { l.defaultFoot.x + offset[0], l.defaultFoot.y + offset[1], l.defaultFoot.z + offset[2] };
+	LR_figure origin = {};
+	LR_moveVector none = {};
+	iksolver s = modelIK.solve(l, origin, none);
+	l.angle = s.angle;
+	lrLegPulses(l, LEG_DOF, servoMainProfile, pulses);
+	return s.isSolved ? 1 : 0;
+}
+
+/** The model's angle inverse flags for leg i: out[0..2] = alpha, beta, gamma (0/1). */
+RC_API void rc_leg_inverse(int i, int *out)
+{
+	out[0] = legs[i].inverse.alpha;
+	out[1] = legs[i].inverse.beta;
+	out[2] = legs[i].inverse.gamma;
 }

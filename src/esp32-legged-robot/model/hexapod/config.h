@@ -9,20 +9,22 @@
 #define LEG_BODY_X      46.0
 #define LEG_BODY_Y      80.0
 #define LEG_BODY_Z       0.0
-// Neutral feet 160 mm from the coxa joint (same direction as before). The old
-// values (222.67, 173.75 and 267.5) put every foot 200 mm out, which is the
-// whole leg stretched flat (coxa + femur + tibia), so with the body 67 mm up
-// no foot could be reached and the IK only ever produced NaN.
-#define LEG_FOOT_X    187.34
-#define LEG_FOOT_Y    155.00
-#define LEG_FOOT_Z     67.31
+// Neutral feet 118 mm out from the coxa axis (same direction as before), 95 mm
+// below it: femur 11.6 deg up, tibia ~15 deg off vertical. Taller than the old
+// 160 / 67 mm stance and the femur servos carry far less torque, since the foot
+// is nearly under the knee (checked in sim/, examples/hexapod_walk.py).
+// Lower or with a higher knee doesn't fit: the femur goes at most 45 deg up
+// (2:1 gear on a 180 deg servo), and from ~12 deg up a 30 mm step hits it.
+#define LEG_FOOT_X    150.24
+#define LEG_FOOT_Y    135.31
+#define LEG_FOOT_Z    95.00
 
 #define LEG_MIDDLE_BODY_X    57.5
 #define LEG_MIDDLE_BODY_Y     0.0
 #define LEG_MIDDLE_BODY_Z     0.0
-#define LEG_MIDDLE_FOOT_X   217.5
+#define LEG_MIDDLE_FOOT_X   175.5
 #define LEG_MIDDLE_FOOT_Y     0.0
-#define LEG_MIDDLE_FOOT_Z    67.31
+#define LEG_MIDDLE_FOOT_Z   95.00
 
 // Robot config
 #define LEG_NUM HEXAPOD_ROBOT
