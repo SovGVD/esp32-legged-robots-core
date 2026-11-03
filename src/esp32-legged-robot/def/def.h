@@ -17,6 +17,7 @@
 #define ESP32PWM 103
 #define INA219   104
 #define DCMOTOR  105
+#define VL53L5CX 106
 
 /**
  * Robot models
@@ -51,8 +52,8 @@
 #define AP_MODE 0
 
 /* Packages code */
-#define P_TELEMETRY_LEN 22
-#define P_TELEMETRY_VERSION 2
+#define P_TELEMETRY_LEN 26
+#define P_TELEMETRY_VERSION 3
 
 #define P_MOVE         77  // ASCII "M"
 #define P_TELEMETRY    84  //       "T"
@@ -73,6 +74,11 @@
 #define TS_BATTERY_SHIFT 7      // 2 bits: BatteryState (0 unknown, 1 ok, 2 low, 3 critical)
 #define TS_SITTING      0x0200  // battery critical: sat down / servos off
 #define TS_OVERRUN      0x0400  // the motion loop missed a tick in the last second
+#define TS_TERRAIN      0x0800  // terrain mode: ToF map and rough gait (`terrain on`)
+#define TS_GAP_BLOCKED  0x1000  // a gap too wide to step over: stopped in that direction
+#define TS_HEADING_HOLD 0x2000  // heading hold on (`heading on`, `turnto`)
+#define TS_HEADING_ABS  0x4000  // heading from the magnetometer (else gyro only, relative)
+#define TS_TOF          0x8000  // ToF sensor(s) running
 
 /* Debug (SLOW!!!)*/
 //#define DEBUG_HAL_LEG

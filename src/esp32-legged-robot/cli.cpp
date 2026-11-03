@@ -6,7 +6,7 @@ static void CLI_prepareCommand();
 const char *CLI_delimiters = " \n";
 char CLI_BUFFER[CLI_BUFFER_LENGTH + 1];
 
-#define CLI_COMMANDS 12
+#define CLI_COMMANDS 16
 #define CLI_MAIN_SET 0
 #define CLI_MODEL_SET 100
 
@@ -30,7 +30,11 @@ const cliCommand cliCommands[CLI_COMMANDS] = {
   { "debug",     cliDebug,      "Show debug information [angle]",    1, 0 },
   { "hal",       cliHal,        "[on|off|state] leg calculation",    1, 0 },
   { "level",     cliLevel,      "[on|off|state] IMU leveling",  1, 0 },
-  { "loop",      cliLoop,       "Motion loop timing, last second",   0, 0 }
+  { "loop",      cliLoop,       "Motion loop timing, last second",   0, 0 },
+  { "terrain",   cliTerrain,    "[on|off|state] ToF terrain map",   1, 0 },
+  { "tof",       cliTof,        "[state|print] ToF sensors",         1, 0 },
+  { "heading",   cliHeading,    "[on|off|state|cal|hand] heading",   1, 0 },
+  { "turnto",    cliTurnTo,     "Turn to compass heading <deg>",     1, 0 }
 };
 
 

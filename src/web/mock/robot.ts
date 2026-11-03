@@ -13,15 +13,17 @@ function cliPackage(text: string): Buffer {
 }
 
 function telemetryPackage(voltage: number, current: number, loopTime: number, extra = 0): Buffer {
-  const b = Buffer.alloc(22);
+  const b = Buffer.alloc(26);
   b[0] = P_TELEMETRY;
-  b[1] = 2; // version
+  b[1] = 3; // version
   b.writeUInt16BE(TS.hal | TS.imu | TS.power | (1 << 7) | extra, 2); // battery ok
   b.writeUInt16BE(Math.round(voltage * 1000), 4);
   b.writeInt16BE(Math.round(current * 1000), 6);
   b.writeUInt16BE(loopTime, 8);
   b.writeInt16BE(Math.round((Math.random() - 0.5) * 200), 10);
   b.writeInt16BE(Math.round((Math.random() - 0.5) * 200), 12);
+  b.writeUInt16BE(Math.round(Math.random() * 3599), 22); // heading
+  b.writeUInt16BE(0xffff, 24); // no hold target
   return b;
 }
 

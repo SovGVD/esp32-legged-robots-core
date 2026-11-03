@@ -79,6 +79,8 @@ static void robotSetup()
 		initBattery();
 		vTaskDelay(100);
 
+		initTof();   // starts its own task: the sensors take a while to boot
+
 		robotLoopReady = true;
 		Serial.println("MainSetup complete");
 	}
@@ -129,7 +131,7 @@ static LoopWindow   window     = {};               // being filled
 static LoopWindow   lastWindow = {};               // previous full second
 
 static const char *const loopStageNames[LOOP_STAGE_COUNT] = {
-	"failsafe", "power", "imu", "motion", "hal"
+	"failsafe", "power", "imu", "tof", "motion", "hal"
 };
 
 void loopProfileMark(LoopStage stage, uint32_t us)

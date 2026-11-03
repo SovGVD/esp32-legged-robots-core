@@ -43,6 +43,17 @@ extern const float           SIT_HEIGHT;
 #endif
 extern const BatteryParams   BATTERY_PARAMS;
 extern const GaitParams *const MODEL_WALK_GAIT;   // statically stable walk, nullptr if the model has only GAIT_PARAMS
+
+// Rough ground (model_data.h TOF_SENSORS, TERRAIN_*): tofCount 0 = not supported
+struct ModelTerrain {
+	const TofSensor        *tof;
+	uint8_t                 tofCount;
+	const TerrainMapParams *map;
+	const TerrainParams    *terrain;
+	const GaitParams       *roughGait;
+	TerrainTiltMode         tilt;
+};
+extern const ModelTerrain MODEL_TERRAIN;
 extern const cliCommand *modelCliCommands;
 extern const uint8_t     modelCliCommandsCount;
 void modelSettingsPrint();
@@ -69,7 +80,8 @@ enum LoopStage : uint8_t {
 	LOOP_STAGE_FAILSAFE = 0,
 	LOOP_STAGE_POWER,      // INA219 + battery (I2C, 10 Hz)
 	LOOP_STAGE_IMU,        // MPU9250 read (I2C), part of MOTION
-	LOOP_STAGE_MOTION,     // leveler, gait, body kinematics, IK (includes IMU)
+	LOOP_STAGE_TOF,        // ToF frames into the terrain map, part of MOTION
+	LOOP_STAGE_MOTION,     // leveler, gait, body kinematics, IK (includes IMU and ToF)
 	LOOP_STAGE_HAL,        // pulses -> servo bus (LEDC / PCA9685 over I2C)
 	LOOP_STAGE_COUNT
 };
@@ -84,6 +96,9 @@ void updateMotion(float dt);   // dt: seconds since the previous motion tick (wa
 const LR_figure &motionBody();
 void requestGait(const GaitParams &params);   // applied once the robot stands still
 void printGaitState();                        // CLI: active gait parameters
+void cliTerrain();                            // CLI: terrain on|off|state
+void cliHeading();                            // CLI: heading on|off|state|cal|hand
+void cliTurnTo();                             // CLI: turnto <deg>
 
 /**
  * HAL (hal.cpp, servo.cpp, hal_*.cpp)
@@ -123,6 +138,11 @@ struct MotionStatus {
 	uint32_t unreachable;
 	uint32_t jointLimit;
 	uint32_t servoRange;
+	bool     terrain;        // terrain mode on
+	bool     gapBlocked;     // a gap too wide ahead: stopped in that direction
+	bool     headingHold;
+	bool     headingTarget;  // the hold has a target (turnto, or the heading when the stick was let go)
+	float    target;         // rad, compass
 };
 MotionStatus motionStatus();
 
@@ -140,6 +160,12 @@ PowerSensor &powerSensor();   // POWER_SENSOR, or NoPowerSensor
 void initIMU();
 void updateIMU();
 void calibrateIMU();
+// ToF (tof.cpp), VL53L5CX with TOF_TYPE
+void    initTof();
+uint8_t tofSensorCount();
+bool    tofReady(uint8_t i);
+bool    tofTakeFrame(uint8_t i, uint32_t &seq, float *mm);   // true and the 64 zones (mm, 0 = none) if newer than seq
+void    cliTof();
 void initPowerSensor();
 void updatePower();
 float getPowerSensorVoltage();

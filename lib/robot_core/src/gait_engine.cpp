@@ -76,6 +76,7 @@ void GaitEngine::reset()
 	_phase    = 0;
 	_active   = false;
 	_terrainZ = 0;
+	_blocked  = false;
 	for (uint8_t i = 0; i < _legCount; i++) {
 		_state[i] = {};
 		_state[i].ground = _legs[i].defaultFoot.z;
@@ -90,6 +91,7 @@ void GaitEngine::setTerrain(const TerrainParams *params, const TerrainMap *map)
 	_terrain = params;
 	_map     = params ? map : nullptr;
 	if (!params) {
+		_blocked = false;
 		for (uint8_t i = 0; i < _legCount; i++) {
 			_state[i].ground = _legs[i].defaultFoot.z;
 			_state[i].searching = false;
@@ -108,11 +110,103 @@ float GaitEngine::plannedGround(uint8_t legId, const LR_point &at) const
 	float z;
 	if (_map && _map->heightAt(at.x, at.y, z)) {
 		z += _terrain->footRadius;
+		// within `tolerance` it is the same ground (map noise): following it
+		// from step to step would let the feet wander
+		if (fabsf(z - own) <= _terrain->tolerance) {
+			return own;
+		}
 		if (fabsf(z - own) <= _terrain->maxStep) {
 			return z;
 		}
 	}
 	return own;
+}
+
+/**
+ * The ground within `gapMargin` of (x, y) along the step direction (dx, dy)
+ * drops away: a mapped point lower than the leg's own ground by more than
+ * `maxStep`, or ground the sensors couldn't see between known ground (the
+ * inside of a narrow gap, the shadow below a cliff edge). A foot there would
+ * slide or fall in.
+ */
+bool GaitEngine::dropsAway(float x, float y, float dx, float dy, float own) const
+{
+	float cs = _map->params().cellSize;
+	float r = _terrain->gapMargin > 0 ? _terrain->gapMargin : _terrain->footRadius + cs;
+	float low = own - _terrain->footRadius - _terrain->maxStep;   // map heights are surface heights
+	for (float d = -r; d <= r + 1e-3f; d += cs * 0.5f) {
+		float px = x + dx * d, py = y + dy * d, z;
+		if (_map->heightAt(px, py, z)) {
+			if (z < low) {
+				return true;
+			}
+		} else if (isShadow(px, py, dx, dy, own)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * (x, y) is unknown, known ground lies just before it along (dx, dy), and
+ * what comes after says it is a hole the sensors couldn't see into: low
+ * ground (the bottom of a wide gap, the floor past a cliff), or a low reading
+ * with level ground right behind it (the far wall of a narrow gap). An
+ * unknown cell before level ground is just a spot no zone hit; one before
+ * lower ground that stays low is the shadow of a step down.
+ */
+bool GaitEngine::isShadow(float x, float y, float dx, float dy, float own) const
+{
+	float cs = _map->params().cellSize, z;
+	bool before = false;
+	for (float d = cs; d <= 8.0f * cs + 1e-3f && !before; d += cs) {
+		before = _map->heightAt(x - dx * d, y - dy * d, z);
+	}
+	if (!before) {
+		return false;
+	}
+	float surface = own - _terrain->footRadius;
+	float deep = surface - _terrain->maxStep;
+	float low  = surface - _terrain->clearance;
+	for (float d = cs; d <= 8.0f * cs + 1e-3f; d += cs) {
+		if (!_map->heightAt(x + dx * d, y + dy * d, z)) {
+			continue;
+		}
+		if (z < deep) {
+			return true;
+		}
+		if (z >= low) {
+			return false;
+		}
+		// lower than the foot's ground: a gap's far wall if level ground follows
+		for (float e = d + cs; e <= d + 3.0f * cs + 1e-3f; e += cs) {
+			if (_map->heightAt(x + dx * e, y + dy * e, z) && z >= low) {
+				return true;
+			}
+		}
+		return false;
+	}
+	return false;
+}
+
+/**
+ * A foot can stand at (x, y): the ground doesn't drop away next to it and it
+ * isn't on the edge of an obstacle across the step direction (dx, dy).
+ */
+bool GaitEngine::footholdOk(float x, float y, float dx, float dy, float own) const
+{
+	if (dropsAway(x, y, dx, dy, own)) {
+		return false;
+	}
+	if (_terrain->edgeLimit > 0) {
+		// the foot needs its own radius plus 1.5 cells of flat ground on both sides:
+		// the cell holding an edge reads as high as the top (rays hit the face)
+		float reach = _terrain->footRadius + 1.5f * _map->params().cellSize;
+		if (_map->edge(x, y, dx, dy, reach) > _terrain->edgeLimit) {
+			return false;
+		}
+	}
+	return true;
 }
 
 /**
@@ -124,34 +218,46 @@ void GaitEngine::planSwing(uint8_t legId)
 	legState &st = _state[legId];
 	LR_point target = touchdownTarget(legId, 0.0f);
 	st.offset = { 0, 0, 0 };
+	st.hold = false;
 
-	if (_map && _terrain->edgeLimit > 0 && _terrain->footholdShift > 0) {
-		// along the step: the edge of an obstacle lies across the path
+	if (_map && _terrain->footholdShift > 0) {
+		// along the step: an edge or a gap lies across the path
 		float dx = target.x - st.liftOff.x, dy = target.y - st.liftOff.y;
 		float len = sqrtf(dx * dx + dy * dy);
-		if (len < 1.0f) {
+		bool stepping = len >= 1.0f;   // not just settling in place
+		if (!stepping) {
 			dx = 0; dy = 1; len = 1;
 		}
 		dx /= len; dy /= len;
-		float cs = _map->params().cellSize;
-		// the foot needs its own radius plus 1.5 cells of flat ground on both sides:
-		// the cell holding an edge reads as high as the top (rays hit the face)
-		float reach = _terrain->footRadius + 1.5f * cs;
-		if (_map->edge(target.x, target.y, dx, dy, reach) > _terrain->edgeLimit) {
-			// nearest flat spot along the step, beyond the edge first (onto the obstacle)
-			for (float d = cs * 0.5f; d <= _terrain->footholdShift + 1e-3f; d += cs * 0.5f) {
-				bool found = false;
+		float own = st.ground;
+		if (!footholdOk(target.x, target.y, dx, dy, own)) {
+			// nearest good spot along the step, beyond first (onto the obstacle, across the gap)
+			bool found = false, beyond = false;
+			float cs = _map->params().cellSize;
+			for (float d = cs * 0.5f; d <= _terrain->footholdShift + 1e-3f && !found; d += cs * 0.5f) {
 				for (int sign = 1; sign >= -1; sign -= 2) {
 					float ox = dx * d * sign, oy = dy * d * sign;
-					float e = _map->edge(target.x + ox, target.y + oy, dx, dy, reach);
-					if (e >= 0 && e <= _terrain->edgeLimit) {
+					if (footholdOk(target.x + ox, target.y + oy, dx, dy, own)) {
 						st.offset = { ox, oy, 0 };
 						found = true;
+						beyond = sign > 0;
 						break;
 					}
 				}
-				if (found) {
-					break;
+			}
+			if (stepping && !beyond && dropsAway(target.x, target.y, dx, dy, own)) {
+				// a gap ahead and this step stays in front of it: can the next one
+				// (a step length further) get across?
+				bool later = false;
+				for (float d = _terrain->footholdShift; d <= _terrain->footholdShift + len + 1e-3f && !later; d += cs * 0.5f) {
+					later = footholdOk(target.x + dx * d, target.y + dy * d, dx, dy, own);
+				}
+				if (!later) {
+					// too wide to step over: stop going that way, the foot stays in front of it
+					st.hold = !found;
+					float yaw = _body.orientation.yaw;
+					_blockedDir = lrRotateZ({ dx, dy, 0 }, -sinf(yaw), cosf(yaw));
+					_blocked = true;
 				}
 			}
 		}
@@ -244,6 +350,20 @@ void GaitEngine::rampVelocity(float dt, const LR_moveVector &command)
 		}
 	}
 
+	if (_blocked) {
+		// a gap ahead: no further that way until the command stops pushing that way
+		float push = command.move.x * _blockedDir.x + command.move.y * _blockedDir.y;
+		if (push <= 0.05f) {
+			_blocked = false;
+		} else {
+			float along = targetX * _blockedDir.x + targetY * _blockedDir.y;
+			if (along > 0) {
+				targetX -= along * _blockedDir.x;
+				targetY -= along * _blockedDir.y;
+			}
+		}
+	}
+
 	_velocity.x = lrApproach(_velocity.x, targetX,   _params.maxAccel * dt);
 	_velocity.y = lrApproach(_velocity.y, targetY,   _params.maxAccel * dt);
 	_yawRate    = lrApproach(_yawRate,    targetYaw, _params.maxYawAccel * dt);
@@ -289,7 +409,8 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 	if (!moving && _active) {
 		bool settled = true;
 		for (uint8_t i = 0; i < _legCount; i++) {
-			if (_state[i].swing || !isAtNeutral(i)) {
+			// at a gap the feet stay where they are: no settling steps next to the edge
+			if (_state[i].swing || _state[i].searching || (!isAtNeutral(i) && !_blocked)) {
 				settled = false;
 				break;
 			}
@@ -350,6 +471,10 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 				st.swing = false;
 				st.landed = true;
 				if (_terrain) {
+					if (st.hold) {
+						l.foot.x = st.liftOff.x - st.offset.x;
+						l.foot.y = st.liftOff.y - st.offset.y;
+					}
 					l.foot.x += st.offset.x;
 					l.foot.y += st.offset.y;
 					l.foot.z  = st.ground;
@@ -359,7 +484,7 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 			}
 			st.skipped = false;
 		} else if (!st.swing && !st.skipped) {
-			if (s <= startWindow && (moving || !isAtNeutral(i))) {
+			if (s <= startWindow && (moving || (!isAtNeutral(i) && !_blocked))) {
 				st.swing     = true;
 				st.searching = false;
 				st.released  = false;
@@ -392,6 +517,10 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 			}
 			LR_point target = touchdownTarget(i, s);
 			if (_terrain) {
+				if (st.hold) {
+					target.x = st.liftOff.x - st.offset.x;
+					target.y = st.liftOff.y - st.offset.y;
+				}
 				target.x += st.offset.x;
 				target.y += st.offset.y;
 				target.z  = st.ground;
@@ -411,6 +540,7 @@ void GaitEngine::update(float dt, const LR_moveVector &command)
 	updateTerrainHeight(dt);
 	updateShift(dt);
 }
+
 
 /**
  * Feet past their swing time without contact: lower them until the sensor

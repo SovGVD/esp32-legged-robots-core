@@ -34,7 +34,7 @@ static uint16_t sat16(uint32_t v)
 
 void pTelemetry() {
   /**
-   * Telemetry package map (big-endian), version 2
+   * Telemetry package map (big-endian), version 3
    * offset | type | length | description
    * -------|------|--------|-------------
    *      0 | char |      1 | 'T' (P_TELEMETRY)
@@ -49,7 +49,9 @@ void pTelemetry() {
    *     16 | u16  |      2 | IK: foot targets out of reach since boot
    *     18 | u16  |      2 | IK: joint limit clamps since boot
    *     20 | u16  |      2 | IK: servo range clamps since boot
-   * Counters stop at 65535.
+   *     22 | u16  |      2 | heading, deg*10 clockwise from magnetic north (0xFFFF: none)
+   *     24 | u16  |      2 | heading hold target, deg*10 (0xFFFF: none)
+   * Counters stop at 65535. Version 3 added 22-25 and the TS_TERRAIN.. bits.
    */
   static uint32_t lastOverruns = 0;
   uint32_t overruns = motionOverrunCount();
@@ -66,6 +68,13 @@ void pTelemetry() {
   st |= ((uint16_t)batteryState() & 0x3) << TS_BATTERY_SHIFT;
   if (m.sitting)            st |= TS_SITTING;
   if (overruns != lastOverruns) st |= TS_OVERRUN;   // since the previous telemetry request (1 s)
+  if (m.terrain)            st |= TS_TERRAIN;
+  if (m.gapBlocked)         st |= TS_GAP_BLOCKED;
+  if (m.headingHold)        st |= TS_HEADING_HOLD;
+  if (imu().headingAbsolute()) st |= TS_HEADING_ABS;
+  if (tofReady(0))          st |= TS_TOF;
+  float heading = 0;
+  bool  haveHeading = imu().heading(heading);
   lastOverruns = overruns;
 
   telemetryPackage[0] = P_TELEMETRY;
@@ -80,6 +89,8 @@ void pTelemetry() {
   int16ToBytes(sat16(m.unreachable), 16);
   int16ToBytes(sat16(m.jointLimit), 18);
   int16ToBytes(sat16(m.servoRange), 20);
+  int16ToBytes(haveHeading ? (int)lroundf(heading * RADTODEG * 10) % 3600 : 0xFFFF, 22);
+  int16ToBytes(m.headingHold && m.headingTarget ? (int)lroundf(m.target * RADTODEG * 10) % 3600 : 0xFFFF, 24);
 }
 
 void pCli(uint8_t* data, size_t len) {

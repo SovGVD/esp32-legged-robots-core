@@ -112,3 +112,43 @@ def test_rubble_has_mixed_heights_everywhere():
     import numpy as np
     pts = [(x, y) for x in np.linspace(-100, 100, 9) for y in np.linspace(300, 1100, 41)]
     assert 0.3 < sum(t.height_at(x, y) > 0 for x, y in pts) / len(pts) < 0.7
+
+
+def test_gaps_and_bridge_scenes():
+    g = terrain.gaps(height=40, widths=(25, 50), segment=250, y0=150)
+    assert g.start_height == 40
+    assert g.height_at(0, 100) == 40                 # on the raised floor
+    assert g.height_at(0, 160) == 0                  # in the first trench
+    assert g.height_at(0, 190) == 40
+    assert g.height_at(0, 150 + 25 + 250 + 10) == 0  # the second, wider one
+    b = terrain.bridge(height=50, ramp=300, deck=900, gap_widths=(25, 40), width=300, y0=200)
+    assert len(b.ramps) == 2
+    assert b.height_at(0, 100) == 0
+    assert b.height_at(0, 350) == pytest.approx(25, abs=1)   # half way up the ramp
+    assert b.height_at(0, 600) == 50                          # on the deck
+    assert b.height_at(400, 600) == 0                         # off the side
+    assert b.max_height() == 50
+    dog = SimDog(terrain=b)
+    assert dog.model.geom("ramp_0") is not None
+
+
+@needs_cxx
+def test_hexapod_steps_over_a_gap_that_it_falls_into_open_loop():
+    from legsim.scenario import DEFAULTS, run
+    d = DEFAULTS["hexapod"]
+    t = terrain.gaps(height=70, widths=(40,), segment=600, y0=400)
+    blind = run("hexapod", t, "none", gait=d["gait"], speed=d["speed"], duration=12)
+    seeing = run("hexapod", t, "tof", gait=d["gait"], speed=d["speed"], duration=12)
+    assert blind.max_tilt > 15                       # a foot goes into the gap
+    assert seeing.distance > 700 and seeing.max_tilt < 10 and not seeing.fell
+
+
+@needs_cxx
+def test_hexapod_stops_at_a_gap_too_wide_to_step_over():
+    from legsim.scenario import DEFAULTS, run
+    d = DEFAULTS["hexapod"]
+    t = terrain.gaps(height=70, widths=(250,), segment=600, y0=400)
+    blocked = []
+    r = run("hexapod", t, "tof", gait=d["gait"], speed=d["speed"], duration=10,
+            frame_cb=lambda robot, fw, _: blocked.append(fw.terrain_state()["blocked"]), frame_dt=0.5)
+    assert blocked[-1] and r.distance < 450 and not r.fell

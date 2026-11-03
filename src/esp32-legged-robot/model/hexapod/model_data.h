@@ -241,11 +241,14 @@ const TofSensor TOF_SENSORS[] = {
 #define TOF_SENSOR_COUNT 2
 
 const TerrainMapParams TERRAIN_MAP_PARAMS = {
-	25,    // cell size, mm (the 40x40 map covers 1 m around the robot: it is 400 mm long with legs)
+	15,    // cell size, mm (the 40x40 map covers 600 mm around the robot; 25 mm cells are too coarse to see a 40 mm gap)
 	6.0,   // cells are forgotten after 6 s (odometry drifts)
 	0.3,   // a lower reading moves a cell 30 % of the way (noise)
 	8      // a reading 8 mm above a cell replaces it at once (obstacle top)
 };
+
+// body tilt the terrain map places ToF readings with (TerrainTilt): with the raw IMU the mapped floor crept up 10-20 mm in 10 s of walking
+#define TERRAIN_TILT_MODE TERRAIN_TILT_FILTERED
 
 const TerrainParams TERRAIN_PARAMS = {
 	30,    // search depth, mm: with foot switches a foot reaches up to 30 mm below its planned touchdown
@@ -257,7 +260,8 @@ const TerrainParams TERRAIN_PARAMS = {
 	60,    // up to 60 mm along the step
 	0,     // foot radius, mm: the foot point is the tibia tip itself
 	5,     // tolerance, mm: touchdowns closer than this to the plan keep the planned height
-	0.05   // servo latency, s (50 Hz pulses plus travel)
+	0.05,  // servo latency, s (50 Hz pulses plus travel)
+	20     // gap margin, mm: keep 20 mm from ground that drops away (a map cell, rounded up)
 };
 
 #endif

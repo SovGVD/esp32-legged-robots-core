@@ -13,6 +13,7 @@ ESP32 runs. `drive()` feeds those pulses to a SimDog.
 """
 
 import ctypes
+import math
 import glob
 import os
 import subprocess
@@ -111,6 +112,14 @@ class FirmwareCore:
         L.rc_tilt_estimate.restype = None
         L.rc_tilt_estimate.argtypes = [ctypes.c_float, f32p, f32p, f32p]
         L.rc_tilt_reset.restype = None
+        L.rc_heading_feed.restype = None
+        L.rc_heading_feed.argtypes = [ctypes.c_float, ctypes.c_float, f32p]
+        L.rc_heading_hold.restype = None
+        L.rc_heading_hold.argtypes = [ctypes.c_int]
+        L.rc_turn_to.restype = None
+        L.rc_turn_to.argtypes = [ctypes.c_float]
+        L.rc_heading_state.restype = None
+        L.rc_heading_state.argtypes = [f32p]
         L.rc_set_height_offset.restype = None
         L.rc_set_height_offset.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_sit_height.restype = ctypes.c_float
@@ -148,7 +157,46 @@ class FirmwareCore:
         self.last_imu = (0.0, 0.0, 0.0)
         self.contacts = None      # foot switch threshold (N) while contact sensing is on
         self.tof = None           # legsim.tof.ToFArray while the terrain map is fed
+        self.heading_sim = None   # set_heading_sensors()
         self.reset()
+
+    # ----------------------------------------------------------------- heading
+    def set_heading_sensors(self, gyro_bias_dps=0.0, magnetometer=True, mag_noise=0.5,
+                            field=(0.0, 20.0, -40.0), seed=0):
+        """Feed the firmware heading code (HeadingEstimator) every tick from the sim:
+        the gyro's yaw rate with a constant bias (deg/s, a real MEMS gyro drifts 0.5-2),
+        and a magnetometer every 4th tick (100 Hz) with noise (uT). field: earth field
+        in the world frame, uT, world x = east, y = north (the robots start facing north).
+        None turns the heading feed off."""
+        if gyro_bias_dps is None:
+            self.heading_sim = None
+            return
+        self.heading_sim = {"bias": math.radians(gyro_bias_dps), "mag": magnetometer, "noise": mag_noise,
+                            "field": np.array(field, dtype=float), "rng": np.random.default_rng(seed), "tick": 0}
+
+    def _feed_heading(self, robot, dt):
+        h = self.heading_sim
+        R = robot.data.xmat[robot._torso].reshape(3, 3)
+        yaw_rate = float(robot.read_imu()["gyro"][2]) + h["bias"]
+        mag = None
+        h["tick"] += 1
+        if h["mag"] and h["tick"] % 4 == 0:
+            m = R.T @ h["field"] + h["rng"].normal(0, h["noise"], 3)
+            mag = (ctypes.c_float * 3)(*map(float, m))
+        self.lib.rc_heading_feed(dt, yaw_rate, mag)
+
+    def heading_hold(self, on=True):
+        """Heading hold on/off (`heading on|off`): keeps the heading the robot has when the yaw command is let go."""
+        self.lib.rc_heading_hold(1 if on else 0)
+
+    def turn_to(self, degrees):
+        """`turnto <deg>`: turn to a compass heading and hold it."""
+        self.lib.rc_turn_to(math.radians(degrees % 360))
+
+    def heading_state(self):
+        v = self._floats(self.lib.rc_heading_state, 6)
+        return {"heading": math.degrees(v[0]), "target": math.degrees(v[1]), "hold": bool(v[2]),
+                "has_target": bool(v[3]), "absolute": bool(v[4]), "field": float(v[5])}
 
     def reset(self):
         self.lib.rc_init()
@@ -186,7 +234,7 @@ class FirmwareCore:
         self.lib.rc_set_terrain(1 if adapt else 0, 1 if tof else 0)
 
     TERRAIN_FIELDS = ("search_depth", "search_speed", "clearance", "max_step", "body_rate", "edge_limit",
-                      "foothold_shift", "foot_radius", "tolerance", "latency")
+                      "foothold_shift", "foot_radius", "tolerance", "latency", "gap_margin")
 
     def tune_terrain(self, reset=False, **fields):
         """Change TERRAIN_PARAMS fields for experiments (kept until tune_terrain(reset=True)),
@@ -205,10 +253,13 @@ class FirmwareCore:
         return int(self.lib.rc_terrain_cells())
 
     def terrain_state(self):
-        """Per leg: ground height (mm, gait frame), reaching for contact, swinging; and the body's terrain height."""
-        v = self._floats(self.lib.rc_terrain_state, self.legs * 3 + 1)
-        legs = v[:-1].reshape(self.legs, 3)
-        return {"ground": legs[:, 0], "searching": legs[:, 1] > 0, "swing": legs[:, 2] > 0, "body": float(v[-1])}
+        """Per leg: ground height (mm, gait frame), reaching for contact, swinging; the body's
+        terrain height, and whether a gap too wide to step
+        over stops the robot (blocked)."""
+        v = self._floats(self.lib.rc_terrain_state, self.legs * 3 + 2)
+        legs = v[:-2].reshape(self.legs, 3)
+        return {"ground": legs[:, 0], "searching": legs[:, 1] > 0, "swing": legs[:, 2] > 0,
+                "body": float(v[-2]), "blocked": bool(v[-1])}
 
     def sense(self, robot, dt=None):
         """Feed the sensors of the current rough ground mode for one tick (drive() calls this)."""
@@ -349,6 +400,8 @@ class FirmwareCore:
         pulses = None
         for _ in range(ticks):
             self.sense(dog)
+            if getattr(self, "heading_sim", None) is not None:
+                self._feed_heading(dog, self.loop_dt)
             self.last_imu = self.imu_angles(dog)
             pulses = self.update(command, imu=self.last_imu)
             if ideal_servos:

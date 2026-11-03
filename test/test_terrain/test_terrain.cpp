@@ -281,6 +281,110 @@ void test_mapped_obstacle_raises_the_swing_and_the_foothold()
 	TEST_ASSERT_GREATER_THAN_FLOAT(2, gait.terrainHeight());
 }
 
+/**
+ * Map: flat ground at the neutral stance, a gap from y0 to y1 with its bottom
+ * `depth` mm lower (the 40-cell map holds 400 mm along y).
+ */
+static void mapGap(TerrainMap &map, float y0, float y1, float depth)
+{
+	for (float x = -150; x <= 150; x += 5) {
+		for (float y = -60; y < 340; y += 5) {
+			bool in = y >= y0 && y < y1;
+			LR_point q = { x, y, in ? -DOG_FOOT_Z - depth : -DOG_FOOT_Z };
+			map.addPoint(q);
+		}
+	}
+}
+
+void test_narrow_gap_is_stepped_over()
+{
+	leg legs[4] = DOG_LEGS;
+	GaitEngine gait;
+	gait.begin(dogTrot(), legs, 4);
+	TerrainMap map;
+	map.begin(MAP);
+	gait.setTerrain(&TERRAIN, &map);
+	mapGap(map, 150, 170, 60);
+	float margin = TERRAIN.footRadius + MAP.cellSize;   // gapMargin 0: foot radius + one cell
+	for (int t = 0; t < (int)(5.0f / DT); t++) {
+		gait.update(DT, forward(0.5f));
+		for (int i = 0; i < 4; i++) {
+			// no foot stands in the gap or on its brink
+			if (!gait.isSwinging(i)) {
+				TEST_ASSERT_FALSE(legs[i].foot.y > 150 - margin + 1 && legs[i].foot.y < 170 + margin - 1);
+				TEST_ASSERT_FLOAT_WITHIN(0.01f, -DOG_FOOT_Z, legs[i].foot.z);
+			}
+		}
+		TEST_ASSERT_FALSE(gait.isBlocked());
+	}
+	// all four feet got across
+	for (int i = 0; i < 4; i++) {
+		TEST_ASSERT_GREATER_THAN_FLOAT(170, legs[i].foot.y);
+	}
+}
+
+void test_wide_gap_stops_the_robot_until_the_command_lets_go()
+{
+	leg legs[4] = DOG_LEGS;
+	GaitEngine gait;
+	gait.begin(dogTrot(), legs, 4);
+	TerrainMap map;
+	map.begin(MAP);
+	gait.setTerrain(&TERRAIN, &map);
+	mapGap(map, 150, 340, 60);
+	for (int t = 0; t < (int)(4.0f / DT); t++) {
+		gait.update(DT, forward(0.5f));
+		for (int i = 0; i < 4; i++) {
+			// nothing ever steps into the gap
+			if (!gait.isSwinging(i)) {
+				TEST_ASSERT_LESS_THAN_FLOAT(150, legs[i].foot.y);
+			}
+			TEST_ASSERT_LESS_THAN_FLOAT(150, legs[i].foot.y);
+		}
+	}
+	TEST_ASSERT_TRUE(gait.isBlocked());
+	TEST_ASSERT_FALSE(gait.isActive() && gait.velocity().y > 1);
+	// still pushing forward: stays put; the block holds only along its direction
+	float y = gait.body().position.y;
+	for (int t = 0; t < (int)(1.0f / DT); t++) {
+		gait.update(DT, forward(0.5f));
+	}
+	TEST_ASSERT_FLOAT_WITHIN(1.0f, y, gait.body().position.y);
+	// stick released: unblocked, and it can walk back
+	gait.update(DT, forward(0));
+	TEST_ASSERT_FALSE(gait.isBlocked());
+	for (int t = 0; t < (int)(1.0f / DT); t++) {
+		gait.update(DT, forward(-0.5f));
+	}
+	TEST_ASSERT_LESS_THAN_FLOAT(y - 20, gait.body().position.y);
+}
+
+void test_cliff_the_sensors_cannot_see_down_also_stops_it()
+{
+	leg legs[4] = DOG_LEGS;
+	GaitEngine gait;
+	gait.begin(dogTrot(), legs, 4);
+	TerrainMap map;
+	map.begin(MAP);
+	gait.setTerrain(&TERRAIN, &map);
+	// the floor ends at y = 150; right past the edge is unseen (the shadow), the
+	// ground far below shows up from y = 220 on
+	for (float x = -150; x <= 150; x += 5) {
+		for (float y = -60; y < 340; y += 5) {
+			if (y >= 150 && y < 220) continue;
+			LR_point q = { x, y, y < 150 ? -DOG_FOOT_Z : -DOG_FOOT_Z - 100 };
+			map.addPoint(q);
+		}
+	}
+	for (int t = 0; t < (int)(4.0f / DT); t++) {
+		gait.update(DT, forward(0.5f));
+		for (int i = 0; i < 4; i++) {
+			TEST_ASSERT_LESS_THAN_FLOAT(150, legs[i].foot.y);
+		}
+	}
+	TEST_ASSERT_TRUE(gait.isBlocked());
+}
+
 int main()
 {
 	UNITY_BEGIN();
@@ -293,5 +397,8 @@ int main()
 	RUN_TEST(test_foot_reaches_down_into_a_hole_and_remembers_it);
 	RUN_TEST(test_early_touchdown_on_something_higher);
 	RUN_TEST(test_mapped_obstacle_raises_the_swing_and_the_foothold);
+	RUN_TEST(test_narrow_gap_is_stepped_over);
+	RUN_TEST(test_wide_gap_stops_the_robot_until_the_command_lets_go);
+	RUN_TEST(test_cliff_the_sensors_cannot_see_down_also_stops_it);
 	return UNITY_END();
 }

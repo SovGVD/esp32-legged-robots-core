@@ -49,6 +49,15 @@ def scene(model, name, height=None):
         return terrains.step(height=height or 20 * k, y0=y0, length=500)
     if name == "drop":
         return terrains.drop(height=height or 15 * k, y0=150.0 if model == "dog" else 200.0)
+    if name == "gaps":
+        # deeper than maxStep (dog 30, hexapod 45 mm): a hole, not a step down
+        if model == "dog":
+            return terrains.gaps(height=height or 50, widths=(25, 50, 150), y0=350)
+        return terrains.gaps(height=height or 70, widths=(40, 80, 220), y0=400)
+    if name == "bridge":
+        if model == "dog":
+            return terrains.bridge(height=height or 40, ramp=450, gap_widths=(25, 35), width=300, y0=200)
+        return terrains.bridge(height=height or 70, ramp=450, deck=1000, gap_widths=(40, 55), width=520, y0=250)
     if name == "course":
         return terrains.course(scale=k, y0=y0)
     return terrains.SCENES[name]()
@@ -103,11 +112,13 @@ def _body_contacts(robot):
 
 
 def run(model="dog", terrain="course", sensing="both", speed=0.5, duration=None, leveling=None,
-        frame_cb=None, frame_dt=1 / 30, seed=0, gait="default", tune=None, **terrain_args):
+        frame_cb=None, frame_dt=1 / 30, seed=0, gait="default", tune=None, steer=False, **terrain_args):
     """Walk forward over `terrain` (a name from legsim.terrain.SCENES or a Terrain) for
     `duration` s (default 8 dog / 6 hexapod) holding the move command `speed`.
     leveling: IMU leveling (default: on with any sensing; the terrain code needs it).
-    frame_cb(robot, fw, t) is called every frame_dt seconds (videos)."""
+    frame_cb(robot, fw, t) is called every frame_dt seconds (videos).
+    steer: turn like an operator would to keep the robot on the line x = 0, heading +Y
+    (from the sim's true pose; the robots have no heading sensor, and a long walk curves)."""
     t = terrains.SCENES[terrain](**terrain_args) if isinstance(terrain, str) else terrain
     fw = core(model)
     if leveling is None:
@@ -129,7 +140,13 @@ def run(model="dog", terrain="course", sensing="both", speed=0.5, duration=None,
         ticks = int(round(duration / fw.loop_dt))
         next_frame = 0.0
         for k in range(ticks):
-            fw.drive(robot, (0, speed, 0, 0, 0, 0))
+            turn = 0.0
+            if steer:
+                p = robot.body_position_mm()
+                yaw = robot.body_orientation()["yaw"]
+                # aim at the line 300 mm ahead; a positive turn command turns clockwise
+                turn = float(np.clip(3.0 * (yaw - p[0] / 300.0), -0.6, 0.6))
+            fw.drive(robot, (0, speed, 0, 0, 0, turn))
             o = robot.body_orientation()
             tilt = math.degrees(max(abs(o["pitch"]), abs(o["roll"])))
             tilts.append(tilt)

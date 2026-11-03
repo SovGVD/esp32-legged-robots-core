@@ -75,6 +75,17 @@
 #define POWER_SENSOR         INA219
 #define POWER_SENSOR_ADDRESS 0x40
 
+// ToF terrain sensor: one VL53L5CX (8x8) on the nose, 40 deg down (TOF_SENSORS
+// in model_data.h). On the main I2C bus (21/22) at its default address 0x29,
+// LPn tied high. For its own bus (faster, no waiting on the IMU) wire it to
+// two free pins and set them here, e.g. 32 / 33.
+#define TOF_TYPE             VL53L5CX
+//#define TOF_I2C_SDA          32
+//#define TOF_I2C_SCL          33
+// zone order, check with `tof print` (see tof.cpp)
+//#define TOF_ZONE_MIRROR_X    1
+//#define TOF_ZONE_MIRROR_Y    0
+
 //Cores loop time
 #define LOOP_TIME 4400   // microseconds (10^-6 seconds)
 #define SERVICE_LOOP_TIME 100000

@@ -99,6 +99,14 @@
 #define POWER_SENSOR_ADDRESS     0x41
 #define POWER_SENSOR             INA219
 
+// ToF terrain sensors: two VL53L5CX (8x8) on the front, turned 20 deg left and
+// right, 35 deg down (TOF_SENSORS in model_data.h; sensor 0 is the left one).
+// Both on the main I2C bus. Sensor 0: LPn tied high, moved to 0x2A at boot.
+// Sensor 1: LPn on TOF_LPN_PIN, starts at 0x29. GPIO 14 is free on the
+// ESP32-CAM without an SD card (assumed; change it to the pin you use).
+#define TOF_TYPE                 VL53L5CX
+#define TOF_LPN_PIN              14
+
 #define IGNORE_BROWNOUT_CONDITION
 
 //Cores loop time

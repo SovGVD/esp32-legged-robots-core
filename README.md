@@ -23,7 +23,9 @@ Universal code for any kind of legged robots (not only legged now) and mobile fr
  - DC motor drivers
    - MX1508 and similar
  - IMU
-   - MPU9650
+   - MPU9250 (GY-91): accelerometer, gyro and the AK8963 magnetometer (heading)
+ - Distance
+   - VL53L5CX 8x8 multizone ToF (terrain map: obstacles and gaps)
  - Other sensors
    - IMA219 - power sensor
 
@@ -105,6 +107,31 @@ using it on a robot, check the IMU mounting with `level state`: raise the left s
 raise the nose and the roll must change (the firmware's pitch is the sideways lean, as on the web client); fix
 it with `IMU_SWAP_ROLL_PITCH`, `IMU_PITCH_SIGN` and `IMU_ROLL_SIGN`. `calib imu` offsets are saved in NVS.
 
+**Heading.** The gyro and the GY-91's magnetometer (AK8963 inside the MPU9250) give a compass heading
+(`HeadingEstimator`: the gyro for the fast part, pulled toward the tilt compensated magnetometer over ~2 s;
+readings whose field strength is off by more than 25 % from the calibrated one, e.g. next to a servo or steel,
+are ignored). Many "GY-91" boards carry an MPU6500 without a magnetometer: then the heading is the gyro alone,
+relative to the start, and drifts. Calibrate once on the robot, servos on, away from steel: `heading cal`
+turns it two full turns in place (needs the web client connected; `heading hand` instead collects for 60 s
+while you turn it by hand), and the result is saved in NVS. `heading on` holds the heading: while you turn
+with the stick the target follows, and when you let go the robot keeps the heading it has then.
+`turnto <deg>` turns to a compass heading and holds it (`heading off` stops). `heading state` prints the
+heading, the field strength and whether it is used. The hold pauses while the failsafe is on (no client).
+
+**Terrain (ToF).** `terrain on` (once standing) switches to the rough gait (`GAIT_PARAMS_ROUGH`, slower and
+higher steps), turns leveling on and feeds the VL53L5CX frames into the terrain map: feet step onto
+obstacles instead of into them, footholds keep away from gaps, and a gap too wide to step over stops the
+robot in that direction until the stick lets go (web page: "GAP AHEAD: stopped"). It is the code the
+simulator results come from (`sim/README.md`, "Rough ground"), not tested on the real robots yet. The dog has
+one sensor on the nose, the hexapod two on the front (`TOF_SENSORS` in `model_data.h`: position, angles).
+Wiring: the sensors share the main I2C bus by default (reads are split into 32 byte transfers so the IMU
+never waits long; `loop` shows a `tof` stage); `TOF_I2C_SDA`/`TOF_I2C_SCL` in `config.h` put them on the
+second I2C controller instead. Two sensors need `TOF_LPN_PIN` wired to the second sensor's LPn (hexapod
+default GPIO 14, an assumption). Check the zone order with `tof print`: cover the left half of a sensor and the
+left columns must get short, cover the top half and the top rows; fix with `TOF_ZONE_MIRROR_X` /
+`TOF_ZONE_MIRROR_Y`. Facing a flat wall the corner zones should read ~10 % more than the middle (distance along
+each zone's ray); if they read the same, set `TOF_DISTANCE_PERPENDICULAR 1`.
+
 **Battery protection.** The INA219 voltage is read at 10 Hz and filtered (servo current makes it sag every
 step). Below `BATTERY_PARAMS.lowVoltage` for 3 s the robot warns (CLI, web page); below `criticalVoltage` it
 ignores the controller, finishes the step, lowers the body by `SIT_HEIGHT` and turns the servos off, so it rests
@@ -112,10 +139,11 @@ low instead of dropping when the battery cuts out. Critical is latched until res
 `model_data.h`; the defaults are for a 2S LiPo (6.8 V / 6.4 V), change them for your pack. Without a power
 sensor reading (e.g. USB powered on the bench) nothing happens.
 
-**Telemetry.** The web page asks for telemetry every second (protocol in `src/web/src/protocol.ts`, version 2):
+**Telemetry.** The web page asks for telemetry every second (protocol in `src/web/src/protocol.ts`, version 3):
 voltage, current, loop time, status bits (HAL, failsafe, gait and whether it is stepping, leveling, IMU and
-power sensor found, battery state, resting, missed motion ticks), IMU tilt, missed tick count and the IK
-counters (feet out of reach / joint limit / servo range clamps). The header shows them, e.g.
+power sensor found, battery state, resting, missed motion ticks, terrain mode, gap ahead, heading hold,
+magnetometer heading, ToF running), IMU tilt, missed tick count, the IK counters (feet out of reach / joint
+limit / servo range clamps), the heading and the hold target. The header shows them, e.g.
 `walk · stepping · level · tilt 0.4° -1.2° · IK 0/3/0`.
 
 **Motion loop timing.** The motion task runs every `LOOP_TIME` (dog 4.4 ms). The gait, leveler and tank drive

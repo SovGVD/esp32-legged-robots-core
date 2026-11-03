@@ -233,6 +233,9 @@ const TerrainMapParams TERRAIN_MAP_PARAMS = {
 	8      // a reading 8 mm above a cell replaces it at once (obstacle top)
 };
 
+// body tilt the terrain map places ToF readings with (TerrainTilt): the trot rocks faster than the filter; filtered cost the 20 mm step in the sim
+#define TERRAIN_TILT_MODE TERRAIN_TILT_RAW
+
 const TerrainParams TERRAIN_PARAMS = {
 	12,    // search depth, mm: with foot switches a foot reaches up to 12 mm below its planned touchdown
 	       // (the legs are 80 mm long and reach 102: deeper runs them out of reach)
@@ -244,7 +247,8 @@ const TerrainParams TERRAIN_PARAMS = {
 	36,    // up to 36 mm along the step
 	6,     // foot radius, mm: the foot point is the centre of the 6 mm TPU shoe ball
 	5,     // tolerance, mm: touchdowns closer than this to the plan keep the planned height
-	0.05   // servo latency, s (50 Hz pulses plus travel)
+	0.05,  // servo latency, s (50 Hz pulses plus travel)
+	20     // gap margin, mm: keep 20 mm from a gap (foot ball radius + a map cell, rounded up)
 };
 
 #endif
