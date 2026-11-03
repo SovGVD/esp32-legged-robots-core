@@ -38,7 +38,7 @@ on macOS, use `trot.py --view` or a video there).
 ## Commands
 
 ```
-python -m pytest -q tests            # 76 checks, ~60 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 77 checks, ~60 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
@@ -343,7 +343,7 @@ the nose looking 40 deg down; hexapod, two on the front turned 20 deg left and
 right, 35 deg down.
 
 In the sim (`legsim/terrain.py`, `legsim/tof.py`): obstacles are static boxes
-(bumps, rocks, bars, step, drop = walk off a platform); a foot switch is
+(bumps, rocks, rubble, bars, step, drop = walk off a platform); a foot switch is
 pressed when the ground pushes the foot up with more than 0.3 N (vertical
 part only, so pushing against the side of an obstacle doesn't press it); the
 ToF casts one ray per zone at 15 Hz with 2 mm + 1 % noise against the
@@ -362,6 +362,8 @@ Findings (rough gait, full stick, 8 s dog / 6 s hexapod; `--compare`):
 | Hexapod, 15 + 30 mm bars | 462 mm | 500 | **627** | **668** |
 | Hexapod, 18 mm bumps | 674 mm, tilt 1.4 | 677, 1.5 | 701, 1.2 | 703, 1.6 |
 | Hexapod, 22 mm drop | 689 mm, tilt 2.1 | 680, 2.9 | 683, 1.1 | 694, 1.4 |
+| Dog, rubble up to 20 mm | 556 mm, tilt 2.7 | 610, 4.3 | 560, 4.2 | 564, 4.4 |
+| Hexapod, rubble up to 30 mm | 683 mm, tilt 1.4 | 653, 1.2 | 696, 1.4 | 666, 1.4 |
 
 * The ToF map does most of the work: with it the dog climbs a 20 mm step its
   open-loop trot can't, and the hexapod walks up 30 mm level instead of
@@ -369,6 +371,15 @@ Findings (rough gait, full stick, 8 s dog / 6 s hexapod; `--compare`):
 * Foot switches alone can only feel an obstacle after hitting it. They help
   on small bumps and holes, not on anything taller than the step height; on
   the dog's trot (two legs down) they add some rocking.
+* Dense rubble (`rubble()`: overlapping blocks 10-80 mm across, mixed
+  heights, about half the ground covered) gains little from sensing: the
+  rough gait's step height already clears most of it, and the blocks are
+  smaller than the map can resolve well. The hexapod
+  walks it the same in every mode (with fewer leg knocks with ToF); the dog,
+  at its height limit, rocks more with sensing (mean tilt ~4 deg vs 2.7).
+  Lowering the swing on high legs (apex over the mean ground) helped here but
+  broke the step climb, so it is not in.
+  `FirmwareCore.tune_terrain(...)` changes `TERRAIN_PARAMS` for experiments.
 * Limits: the hexapod's femur servos (45 deg each way, 2:1 gear) run out
   above ~30 mm obstacles, the dog's legs (80 mm, reach 102) around 20 mm.
   Higher needs a taller stance or longer legs, not more sensing.

@@ -51,13 +51,15 @@ static bool terrainOn = false;
 static bool mapOn     = false;
 static LR_angle lastImu = { 0, 0, 0 };
 static float tiltGain = 1.0f;
+// TERRAIN_PARAMS, tunable from Python (rc_tune_terrain); kept across rc_init()
+static TerrainParams terrainParams = TERRAIN_PARAMS;
 
 static void applyTerrain()
 {
 	GaitParams p = motion.gait().params();
 	p.useContactSensors = contactOn;
 	motion.gait().setParams(p);
-	motion.gait().setTerrain(terrainOn ? &TERRAIN_PARAMS : nullptr, mapOn ? &terrainMap : nullptr);
+	motion.gait().setTerrain(terrainOn ? &terrainParams : nullptr, mapOn ? &terrainMap : nullptr);
 }
 
 // Pristine copy of the model legs, so rc_init() can start over
@@ -438,3 +440,18 @@ RC_API void rc_terrain_state(float *out)
 
 /** Experiments: scale of the IMU tilt used for contact heights (1 = as measured). */
 RC_API void rc_set_tilt_gain(float g) { tiltGain = g; }
+
+/**
+ * Experiments: change one TERRAIN_PARAMS field (index in declaration order:
+ * searchDepth, searchSpeed, clearance, maxStep, bodyRate, edgeLimit,
+ * footholdShift, footRadius, tolerance, latency); index < 0 restores all.
+ */
+RC_API void rc_tune_terrain(int index, float value)
+{
+	const int n = sizeof(TerrainParams) / sizeof(float);
+	if (index < 0) {
+		terrainParams = TERRAIN_PARAMS;
+	} else if (index < n) {
+		reinterpret_cast<float *>(&terrainParams)[index] = value;
+	}
+}

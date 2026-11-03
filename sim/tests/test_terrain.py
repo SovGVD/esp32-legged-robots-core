@@ -101,3 +101,14 @@ def test_terrain_mode_on_flat_ground_walks_like_open_loop():
         b = run(model, terrain.flat(), "both", gait="rough", speed=1.0, duration=4)
         assert b.distance > 0.9 * a.distance
         assert b.mean_tilt < 2.5, model
+
+
+def test_rubble_has_mixed_heights_everywhere():
+    t = terrain.rubble(max_height=20)
+    heights = [b[2] for b in t.boxes]
+    assert len(heights) > 100
+    assert min(heights) < 5 and max(heights) > 15
+    # about half the path is covered
+    import numpy as np
+    pts = [(x, y) for x in np.linspace(-100, 100, 9) for y in np.linspace(300, 1100, 41)]
+    assert 0.3 < sum(t.height_at(x, y) > 0 for x, y in pts) / len(pts) < 0.7

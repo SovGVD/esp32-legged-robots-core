@@ -40,6 +40,8 @@ def scene(model, name, height=None):
         return terrains.bumps(max_height=height or 12 * k, y0=y0)
     if name == "rocks":
         return terrains.rocks(max_height=height or 15 * k, y0=y0)
+    if name == "rubble":
+        return terrains.rubble(max_height=height or 20 * k, y0=y0)
     if name == "bars":
         h = height or 20 * k
         return terrains.bars(heights=(h / 2, h), spacing=300, y0=y0)

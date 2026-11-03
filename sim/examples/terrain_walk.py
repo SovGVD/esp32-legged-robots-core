@@ -8,7 +8,7 @@ firmware's terrain code, with or without foot switches and ToF sensors.
   python examples/terrain_walk.py --hexapod --video walk.mp4   # render: ToF sensors (boxes), view cones, zone hits (dots)
   MUJOCO_GL=glfw xvfb-run -a python examples/terrain_walk.py --video walk.mp4   # headless
 
-Scenes: flat, bumps, rocks, bars, step, drop, course (legsim/terrain.py), sized
+Scenes: flat, bumps, rocks, rubble, bars, step, drop, course (legsim/terrain.py), sized
 for the robot (the hexapod gets 1.5x higher obstacles). Sensing: none (open loop,
 like the real robots today), contacts (foot switches), tof (ToF terrain map),
 both.

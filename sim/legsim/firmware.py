@@ -98,6 +98,8 @@ class FirmwareCore:
         L.rc_set_stability_gain.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_tune_gait.restype = None
         L.rc_tune_gait.argtypes = [ctypes.c_float] * 5
+        L.rc_tune_terrain.restype = None
+        L.rc_tune_terrain.argtypes = [ctypes.c_int, ctypes.c_float]
         L.rc_set_side_limits.restype = None
         L.rc_set_side_limits.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_set_center_of_mass.restype = None
@@ -182,6 +184,17 @@ class FirmwareCore:
         self.tof = ToFArray(self.tof_sensors(), **tof_args) if tof else None
         self.lib.rc_set_contact_sensing(1 if contacts else 0)
         self.lib.rc_set_terrain(1 if adapt else 0, 1 if tof else 0)
+
+    TERRAIN_FIELDS = ("search_depth", "search_speed", "clearance", "max_step", "body_rate", "edge_limit",
+                      "foothold_shift", "foot_radius", "tolerance", "latency")
+
+    def tune_terrain(self, reset=False, **fields):
+        """Change TERRAIN_PARAMS fields for experiments (kept until tune_terrain(reset=True)),
+        e.g. tune_terrain(clearance=15, body_rate=0)."""
+        if reset:
+            self.lib.rc_tune_terrain(-1, 0.0)
+        for k, v in fields.items():
+            self.lib.rc_tune_terrain(self.TERRAIN_FIELDS.index(k), float(v))
 
     def terrain_height(self, x, y):
         """Mapped ground (mm, gait frame) at gait-frame (x, y), or None."""

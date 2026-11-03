@@ -14,6 +14,7 @@ robot's feet, legs and body collide with them and the simulated ToF sensors
 Scenes (each leaves the start area flat):
   bumps()     tiles of random height, like rough ground or a lawn of small rocks
   rocks()     scattered rotated blocks
+  rubble()    dense overlapping blocks of mixed size and height
   bars()      obstacles across the path, one after another
   step()      a platform to climb onto (and off again)
   drop()      start on a platform and walk off its edge (a step down)
@@ -106,6 +107,21 @@ def rocks(count=40, max_height=20.0, size=(20.0, 60.0), length=1200.0, width=400
     return t
 
 
+def rubble(max_height=20.0, density=1.0, length=1000.0, width=450.0, y0=200.0, seed=7):
+    """Dense rubble: many overlapping blocks of mixed size (10-80 mm), height
+    (10-100 % of max_height) and yaw, covering about half the ground, so
+    every step meets small and large edges."""
+    rng = np.random.default_rng(seed)
+    t = Terrain(f"rubble{max_height:g}")
+    count = int(density * length * width / 2500.0)
+    for _ in range(count):
+        big = rng.random() < 0.3
+        sx, sy = rng.uniform(40, 80, 2) if big else rng.uniform(10, 40, 2)
+        h = rng.uniform(0.1, 0.6 if big else 1.0) * max_height
+        t.add_box(rng.uniform(-width / 2, width / 2), rng.uniform(y0, y0 + length), h, sx, sy, rng.uniform(0, math.pi))
+    return t
+
+
 def bars(heights=(10.0, 20.0, 30.0), depth=30.0, spacing=350.0, width=600.0, y0=250.0):
     """Obstacles across the path (depth mm along the path), `spacing` mm apart."""
     t = Terrain("bars")
@@ -140,6 +156,7 @@ SCENES = {
     "flat": flat,
     "bumps": bumps,
     "rocks": rocks,
+    "rubble": rubble,
     "bars": bars,
     "step": step,
     "drop": drop,
