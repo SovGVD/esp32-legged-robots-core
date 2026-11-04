@@ -466,24 +466,68 @@ joined by an 80 cm doorway, with a sofa, a cabinet, table legs and boxes.
     python examples/lidar_nav.py --model hexapod
     MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --video out/dog-lidar.mp4 --png out/map.png
 
-Results (gyro drifting 1 deg/s, no magnetometer: indoors it is thrown off by steel and wiring):
+Results (gyro drifting 1 deg/s, no magnetometer: indoors it is thrown off by steel and wiring;
+10 cm map cells):
 
 | robot   | goal              | reached | lidar pose error | odometry only   |
 |---------|-------------------|---------|------------------|-----------------|
-| dog     | (-0.7, 3.0) m     | 35 s    | 69 mm, 0.1 deg   | 1080 mm, 34 deg |
-| dog     | (1.1, 2.9) m      | 17 s    | 56 mm, 0.3 deg   | 968 mm, 47 deg  |
-| dog     | back to (0.3, 0)  | 26 s    | 36 mm, 0.0 deg   | 1986 mm, 75 deg |
-| hexapod | (-0.9, 3.9) m     | 37 s    | 63 mm, 0.7 deg   | 1278 mm, 40 deg |
-| hexapod | (1.3, 3.7) m      | 17 s    | 47 mm, 0.8 deg   | 1311 mm, 58 deg |
-| hexapod | back to (0.5, 0)  | 27 s    | 52 mm, 0.5 deg   | 3343 mm, 85 deg |
+| dog     | (-0.7, 3.0) m     | 35 s    | 24 mm, 0.6 deg   | 304 mm, 0.1 deg |
+| dog     | (1.1, 2.9) m      | 17 s    | 26 mm, 0.5 deg   | 326 mm, 0.5 deg |
+| dog     | back to (0.3, 0)  | 27 s    | 72 mm, 0.0 deg   | 64 mm, 1.3 deg  |
+| hexapod | (-0.9, 3.9) m     | 38 s    | 87 mm, 0.1 deg   | 121 mm, 0.8 deg |
+| hexapod | (1.3, 3.7) m      | 17 s    | 78 mm, 0.0 deg   | 155 mm, 0.9 deg |
+| hexapod | back to (0.5, 0)  | 27 s    | 58 mm, 0.2 deg   | 139 mm, 1.0 deg |
 
-The odometry alone is useless after a few metres (the dog's feet slip, the gyro drifts); with
-the lidar the pose stays within a few cm. The remaining error is mostly the 5 cm map cells:
-the matcher pulls points toward cell centres, up to half a cell. No rejected scans, no CRC
-errors. Limits: the map is 10 x 10 m around the start (larger flats need a bigger grid or a
-moving map), no loop closure (a long loop through several rooms can come back a little off),
-things below the scan plane are invisible to it, and moving people leave marks that fade as
-the lidar sees through them again. Tests: `tests/test_lidar.py`, `test/test_lidar` (native).
+With the lidar the pose stays within a few cm; the remaining error is mostly the map cells
+(the matcher pulls points toward cell centres, up to half a cell). No rejected scans, no CRC
+errors. The odometry alone drifts a few cm per metre here, but the sim's feet don't slip like
+real ones and the gyro's bias is learned while standing (`Odometry2D`): on the robot expect
+worse. (The sim gyro reports the mean turn rate of each tick, like an IMU behind its low-pass
+filter; the instantaneous rate sampled once a tick aliased with the foot impacts and read
+2-3 % short over a turn.) Limits: the map is 20 x 20 m around the start, the planner sees
+10 x 10 m of it around the robot and the goal at a time, no loop closure (a long loop through
+several rooms can come back a little off), things below the scan plane are invisible to it,
+and moving people leave marks that fade as the lidar sees through them again. Tests:
+`tests/test_lidar.py`, `test/test_lidar` (native).
+
+## ToF room scans: the same map without a lidar
+
+`FirmwareCore.set_tof_nav(True)` feeds the map from the terrain ToF sensors instead
+(`tof_scan.h`, `TofNavigator`): to scan, the robot stops, tilts its nose up (and crouches 15 mm,
+the legs reach further), turns once around at ~0.45 rad/s and puts every zone ray within 4 deg
+of level that hit something higher than 4 cm above the floor into a 360 deg scan (one point per
+degree, odometry of the frame's moment), which goes into the same `LidarSlam` matcher and map.
+Walking to a goal it scans first, then every metre. The simulated VL53L5CX reports the closest
+target of 2 x 2 rays per zone, out to 3 m, ~40 ms late. `set_tof_mount(i, deg)` and
+`tune_tof_scan(...)` try other mounts and scan settings.
+
+    python examples/lidar_nav.py --tof --mount 25 --scan-tilt 8                 # dog, sensor 25 deg down
+    python examples/lidar_nav.py --tof --model hexapod --mount 22 --scan-tilt 6
+    MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --tof --mount 25 --scan-tilt 8 --video out/dog-tof.mp4 --speedup 6
+
+The legs can tilt the dog's nose up ~15 deg (with the crouch; 20 deg runs the legs out of reach)
+and the hexapod's ~10 deg (servo ranges). The sensors' top zone row looks 19.7 +- 2.8 deg above
+their axis, and a zone reports the floor under its lower edge before a wall further away, so the
+lower edge has to look level: nose up = mount angle - 17 deg. With today's mounts (dog 40 deg,
+hexapod 35 deg down) that is out of reach, walls beyond ~1 m are lost and the robots got lost
+(dog 1 of 3 goals, ~1 m off; hexapod none). With flatter mounts:
+
+| robot (mount)    | goal              | reached | map pose error   | odometry only    |
+|------------------|-------------------|---------|------------------|------------------|
+| dog (25 deg)     | (-0.7, 3.0) m     | 230 s   | 125 mm, 4.5 deg  | 1325 mm, 39 deg  |
+| dog              | (1.1, 2.9) m      | 48 s    | 127 mm, 3.1 deg  | 1773 mm, 45 deg  |
+| dog              | back to (0.3, 0)  | 74 s    | 90 mm, 2.9 deg   | 1527 mm, 58 deg  |
+| hexapod (22 deg) | (-0.9, 3.9) m     | 172 s   | 326 mm, 0.5 deg  | 284 mm, 6 deg    |
+| hexapod          | (1.3, 3.7) m      | 51 s    | 303 mm, 1.6 deg  | 347 mm, 8 deg    |
+| hexapod          | back to (0.5, 0)  | 98 s    | 290 mm, 0.6 deg  | 389 mm, 10 deg   |
+
+Every goal is reached, slowly (each scan is ~16 s standing and turning; the first goal is behind
+a wall the robot hasn't seen, it walks into the corner first). The dog's odometry suffers from the
+scan turns (a few degrees off per turn), which the scans then correct. The hexapod's map pose is
+~30 cm off, about what its odometry alone is: the sparse scans hardly improve on it at 10 cm
+cells (with 5 cm cells it was 1-10 cm). A flatter mount costs some terrain sensing: the dog crossed
+50 mm gaps worse (345 vs 617 mm walked in 8 s), the hexapod's runs were about the same.
+Tests: `tests/test_lidar.py` (ToF test with the flatter mounts), `test/test_tof_scan` (native).
 
 ## Plan
 

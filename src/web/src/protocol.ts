@@ -16,9 +16,9 @@
  *   'L' level      [0x4C, on]    IMU leveling on/off (ignored without an IMU)
  *   'D' tof        [0x44] request, answered with a ToF package (ToF builds only)
  *   'V' / 'v'      start / stop camera stream (camera builds only)
- *   'P' map        [0x50] request, answered with a map package (lidar builds only)
- *   'N' nav        [0x4E] request, answered with a nav package (lidar builds only)
- *   'W' goto       [0x57, x:i16, y:i16] walk to a map point (mm); [0x57] alone stops
+ *   'P' map        [0x50] request, answered with a map package (lidar / ToF room scan builds)
+ *   'N' nav        [0x4E] request, answered with a nav package (lidar / ToF room scan builds)
+ *   'W' goto       [0x57, x:i16, y:i16] walk to a map point (mm); [0x57] alone stops; [0x57, 'S'] scans the room (ToF)
  *
  * Robot -> client
  *   text "Ok"      sent once after connecting
@@ -33,7 +33,8 @@
  *   'N' nav        [0x4E, flags:u8, state:u8, match:u8, x:i16, y:i16, heading*100:i16, goalX:i16, goalY:i16,
  *                  scans:u16, p:u8, p x (x:i16, y:i16), s:u16, s x (x:i16, y:i16)]
  *                  mm and deg (counter-clockwise, 0 = facing +y) in the map frame; scan points in the
- *                  robot frame (x right, y forward). flags: 1 lidar data, 2 frozen, 4 blocked, 8 no memory
+ *                  robot frame (x right, y forward). flags: 1 sensor data, 2 frozen, 4 blocked, 8 no memory,
+ *                  16 ToF scan running, 32 ToF room scans (no lidar)
  *   'C' cli        [0x43, ...utf8 output]
  */
 
@@ -217,6 +218,11 @@ export function encodeGoto(x?: number, y?: number): Uint8Array {
   v.setInt16(1, c(x));
   v.setInt16(3, c(y));
   return b;
+}
+
+/** One ToF room scan (stop, nose up, turn around). */
+export function encodeScan(): Uint8Array {
+  return Uint8Array.of(P_GOTO, 0x53);
 }
 
 export function encodeVideo(start: boolean): Uint8Array {

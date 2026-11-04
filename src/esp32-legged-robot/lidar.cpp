@@ -1,48 +1,70 @@
 /**
- * 2D lidar (LDROBOT LD06 / LD19) for indoor maps and walking to a point.
+ * Indoor map, localization and walking to a point: with a 2D lidar (LDROBOT
+ * LD06 / LD19, LIDAR_TYPE in config.h) or, without one, with room scans of
+ * the terrain ToF sensors (VL53L5CX, TOF_SCAN_PARAMS in model_data.h).
  *
- * Wiring: the lidar's TX to LIDAR_RX_PIN (config.h), 5 V and GND; its PWM
- * pin to GND (the lidar then runs its own 10 rev/s speed control). It
- * streams 230400 baud on its own, nothing is sent to it.
+ * Lidar wiring: the lidar's TX to LIDAR_RX_PIN (config.h), 5 V and GND; its
+ * PWM pin to GND (the lidar then runs its own 10 rev/s speed control). It
+ * streams 230400 baud on its own, nothing is sent to it. A task on core 0
+ * reads the UART, parses the packets (Ld06Parser) and collects revolutions
+ * (LidarScanBuilder). Each finished revolution goes into LidarSlam with the
+ * odometry from the motion task (motionOdometry: gait velocity turned by the
+ * gyro), which corrects the pose against the map and adds the scan to it;
+ * then the Navigator (if a goal is set) plans and writes its move command.
  *
- * A task on core 0 reads the UART, parses the packets (Ld06Parser) and
- * collects revolutions (LidarScanBuilder). Each finished revolution goes
- * into LidarSlam with the odometry from the motion task (motionOdometry:
- * gait velocity turned by the gyro), which corrects the pose against the
- * map and adds the scan to it; then the Navigator (if a goal is set) plans
- * and writes its move command, which the motion task picks up
- * (lidarNavCommand). The motion task only copies a few numbers: the map,
- * matching and planning never run on the motion core.
+ * ToF room scans (tof_scan.h): a task on core 0 runs TofNavigator 50 times a
+ * second. A scan stops the robot, tilts its nose up (lidarNavBody, applied by
+ * the motion task), turns it once around and puts what the sensors saw near
+ * level into the same map; walking to a goal it scans every scanEvery mm.
+ * The ToF task keeps reading the sensors as usual (tofPeekFrame).
  *
- * Memory: the map (40 KB) is allocated when the first lidar packet arrives,
- * the planner (30 KB) with the first goal, so a robot without a lidar loses
+ * Either way the motion task only copies a few numbers (lidarNavCommand):
+ * the map, matching and planning never run on the motion core.
+ *
+ * Memory: the map (40 KB) is allocated when the first data arrives, the
+ * planner (30 KB) with the first goal, so a robot without the sensor loses
  * nothing.
  *
- * The same lib/robot_core code runs in the simulator (sim/examples/lidar_nav.py),
- * which feeds it LD06 bytes from a simulated lidar.
+ * The same lib/robot_core code runs in the simulator (sim/examples/lidar_nav.py,
+ * --tof for the room scans).
  */
 #include "robot.h"
 
-#if defined(LIDAR_TYPE) && LIDAR_TYPE == LD06 && defined(LIDAR_SUPPORTED)
+#if defined(NAV_LIDAR) || defined(NAV_TOF)
 
-#ifndef LIDAR_UART
-	#define LIDAR_UART 2
-#endif
-#ifndef LIDAR_RX_PIN
-	#error "LIDAR_TYPE needs LIDAR_RX_PIN (config.h): the GPIO the lidar's TX wire goes to"
+#ifdef NAV_LIDAR
+	#ifndef LIDAR_UART
+		#define LIDAR_UART 2
+	#endif
+	#ifndef LIDAR_RX_PIN
+		#error "LIDAR_TYPE needs LIDAR_RX_PIN (config.h): the GPIO the lidar's TX wire goes to"
+	#endif
+	static HardwareSerial    lidarSerial(LIDAR_UART);
+	static Ld06Parser        parser;
+	static LidarScanBuilder  scans;
+	static Navigator         nav;
+	#define NAV_STATE() nav
+	#define NAV_BLOCKED() nav.blocked()
+#else
+	static TofNavigator      tofNav;
+	static uint32_t          tofSeq[2] = { 0, 0 };
+	static volatile float    navTilt = 0;     // nose up, rad (motion task applies it)
+	static volatile float    navCrouch = 0;   // body lower, mm
+	static volatile bool     scanRequest = false;
+	static const LidarParams TOF_ORIGIN = { { 0, 0, 0 }, 0, false, 0, 0, 0 };   // beams start at the body origin
+	#define NAV_STATE() tofNav.nav()
+	#define NAV_BLOCKED() tofNav.blocked()
 #endif
 
-static HardwareSerial lidarSerial(LIDAR_UART);
-static Ld06Parser        parser;
-static LidarScanBuilder  scans;
 static LidarSlam         slam;
-static Navigator         nav;
-static SemaphoreHandle_t lock = nullptr;     // slam, nav, scans: lidar task vs. CLI / web server
+static SemaphoreHandle_t lock = nullptr;     // slam, nav, scans: lidar / ToF nav task vs. CLI / web server
 static bool              mapOk = false;      // map allocated
 static bool              noMemory = false;
+static uint32_t          lastPacketMs = 0;   // last lidar packet / ToF frame
+#ifdef NAV_LIDAR
 static LR_pose2          scanStartOdom = { 0, 0, 0 };
 static uint32_t          lastScanMs = 0;
-static uint32_t          lastPacketMs = 0;
+#endif
 
 // navigator -> motion task
 static portMUX_TYPE      navLock = portMUX_INITIALIZER_UNLOCKED;
@@ -51,6 +73,16 @@ static volatile bool     navActive = false;
 static volatile uint32_t navCmdMs = 0;
 static volatile bool     cancelRequest = false;
 
+static bool navSupported()
+{
+#ifdef NAV_LIDAR
+	return MODEL_LIDAR.lidar != nullptr;
+#else
+	return MODEL_LIDAR.tofScan != nullptr && tofSensorCount() > 0;
+#endif
+}
+
+#ifdef NAV_LIDAR
 static void scanDone()
 {
 	MotionOdometry odo = motionOdometry();
@@ -114,7 +146,7 @@ static void lidarTask(void *)
 
 void initLidar()
 {
-	if (MODEL_LIDAR.lidar == nullptr) {
+	if (!navSupported()) {
 		return;
 	}
 	lock = xSemaphoreCreateMutex();
@@ -127,6 +159,113 @@ void initLidar()
 	Serial.printf("Lidar: LD06 on UART%u, RX GPIO %u\n", (unsigned)LIDAR_UART, (unsigned)LIDAR_RX_PIN);
 }
 
+bool lidarNavBody(float &tilt, float &crouch)
+{
+	tilt = 0;
+	crouch = 0;
+	return false;
+}
+
+bool lidarScan()
+{
+	return false;
+}
+
+#else   // NAV_TOF
+
+static void tofNavTask(void *)
+{
+	TickType_t wake = xTaskGetTickCount();
+	uint32_t last = millis();
+	float mm[64];
+	int16_t raw[64];
+	for (;;) {
+		vTaskDelayUntil(&wake, pdMS_TO_TICKS(20));
+		uint32_t now = millis();
+		float dt = (now - last) / 1000.0f;
+		last = now;
+		if (!mapOk) {
+			if (noMemory || !tofReady(0)) {
+				continue;
+			}
+			xSemaphoreTake(lock, portMAX_DELAY);
+			mapOk = slam.begin(TOF_ORIGIN, *MODEL_LIDAR.tofMap);
+			xSemaphoreGive(lock);
+			if (!mapOk) {
+				noMemory = true;
+				Serial.println("ToF map: no memory for the map (40 KB)");
+				continue;
+			}
+			Serial.println("ToF map: sensors running, map started (`lidar scan` or a goal scans the room)");
+		}
+		MotionOdometry odo = motionOdometry();
+		xSemaphoreTake(lock, portMAX_DELAY);
+		for (uint8_t i = 0; i < tofSensorCount() && i < 2; i++) {
+			uint32_t seq = tofSeq[i];
+			if (tofPeekFrame(i, seq, raw) && seq != tofSeq[i]) {
+				tofSeq[i] = seq;
+				lastPacketMs = now;
+				for (uint8_t z = 0; z < 64; z++) {
+					mm[z] = raw[z];
+				}
+				tofNav.addFrame(MODEL_TERRAIN.tof[i], mm, odo.pose, odo.tilt, odo.floorZ);
+			}
+		}
+		if (cancelRequest) {
+			tofNav.stop();
+			cancelRequest = false;
+		}
+		if (scanRequest) {
+			tofNav.scan();
+			scanRequest = false;
+		}
+		LR_moveVector cmd = tofNav.update(dt, slam, odo.pose, odo.maxYawRate, odo.gaitActive);
+		bool active = tofNav.active();
+		float tilt = tofNav.tilt(), crouch = tofNav.crouch();
+		xSemaphoreGive(lock);
+
+		portENTER_CRITICAL(&navLock);
+		navCmd    = cmd;
+		navCmdMs  = now;
+		navTilt   = tilt;
+		navCrouch = crouch;
+		portEXIT_CRITICAL(&navLock);
+		navActive = active;
+	}
+}
+
+void initLidar()
+{
+	if (!navSupported()) {
+		return;
+	}
+	lock = xSemaphoreCreateMutex();
+	tofNav.begin(*MODEL_LIDAR.tofScan, *MODEL_LIDAR.nav);
+	// core 0 with WiFi and the web server: a scan's match is ~10 ms once in a while, planning a few ms a second
+	xTaskCreatePinnedToCore(tofNavTask, "tofnav", 6144, nullptr, 1, nullptr, 0);
+	Serial.println("Map: ToF room scans (no lidar)");
+}
+
+bool lidarNavBody(float &tilt, float &crouch)
+{
+	portENTER_CRITICAL(&navLock);
+	tilt = navTilt;
+	crouch = navCrouch;
+	portEXIT_CRITICAL(&navLock);
+	return navSupported();
+}
+
+bool lidarScan()
+{
+	if (!mapOk) {
+		return false;
+	}
+	scanRequest = true;
+	return true;
+}
+
+#endif
+
 bool lidarNavCommand(LR_moveVector &cmd)
 {
 	if (!navActive) {
@@ -137,7 +276,7 @@ bool lidarNavCommand(LR_moveVector &cmd)
 	uint32_t at = navCmdMs;
 	portEXIT_CRITICAL(&navLock);
 	if (millis() - at > 300) {
-		// no scans: the lidar stopped (or the task is stuck), stand still
+		// no updates: the lidar stopped (or the task is stuck), stand still
 		LR_moveVector stop = { { 0, 0, 0 }, { 0, 0, 0 } };
 		cmd = stop;
 	}
@@ -155,10 +294,14 @@ bool lidarGoto(float x, float y)
 	if (!mapOk) {
 		return false;
 	}
-	xSemaphoreTake(lock, portMAX_DELAY);
-	bool ok = nav.setGoal(x, y);
-	xSemaphoreGive(lock);
 	cancelRequest = false;
+	xSemaphoreTake(lock, portMAX_DELAY);
+#ifdef NAV_LIDAR
+	bool ok = nav.setGoal(x, y);
+#else
+	bool ok = tofNav.setGoal(x, y);
+#endif
+	xSemaphoreGive(lock);
 	return ok;
 }
 
@@ -183,7 +326,7 @@ void lidarStop()
 size_t pMap(uint8_t *out, size_t room, uint8_t part)
 {
 	(void)part;
-	if (MODEL_LIDAR.lidar == nullptr || room < 2) {
+	if (!navSupported() || room < 2) {
 		return 0;
 	}
 	out[0] = P_MAP;
@@ -196,8 +339,12 @@ size_t pMap(uint8_t *out, size_t room, uint8_t part)
 	if (room < len) {
 		return 0;
 	}
-	uint16_t cell = (uint16_t)MODEL_LIDAR.map->cellSize;
+	uint16_t cell = (uint16_t)slam.grid().cellSize();
+#ifdef NAV_LIDAR
 	int8_t strong = 2 * MODEL_LIDAR.map->hit;
+#else
+	int8_t strong = 2 * MODEL_LIDAR.tofMap->hit;
+#endif
 	out[2] = n >> 8; out[3] = n & 0xFF;
 	out[4] = cell >> 8; out[5] = cell & 0xFF;
 	xSemaphoreTake(lock, portMAX_DELAY);
@@ -228,7 +375,8 @@ static void put16(uint8_t *&p, int v)
  * offset | type | length | description
  * -------|------|--------|-------------
  *      0 | char |      1 | 'N' (P_NAV)
- *      1 | u8   |      1 | flags: 1 lidar data, 2 map frozen, 4 blocked ahead, 8 no memory
+ *      1 | u8   |      1 | flags: 1 sensor data (lidar / ToF), 2 map frozen, 4 blocked ahead, 8 no memory,
+ *        |      |        |        16 ToF scan running, 32 ToF room scans (no lidar)
  *      2 | u8   |      1 | navigator state (NavState: 0 idle, 1 walking, 2 arrived, 3 no path, 4 no memory)
  *      3 | u8   |      1 | last scan match (LidarMatch: 0 none, 1 ok, 2 new area, 3 rejected, 4 few points)
  *      4 | i16  |      2 | robot x, mm (map frame: x right, y forward at the start)
@@ -245,30 +393,39 @@ static void put16(uint8_t *&p, int v)
  */
 size_t pNav(uint8_t *out, size_t room)
 {
-	if (MODEL_LIDAR.lidar == nullptr || room < 19 + 4 * LR_NAV_PATH + 4 * LR_LIDAR_BINS / 2) {
+	if (!navSupported() || room < 19 + 4 * LR_NAV_PATH + 4 * LR_LIDAR_BINS / 2) {
 		return 0;
 	}
 	MotionOdometry odo = motionOdometry();
 	uint8_t *p = out;
 	*p++ = P_NAV;
 	if (!mapOk) {
+#ifdef NAV_TOF
+		*p++ = (noMemory ? 8 : 0) | 32;
+#else
 		*p++ = noMemory ? 8 : 0;
+#endif
 		memset(p, 0, 17);   // state .. scan count, all zero
 		return 19;
 	}
 	xSemaphoreTake(lock, portMAX_DELAY);
 	LR_pose2 pose = slam.pose(odo.pose);
-	*p++ = (millis() - lastPacketMs < 1000 ? 1 : 0) | (slam.frozen() ? 2 : 0) | (nav.blocked() ? 4 : 0);
-	*p++ = nav.state();
+	const Navigator &nv = NAV_STATE();
+	uint8_t flags = (millis() - lastPacketMs < 1000 ? 1 : 0) | (slam.frozen() ? 2 : 0) | (NAV_BLOCKED() ? 4 : 0);
+#ifdef NAV_TOF
+	flags |= 32 | (tofNav.phase() != TOF_SCAN_IDLE ? 16 : 0);
+#endif
+	*p++ = flags;
+	*p++ = nv.state();
 	*p++ = slam.lastMatch();
 	put16(p, (int)pose.x);
 	put16(p, (int)pose.y);
 	put16(p, (int)lroundf(pose.theta * RADTODEG * 100));
-	put16(p, (int)nav.goalX());
-	put16(p, (int)nav.goalY());
+	put16(p, (int)nv.goalX());
+	put16(p, (int)nv.goalY());
 	put16(p, (int)(slam.scans() & 0xFFFF));
 	const float *x, *y;
-	uint8_t pn = nav.active() ? nav.path(x, y) : 0;
+	uint8_t pn = nv.active() ? nv.path(x, y) : 0;
 	*p++ = pn;
 	for (uint8_t i = 0; i < pn; i++) {
 		put16(p, (int)x[i]);
@@ -287,6 +444,7 @@ size_t pNav(uint8_t *out, size_t room)
 static const char *const navStateNames[] = { "idle", "walking to goal", "arrived", "no path", "no memory" };
 static const char *const matchNames[] = { "none", "ok", "new area", "rejected (odometry kept)", "too few points" };
 
+#ifdef NAV_LIDAR
 static void printDistances()
 {
 	// closest reading around each of 8 directions (body frame), +-15 deg
@@ -318,19 +476,36 @@ static void printDistances()
 	}
 	cliSerial->println("A box 30 cm in front must show as front; else fix LIDAR_PARAMS yaw (model_data.h).");
 }
+#else
+static const char *const phaseNames[] = { "", "stopping", "nose up", "turning around", "nose down" };
+#endif
 
 void cliLidar()
 {
 	char *mode = CLI_readWord();
+	if (!navSupported()) {
+		cliSerial->println("This model has no map support.");
+		return;
+	}
+#ifdef NAV_LIDAR
 	if (strcmp(mode, "print") == 0) {
 		printDistances();
 		return;
 	}
+#else
+	if (strcmp(mode, "scan") == 0) {
+		cliSerial->println(lidarScan() ? "Scanning the room: the robot stops, lifts its nose and turns once around."
+		                               : "No map yet (ToF sensors not running? `tof state`).");
+		return;
+	}
+#endif
 	if (strcmp(mode, "reset") == 0 && mapOk) {
 		lidarNavCancel();
 		xSemaphoreTake(lock, portMAX_DELAY);
 		slam.reset();
+#ifdef NAV_LIDAR
 		scanStartOdom = motionOdometry().pose;
+#endif
 		xSemaphoreGive(lock);
 		cliSerial->println("Map cleared: the robot is at 0, 0 facing +y.");
 	} else if (strcmp(mode, "freeze") == 0 && mapOk) {
@@ -342,26 +517,36 @@ void cliLidar()
 		cliSerial->println("Stopped walking to the goal.");
 	}
 	MotionOdometry odo = motionOdometry();
+#ifdef NAV_LIDAR
 	cliSerial->printf("Lidar: %s, %.1f rev/s, %u packets, %u CRC errors\n",
 	                  millis() - lastPacketMs < 1000 ? "running" : "no data (wiring? LIDAR_RX_PIN)",
 	                  parser.speed() / 360.0f, (unsigned)parser.packets(), (unsigned)parser.crcErrors());
+#else
+	cliSerial->printf("ToF room scans: sensors %s\n", millis() - lastPacketMs < 1000 ? "running" : "no data (`tof state`)");
+#endif
 	if (!mapOk) {
-		cliSerial->println(noMemory ? "Map: no memory" : "Map: starts with the first lidar data");
+		cliSerial->println(noMemory ? "Map: no memory" : "Map: starts with the first sensor data");
 		return;
 	}
 	xSemaphoreTake(lock, portMAX_DELAY);
 	LR_pose2 pose = slam.pose(odo.pose);
+	const Navigator &nv = NAV_STATE();
 	cliSerial->printf("Map: %u occupied cells%s, %u scans, %u rejected; last match %s, score %.2f\n",
 	                  (unsigned)slam.grid().occupiedCells(), slam.frozen() ? " (frozen)" : "",
 	                  (unsigned)slam.scans(), (unsigned)slam.rejected(), matchNames[slam.lastMatch()], slam.lastScore());
+#ifdef NAV_TOF
+	cliSerial->printf("Scan: %s, last scan %u points; gyro bias %.2f deg/s\n",
+	                  tofNav.phase() == TOF_SCAN_IDLE ? "idle" : phaseNames[tofNav.phase()],
+	                  (unsigned)tofNav.lastPoints(), motionOdometryBias() * RADTODEG);
+#endif
 	cliSerial->printf("Pose: x %.2f m, y %.2f m, heading %.0f deg (counter-clockwise from the start)\n",
 	                  pose.x / 1000, pose.y / 1000, pose.theta * RADTODEG);
-	cliSerial->printf("Goal: %s", navStateNames[nav.state()]);
-	if (nav.state() != NAV_IDLE) {
-		cliSerial->printf(", %.2f / %.2f m, %.2f m away%s", nav.goalX() / 1000, nav.goalY() / 1000,
-		                  nav.distance() / 1000, nav.blocked() ? ", blocked ahead" : "");
+	cliSerial->printf("Goal: %s", navStateNames[nv.state()]);
+	if (nv.state() != NAV_IDLE) {
+		cliSerial->printf(", %.2f / %.2f m, %.2f m away%s", nv.goalX() / 1000, nv.goalY() / 1000,
+		                  nv.distance() / 1000, NAV_BLOCKED() ? ", blocked ahead" : "");
 	}
-	cliSerial->println(FS_FAIL && nav.active() ? " (no client: standing)" : "");
+	cliSerial->println(FS_FAIL && nv.active() ? " (no client: standing)" : "");
 	xSemaphoreGive(lock);
 }
 
@@ -370,7 +555,7 @@ void cliGoto()
 	float x = CLI_readFloat();
 	float y = CLI_readFloat();
 	if (!mapOk) {
-		cliSerial->println("No lidar map yet (`lidar state`).");
+		cliSerial->println("No map yet (`lidar state`).");
 		return;
 	}
 	if (!lidarGoto(x * 1000, y * 1000)) {
@@ -384,12 +569,14 @@ void cliGoto()
 
 void initLidar() {}
 bool lidarNavCommand(LR_moveVector &cmd) { (void)cmd; return false; }
+bool lidarNavBody(float &tilt, float &crouch) { tilt = 0; crouch = 0; return false; }
+bool lidarScan() { return false; }
 void lidarNavCancel() {}
 size_t pMap(uint8_t *out, size_t room, uint8_t part) { (void)out; (void)room; (void)part; return 0; }
 size_t pNav(uint8_t *out, size_t room) { (void)out; (void)room; return 0; }
 bool lidarGoto(float x, float y) { (void)x; (void)y; return false; }
 void lidarStop() {}
-void cliLidar() { cliSerial->println("No lidar (LIDAR_TYPE in config.h)."); }
-void cliGoto() { cliSerial->println("No lidar (LIDAR_TYPE in config.h)."); }
+void cliLidar() { cliSerial->println("No map: needs LIDAR_TYPE or a VL53L5CX (config.h)."); }
+void cliGoto() { cliSerial->println("No map: needs LIDAR_TYPE or a VL53L5CX (config.h)."); }
 
 #endif

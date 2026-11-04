@@ -100,6 +100,7 @@ export function mapPackage(): Buffer {
 
 /** Robot walking straight toward the goal (no planning), with a fake scan of the nearest walls. */
 export class MockNav {
+  scanUntil = 0;
   x = 0;
   y = 0;
   heading = 0;
@@ -150,7 +151,8 @@ export class MockNav {
     const path = this.goal && this.state === 1 ? [[this.x, this.y], this.goal] : [];
     const b = Buffer.alloc(19 + path.length * 4 + scan.length * 4);
     b[0] = P_NAV;
-    b[1] = 1;
+    // flags: data; TOF_NAV=1 env: ToF room scans (Scan button), scanning for 3 s after one
+    b[1] = 1 | (process.env.TOF_NAV ? 32 : 0) | (Date.now() < this.scanUntil ? 16 : 0);
     b[2] = this.state;
     b[3] = 1;
     b.writeInt16BE(Math.round(this.x), 4);
@@ -238,7 +240,10 @@ export function attachMockRobot(httpServer: HttpServer, log = console.log): void
           ws.send(nav.package());
           break;
         case P_GOTO:
-          if (raw.length >= 5) {
+          if (raw.length === 2 && raw[1] === 0x53) {
+            nav.scanUntil = Date.now() + 3000;
+            log('[mock robot] scan');
+          } else if (raw.length >= 5) {
             nav.goal = [raw.readInt16BE(1), raw.readInt16BE(3)];
             nav.state = 1;
             log(`[mock robot] goto ${nav.goal[0]} ${nav.goal[1]} mm`);

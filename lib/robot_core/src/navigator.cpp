@@ -42,15 +42,35 @@ bool Navigator::setGoal(float x, float y)
 
 bool Navigator::cellOf(float x, float y, int &ix, int &iy) const
 {
-	ix = (int)floorf(x / _cell) + NAV_N / 2;
-	iy = (int)floorf(y / _cell) + NAV_N / 2;
+	ix = (int)floorf(x / _cell) + LR_NAV_FULL / 2 - _ox;
+	iy = (int)floorf(y / _cell) + LR_NAV_FULL / 2 - _oy;
 	return ix >= 0 && iy >= 0 && ix < NAV_N && iy < NAV_N;
 }
 
 void Navigator::centre(int ix, int iy, float &x, float &y) const
 {
-	x = (ix - NAV_N / 2 + 0.5f) * _cell;
-	y = (iy - NAV_N / 2 + 0.5f) * _cell;
+	x = (ix + _ox - LR_NAV_FULL / 2 + 0.5f) * _cell;
+	y = (iy + _oy - LR_NAV_FULL / 2 + 0.5f) * _cell;
+}
+
+/**
+ * The planning window: centred between the robot and the goal (or a point
+ * toward a far goal, so the robot stays well inside), inside the map.
+ */
+void Navigator::placeWindow(const LR_pose2 &pose)
+{
+	float dx = _goalX - pose.x, dy = _goalY - pose.y;
+	float d = sqrtf(dx * dx + dy * dy);
+	float reach = NAV_N * _cell * 0.8f;   // the robot ends up 0.4 window from the centre at most
+	if (d > reach) {
+		dx *= reach / d;
+		dy *= reach / d;
+	}
+	float mx = pose.x + dx * 0.5f, my = pose.y + dy * 0.5f;
+	int ox = (int)floorf(mx / _cell) + LR_NAV_FULL / 2 - NAV_N / 2;
+	int oy = (int)floorf(my / _cell) + LR_NAV_FULL / 2 - NAV_N / 2;
+	_ox = ox < 0 ? 0 : (ox > LR_NAV_FULL - NAV_N ? LR_NAV_FULL - NAV_N : ox);
+	_oy = oy < 0 ? 0 : (oy > LR_NAV_FULL - NAV_N ? LR_NAV_FULL - NAV_N : oy);
 }
 
 /**
@@ -60,14 +80,13 @@ void Navigator::centre(int ix, int iy, float &x, float &y) const
  */
 void Navigator::buildCost(const OccupancyGrid &grid)
 {
-	_cell = grid.cellSize() * LR_NAV_FACTOR;
 	uint8_t *clr = _cost;
 	const int8_t *fine = grid.cells();
 	for (int y = 0; y < NAV_N; y++) {
 		for (int x = 0; x < NAV_N; x++) {
 			bool occ = false;
 			for (int fy = 0; fy < LR_NAV_FACTOR && !occ; fy++) {
-				const int8_t *row = fine + (y * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + x * LR_NAV_FACTOR;
+				const int8_t *row = fine + ((y + _oy) * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + (x + _ox) * LR_NAV_FACTOR;
 				for (int fx = 0; fx < LR_NAV_FACTOR; fx++) {
 					if (row[fx] > 0) {
 						occ = true;
@@ -119,7 +138,7 @@ void Navigator::buildCost(const OccupancyGrid &grid)
 			}
 			bool unknown = true;
 			for (int fy = 0; fy < LR_NAV_FACTOR && unknown; fy++) {
-				const int8_t *row = fine + (y * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + x * LR_NAV_FACTOR;
+				const int8_t *row = fine + ((y + _oy) * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + (x + _ox) * LR_NAV_FACTOR;
 				for (int fx = 0; fx < LR_NAV_FACTOR; fx++) {
 					if (row[fx] != 0) {
 						unknown = false;
@@ -278,10 +297,15 @@ bool Navigator::plan(const OccupancyGrid &grid, const LR_pose2 &pose)
 	if (!grid.ready() || !allocate()) {
 		return false;
 	}
+	_cell = grid.cellSize() * LR_NAV_FACTOR;
+	placeWindow(pose);
 	buildCost(grid);
 	int gx, gy;
 	if (!cellOf(_goalX, _goalY, gx, gy)) {
-		return false;
+		// further than the window reaches: head for its edge toward the goal, the
+		// window moves along at the next replan
+		gx = gx < 0 ? 0 : (gx >= NAV_N ? NAV_N - 1 : gx);
+		gy = gy < 0 ? 0 : (gy >= NAV_N ? NAV_N - 1 : gy);
 	}
 	if (_cost[gy * NAV_N + gx] == 0) {
 		// goal too close to a wall: the nearest free cell within 50 cm
@@ -310,7 +334,8 @@ bool Navigator::plan(const OccupancyGrid &grid, const LR_pose2 &pose)
 	return true;
 }
 
-LR_moveVector Navigator::update(float dt, const LidarSlam &slam, const LR_pose2 &pose, float maxYawRate)
+LR_moveVector Navigator::update(float dt, const LidarSlam &slam, const LR_pose2 &pose, float maxYawRate,
+                                int8_t blockedAhead, float obstacleX)
 {
 	LR_moveVector cmd = { { 0, 0, 0 }, { 0, 0, 0 } };
 	_blocked = false;
@@ -355,11 +380,15 @@ LR_moveVector Navigator::update(float dt, const LidarSlam &slam, const LR_pose2 
 
 	// something right in front (people, chair legs the map hasn't caught up with)
 	const float *px, *py;
-	uint16_t n = slam.points(px, py);
+	uint16_t n = blockedAhead < 0 ? slam.points(px, py) : 0;
+	_blocked = blockedAhead > 0;
+	float sideSum = blockedAhead > 0 ? obstacleX : 0;
+	uint16_t sideN = blockedAhead > 0 ? 1 : 0;
 	for (uint16_t i = 0; i < n; i++) {
 		if (py[i] > 0 && py[i] < _params.stopDistance && fabsf(px[i]) < _params.robotRadius * 0.8f) {
 			_blocked = true;
-			break;
+			sideSum += px[i];
+			sideN++;
 		}
 	}
 
@@ -375,6 +404,11 @@ LR_moveVector Navigator::update(float dt, const LidarSlam &slam, const LR_pose2 
 	if (fabsf(err) < _params.turnInPlace && !_blocked) {
 		float slow = constrain(_distance / (3 * _params.goalTolerance), 0.3f, 1.0f);
 		cmd.move.y = _params.speed * cosf(err) * slow;
+	} else if (_blocked && fabsf(err) < _params.turnInPlace) {
+		// facing the way to go but something is in front (a door frame the path
+		// cuts close to): step sideways away from it, the path is still ahead
+		float side = sideN ? sideSum / sideN : 0;
+		cmd.move.x = side > 0 ? -0.5f * _params.speed : 0.5f * _params.speed;
 	}
 	return cmd;
 }

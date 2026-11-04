@@ -86,11 +86,13 @@
 //#define TOF_ZONE_MIRROR_X    1
 //#define TOF_ZONE_MIRROR_Y    0
 
-// 2D lidar (LD06 / LD19, LIDAR_PARAMS in model_data.h): its TX wire to GPIO 34
-// (input only, free on the dog, not a strapping pin), 5 V, GND, its PWM pin
-// to GND. Only receives (UART2, 230400 baud). Comment out LIDAR_TYPE to drop
-// the driver; without a lidar connected it costs no map memory.
-#define LIDAR_TYPE           LD06
+// Indoor map and walking to a point (`lidar`, `goto`, web Map view). Without
+// LIDAR_TYPE the ToF sensor does it: room scans (stop, nose up, turn around,
+// TOF_SCAN_PARAMS in model_data.h). With an LD06 / LD19 lidar (LIDAR_PARAMS)
+// uncomment LIDAR_TYPE: its TX wire to GPIO 34 (input only, free on the dog,
+// not a strapping pin), 5 V, GND, its PWM pin to GND. Only receives (UART2,
+// 230400 baud). Either way the map memory is taken only once data arrives.
+//#define LIDAR_TYPE           LD06
 #define LIDAR_RX_PIN         34
 
 //Cores loop time

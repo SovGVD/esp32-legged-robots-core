@@ -15,6 +15,7 @@
 #include "lidar.h"
 #include "lidar_slam.h"
 #include "navigator.h"
+#include "tof_scan.h"
 #include "gait_engine.h"
 #include "angle_pid.h"
 #include "motion_controller.h"

@@ -8,9 +8,11 @@ const COLORS = [
   [236, 240, 245, 255],
 ];
 const MATCH = ['', '', 'new area', 'lost? odometry only', 'few points'];
+const FLAG_SCANNING = 16;
+const FLAG_TOF = 32;
 
 /**
- * Lidar map view: the firmware's occupancy map around the robot (north =
+ * Map view (lidar or ToF room scans): the firmware's occupancy map around the robot (north =
  * the direction the robot faced when the map started, up), the last scan,
  * the planned path and the goal. Tap the map to send the robot there.
  */
@@ -24,8 +26,14 @@ export class MapPanel {
   private pending: [number, number] | null = null;
   private scale = 0.08; // css px per mm (5 m across ~400 px)
   private down: [number, number] | null = null;
+  private readonly scanButton: HTMLButtonElement;
 
-  constructor(host: HTMLElement, onGoto: (x?: number, y?: number) => void) {
+  /**
+   * Map view (lidar or ToF room scans).
+   * @param onGoto walk to a map point (mm), no arguments: stop
+   * @param onScan scan the room once (ToF room scans only)
+   */
+  constructor(host: HTMLElement, onGoto: (x?: number, y?: number) => void, onScan: () => void) {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'map';
     this.ctx = this.canvas.getContext('2d')!;
@@ -38,6 +46,7 @@ export class MapPanel {
       b.textContent = text;
       b.addEventListener('click', fn);
       bar.append(b);
+      return b;
     };
     button('−', () => this.zoom(1 / 1.5));
     button('+', () => this.zoom(1.5));
@@ -45,6 +54,9 @@ export class MapPanel {
       this.pending = null;
       onGoto();
     });
+    this.scanButton = button('Scan', onScan);
+    this.scanButton.title = 'Scan the room: the robot stops, lifts its nose and turns once around';
+    this.scanButton.hidden = true;
     host.append(this.canvas, this.info, bar);
     this.canvas.addEventListener('pointerdown', (e) => (this.down = [e.offsetX, e.offsetY]));
     this.canvas.addEventListener('pointerup', (e) => {
@@ -84,6 +96,7 @@ export class MapPanel {
 
   setNav(nav: NavInfo): void {
     this.nav = nav;
+    this.scanButton.hidden = !(nav.flags & FLAG_TOF);
     if (nav.state !== 0) this.pending = null;
     this.draw();
   }
@@ -110,7 +123,8 @@ export class MapPanel {
     ctx.fillStyle = '#1b2029';
     ctx.fillRect(0, 0, w, h);
     if (!map?.running || !nav) {
-      this.info.textContent = map && !map.running ? 'Lidar: no data yet (wiring?)' : 'Waiting for the lidar map…';
+      const sensor = nav && nav.flags & FLAG_TOF ? 'ToF sensors' : 'Lidar';
+      this.info.textContent = map && !map.running ? `${sensor}: no data yet (wiring?)` : 'Waiting for the map…';
       return;
     }
     const s = this.scale;
@@ -161,9 +175,10 @@ export class MapPanel {
     ctx.restore();
 
     const parts = [`${(nav.x / 1000).toFixed(2)}, ${(nav.y / 1000).toFixed(2)} m`, NAV_STATES[nav.state] ?? '?'];
+    if (nav.flags & FLAG_SCANNING) parts.push('scanning the room');
     if (nav.flags & 4) parts.push('blocked ahead');
     if (nav.flags & 2) parts.push('map frozen');
-    if (!(nav.flags & 1)) parts.push('NO LIDAR DATA');
+    if (!(nav.flags & 1)) parts.push(nav.flags & FLAG_TOF ? 'NO TOF DATA' : 'NO LIDAR DATA');
     if (MATCH[nav.match]) parts.push(MATCH[nav.match]);
     this.info.textContent = parts.join(' · ') + ' — tap to walk there';
   }

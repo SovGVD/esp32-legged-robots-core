@@ -107,11 +107,14 @@
 #define TOF_TYPE                 VL53L5CX
 #define TOF_LPN_PIN              14
 
-// 2D lidar (LD06 / LD19, LIDAR_PARAMS in model_data.h): its TX wire to GPIO 15
-// (free on the ESP32-CAM without an SD card; high at boot is the normal
-// state of this strapping pin), 5 V, GND, its PWM pin to GND. Only receives
-// (UART2, 230400 baud). Without a lidar connected it costs no map memory.
-#define LIDAR_TYPE               LD06
+// Indoor map and walking to a point (`lidar`, `goto`, web Map view). Without
+// LIDAR_TYPE the ToF sensors do it: room scans (stop, nose up, turn around,
+// TOF_SCAN_PARAMS in model_data.h). With an LD06 / LD19 lidar (LIDAR_PARAMS)
+// uncomment LIDAR_TYPE: its TX wire to GPIO 15 (free on the ESP32-CAM without
+// an SD card; high at boot is the normal state of this strapping pin), 5 V,
+// GND, its PWM pin to GND. Only receives (UART2, 230400 baud). Either way the
+// map memory is taken only once data arrives.
+//#define LIDAR_TYPE               LD06
 #define LIDAR_RX_PIN             15
 
 #define IGNORE_BROWNOUT_CONDITION

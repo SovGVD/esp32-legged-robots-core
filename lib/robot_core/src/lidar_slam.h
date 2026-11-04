@@ -1,5 +1,6 @@
 /**
- * 2D mapping and localization with a 360 degree lidar, small enough for an
+ * 2D mapping and localization with a 360 degree scan (a lidar, or the ToF
+ * room scan: tof_scan.h), small enough for an
  * ESP32: an occupancy grid (one signed byte per cell) and a scan matcher
  * that corrects the walking odometry against it (Gauss-Newton on the
  * smoothed map, like Hector SLAM, coarse then fine).
@@ -16,8 +17,8 @@
  *      cells along each beam become more "free", the cell at its end more
  *      "occupied".
  *
- * The map is fixed in size (LR_LIDAR_GRID cells per side, 200 x 200 x 5 cm =
- * 10 x 10 m, 40 KB, allocated by begin()), centred on the place it was
+ * The map is fixed in size (LR_LIDAR_GRID cells per side, 200 x 200 x 10 cm =
+ * 20 x 20 m, 40 KB, allocated by begin()), centred on the place it was
  * started. Readings outside it are ignored.
  */
 #ifndef LR_LIDAR_SLAM_H
@@ -82,15 +83,30 @@ class OccupancyGrid {
 /**
  * Dead reckoning in the plane: the gait's body velocity turned by the gyro
  * heading (the gait's own yaw is only what it was told to turn).
+ *
+ * While the robot stands (the gait idle) the yaw rate it reads is the gyro's
+ * bias (a MEMS gyro reads ~1 deg/s while still): it is learned then and
+ * taken off every reading. Without that a slow scan turn of 30 s would come
+ * out 30 deg short or long, and the scan smeared.
  */
 class Odometry2D {
 	public:
 		void reset() { _pose.x = 0; _pose.y = 0; _pose.theta = 0; }
-		/** v: body frame velocity mm/s (x right, y forward), yawRate rad/s counter-clockwise */
-		void update(float dt, const LR_point &v, float yawRate);
+		/**
+		 * v: body frame velocity mm/s (x right, y forward), yawRate rad/s counter-clockwise (gyro),
+		 * standing: the feet are planted (gait idle), the body isn't turning
+		 */
+		void update(float dt, const LR_point &v, float yawRate, bool standing = false);
 		const LR_pose2 &pose() const { return _pose; }
+		/** gyro bias learned while standing, rad/s (taken off the yaw rate) */
+		float bias() const { return _bias; }
+		void setBiasTau(float s) { _tau = s; }
 	private:
 		LR_pose2 _pose = { 0, 0, 0 };
+		float    _bias = 0;
+		float    _still = 0;     // s standing
+		float    _learned = 0;   // s of standing used for the bias (fast start, then the time constant)
+		float    _tau = 5.0f;
 };
 
 enum LidarMatch : uint8_t {
@@ -118,6 +134,18 @@ class LidarSlam {
 		 * and within the scan is used).
 		 */
 		LidarMatch addScan(const LidarScan &scan, const LR_pose2 &odomStart, const LR_pose2 &odomEnd);
+		/**
+		 * A scan collected some other way (the ToF room scan, TofScanBuilder):
+		 * n points (at most LR_LIDAR_BINS) already in the body frame of
+		 * odomEnd, mm; beams start at the body origin.
+		 */
+		LidarMatch addPoints(const float *x, const float *y, uint16_t n, const LR_pose2 &odomEnd);
+		/**
+		 * Something the scans can't see (too low, or the scan was thrown away)
+		 * stopped the robot at map point (x, y): make that cell occupied so the
+		 * planner goes around it. Not while frozen.
+		 */
+		void markOccupied(float x, float y);
 		/** Robot pose in the map now, from the odometry now (between scans). */
 		LR_pose2 pose(const LR_pose2 &odomNow) const { return lrPoseCompose(_mapFromOdom, odomNow); }
 		/** Robot pose in the map at the end of the last scan. */
@@ -155,11 +183,14 @@ class LidarSlam {
 		uint16_t _n = 0;
 		float    _dirX[LR_LIDAR_BINS];
 		float    _dirY[LR_LIDAR_BINS];
+		float    _originX = 0;   // body frame start of the beams (the sensor), mm
+		float    _originY = 0;
 
 		void  deskew(const LidarScan &scan, const LR_pose2 &odomStart, const LR_pose2 &odomEnd);
 		void  match(LR_pose2 &pose, int level, int iterations) const;
 		float score(const LR_pose2 &pose, float &known, float &freeShare) const;
 		void  insert(const LR_pose2 &pose);
+		LidarMatch process(const LR_pose2 &odomEnd);
 };
 
 #endif

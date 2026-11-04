@@ -20,8 +20,10 @@ import numpy as np
 
 
 class ToFArray:
-    def __init__(self, sensors, rate_hz=15.0, noise_mm=2.0, noise_rel=0.01, subrays=1, zone_fov=None, seed=0):
-        """sensors: list of dicts from FirmwareCore.tof_sensors() (position mm, rays body frame, max_range mm)."""
+    def __init__(self, sensors, rate_hz=15.0, noise_mm=2.0, noise_rel=0.01, subrays=1, zone_fov=None, seed=0,
+                 latency=0.0):
+        """sensors: list of dicts from FirmwareCore.tof_sensors() (position mm, rays body frame, max_range mm).
+        latency: s between measuring a frame and the firmware getting it (I2C read, task timing)."""
         self.sensors = sensors
         self.period = 1.0 / rate_hz
         self.noise_mm = noise_mm
@@ -30,12 +32,15 @@ class ToFArray:
         self.zone_fov = zone_fov
         self._rng = np.random.default_rng(seed)
         self._clock = 0.0
+        self.latency = latency
+        self._queue = []         # (time left, frames) measured but not delivered yet
         self.last_hits = []      # world points (m) of the last frames, for drawing
         self._geomgroup = np.array([1, 0, 0, 0, 0, 0], dtype=np.uint8)
         self._geomid = np.zeros(1, dtype=np.int32)
 
     def reset(self):
         self._clock = 0.0
+        self._queue = []
         self.last_hits = []
 
     def _cast(self, robot, pnt, vec):
@@ -149,7 +154,17 @@ class ToFArray:
     def poll(self, robot, dt):
         """Call every control tick: a new frame list when the sensors have one, else None."""
         self._clock += dt
-        if self._clock + 1e-9 < self.period:
-            return None
-        self._clock -= self.period
-        return self.measure(robot)
+        frames = None
+        if self._clock + 1e-9 >= self.period:
+            self._clock -= self.period
+            frames = self.measure(robot)
+        if self.latency <= 0:
+            return frames
+        if frames is not None:
+            self._queue.append([self.latency, frames])
+        out = None
+        for q in self._queue:
+            q[0] -= dt
+        while self._queue and self._queue[0][0] <= 1e-9:
+            out = self._queue.pop(0)[1]
+        return out

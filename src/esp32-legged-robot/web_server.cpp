@@ -79,9 +79,11 @@ static void initWebServerConfig()
 	// ToF view: t = number of sensors (0 = none), r = range of the colour scale, mm
 	addIntToWebServerConfig("t", tofSensorCount());
 	addIntToWebServerConfig("r", tofMaxRange());
-	// n = 1: lidar map view (LIDAR_TYPE and a model with LIDAR_PARAMS)
-#if defined(LIDAR_TYPE)
+	// n = 1: map view (LIDAR_TYPE and a model with LIDAR_PARAMS, or ToF room scans: TOF_SCAN_PARAMS)
+#if defined(NAV_LIDAR)
 	addIntToWebServerConfig("n", MODEL_LIDAR.lidar != nullptr ? 1 : 0);
+#elif defined(NAV_TOF)
+	addIntToWebServerConfig("n", MODEL_LIDAR.tofScan != nullptr && tofSensorCount() > 0 ? 1 : 0);
 #else
 	addIntToWebServerConfig("n", 0);
 #endif

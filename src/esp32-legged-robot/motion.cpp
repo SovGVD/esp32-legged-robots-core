@@ -72,6 +72,8 @@ MotionOdometry motionOdometry()
 	return o;
 }
 
+float motionOdometryBias() { return 0; }
+
 void cliTerrain() { cliSerial->println("Tracks: no terrain mode."); }
 void cliHeading() { cliSerial->println("Tracks: no heading hold yet."); }
 void cliTurnTo()  { cliSerial->println("Tracks: no heading hold yet."); }
@@ -133,14 +135,32 @@ MotionOdometry motionOdometry()
 	return o;
 }
 
-static void updateOdometry(float dt)
+float motionOdometryBias()
+{
+	return odometry.bias();   // a float: read whole on the ESP32
+}
+
+static void updateOdometry(float dt, float scanTilt)
 {
 	// the gait's velocity, turned by the gyro (the gait's own yaw is only what it was told)
-	float yawRate = imu().ready() ? imu().yawRate() - imu().gyroBias() : motion.gait().yawRate();
-	odometry.update(dt, motion.gait().velocity(), yawRate);
+	bool gyro = imu().ready();
+	LR_angle tilt = { 0, scanTilt, 0 };
+	float yawRate = motion.gait().yawRate();
+	if (gyro) {
+		tilt.pitch = IMU_DATA.pitch;
+		tilt.roll  = IMU_DATA.roll;
+		// the gyro's z axis tilts with the body (a ToF scan's nose up): a turn
+		// about the vertical shows on it as rate * cos(tilt)
+		yawRate = (imu().yawRate() - imu().gyroBias()) / (cosf(tilt.pitch) * cosf(tilt.roll));
+	}
+	bool standing = gyro && !motion.gait().isActive();   // still: the odometry learns the gyro's bias
+	odometry.update(dt, motion.gait().velocity(), yawRate, standing);
 	portENTER_CRITICAL(&odometryLock);
 	odometryOut.pose       = odometry.pose();
 	odometryOut.maxYawRate = motion.gait().params().maxYawRate;
+	odometryOut.tilt       = tilt;
+	odometryOut.floorZ     = legs[0].defaultFoot.z;   // TofNavigator adds its own crouch
+	odometryOut.gaitActive = motion.gait().isActive();
 	portEXIT_CRITICAL(&odometryLock);
 }
 
@@ -406,7 +426,10 @@ void updateMotion(float dt)
 		loopProfileMark(LOOP_STAGE_IMU, micros() - t);
 	}
 	leveler.setEnabled(levelRequest && imu().ready());
-	static const LR_angle levelTarget = { 0, 0, 0 };
+	// a ToF room scan wants the nose up: not something to level away
+	float wantTilt = 0, wantCrouch = 0;
+	lidarNavBody(wantTilt, wantCrouch);
+	const LR_angle levelTarget = { 0, wantTilt, 0 };
 	// (on rough ground it keeps working: the feet stand at different heights)
 	bool hold = motion.gait().isActive() && !motion.gait().params().staticStability && !terrainOn;
 	imuCorrection = leveler.update(dt, IMU_DATA, levelTarget, hold);
@@ -425,8 +448,15 @@ void updateMotion(float dt)
 	if (!navigate(cmd)) {
 		cmd = steer(dt, cmd);   // heading hold: not while the navigator steers
 	}
-	motion.update(dt, batteryGuard(cmd), imuCorrection);
-	updateOdometry(dt);
+	// ToF room scan: nose up (and the body a little lower) while it turns around
+	LR_angle correction = imuCorrection;
+	float scanTilt = 0, crouch = 0;
+	if (lidarNavBody(scanTilt, crouch) && batteryState() != BATTERY_CRITICAL) {
+		correction.roll -= scanTilt;   // BodyKinematics subtracts the correction: nose up
+		motion.setHeightOffset(-crouch, 200.0f);
+	}
+	motion.update(dt, batteryGuard(cmd), correction);
+	updateOdometry(dt, scanTilt);
 }
 
 void cliTerrain()

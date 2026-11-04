@@ -169,6 +169,15 @@ class FirmwareCore:
         L.rc_nav_goal.restype = ctypes.c_int
         L.rc_nav_goal.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_nav_stop.restype = None
+        L.rc_tofnav_enable.restype = ctypes.c_int
+        L.rc_tofnav_enable.argtypes = [ctypes.c_int]
+        L.rc_tofnav_scan.restype = None
+        L.rc_tofnav_params.restype = None
+        L.rc_tofnav_params.argtypes = [f32p]
+        L.rc_tofnav_tune.restype = None
+        L.rc_tofnav_tune.argtypes = [f32p, ctypes.c_int]
+        L.rc_tof_mount.restype = None
+        L.rc_tof_mount.argtypes = [ctypes.c_int, ctypes.c_float]
         self.legs = L.rc_leg_count()
         self.dof = L.rc_leg_dof()
         self.loop_dt = float(L.rc_loop_dt())
@@ -178,6 +187,7 @@ class FirmwareCore:
         self.tof = None           # legsim.tof.ToFArray while the terrain map is fed
         self.heading_sim = None   # set_heading_sensors()
         self.lidar = None         # legsim.lidar.LidarLD06 while the lidar is on (set_lidar)
+        self.tof_nav = False      # ToF room scans feed the map (set_tof_nav)
         self.reset()
 
     # ----------------------------------------------------------------- heading
@@ -196,8 +206,21 @@ class FirmwareCore:
 
     def _feed_heading(self, robot, dt):
         h = self.heading_sim
-        R = robot.data.xmat[robot._torso].reshape(3, 3)
-        yaw_rate = float(robot.read_imu()["gyro"][2]) + h["bias"]
+        R = robot.data.xmat[robot._torso].reshape(3, 3).copy()
+        # the body's mean turn rate over the last tick, like a gyro behind its low-pass
+        # filter: the instantaneous rate at the tick sampled every tick aliases with
+        # the gait's foot impacts (2-3 % short over a turn in place)
+        prev = h.get("R")
+        h["R"] = R
+        if prev is None or dt <= 0:
+            rate_z = float(robot.read_imu()["gyro"][2])
+        else:
+            Rel = prev.T @ R
+            angle = math.acos(max(-1.0, min(1.0, (np.trace(Rel) - 1) / 2)))
+            axis = np.array([Rel[2, 1] - Rel[1, 2], Rel[0, 2] - Rel[2, 0], Rel[1, 0] - Rel[0, 1]])
+            n = np.linalg.norm(axis)
+            rate_z = float(axis[2] / n * angle / dt) if n > 1e-12 else 0.0
+        yaw_rate = rate_z + h["bias"]
         mag = None
         h["tick"] += 1
         if h["mag"] and h["tick"] % 4 == 0:
@@ -219,6 +242,8 @@ class FirmwareCore:
                 "has_target": bool(v[3]), "absolute": bool(v[4]), "field": float(v[5])}
 
     def reset(self):
+        if getattr(self, "heading_sim", None) is not None:
+            self.heading_sim.pop("R", None)
         self.lib.rc_init()
         self.lib.rc_tilt_reset()
         self.unsolved = 0
@@ -250,6 +275,53 @@ class FirmwareCore:
             raise MemoryError("lidar map allocation failed")
         self.lidar = LidarLD06(self.lidar_params(), **lidar_args)
         self.reset()
+
+    TOF_PHASES = ("idle", "stop", "tilt", "turn", "level")
+
+    def tof_scan_params(self):
+        """The model's TOF_SCAN_PARAMS (tof_scan.h): tilt (rad), rates, turn angle, ranges (mm), ..."""
+        v = self._floats(self.lib.rc_tofnav_params, 12)
+        keys = ("tilt", "tilt_rate", "turn_rate", "turn_angle", "band", "min_range", "max_range", "min_height",
+                "scan_every", "settle_time", "obstacle_height", "crouch")
+        return dict(zip(keys, map(float, v)))
+
+    def set_tof_nav(self, on=True, sensor_range=None, **tof_args):
+        """Map, localization and walking to a point with the ToF sensors instead of a lidar
+        (tof_scan.h: stop, tilt the nose up, turn once around, scan). The simulated ToF
+        sensors (legsim.tof.ToFArray, tof_args: noise, latency, subrays, seed) report out to
+        sensor_range mm (default: the scan's max range plus a little), not the terrain
+        map's short TOF_SENSORS range. Kept across reset(), which clears the map."""
+        from .tof import ToFArray
+        if not on:
+            self.tof_nav = False
+            self.tof = None
+            self.lib.rc_tofnav_enable(0)
+            return
+        if not self.lib.rc_tofnav_enable(1):
+            raise MemoryError("map allocation failed")
+        self.tof_nav = True
+        reach = sensor_range or self.tof_scan_params()["max_range"] + 500
+        sensors = [dict(s, max_range=reach) for s in self.tof_sensors()]
+        self.tof = ToFArray(sensors, **tof_args)
+        self.reset()
+
+    def tune_tof_scan(self, reset=False, **fields):
+        """Override TOF_SCAN_PARAMS fields (names as tof_scan_params()) for experiments."""
+        keys = ("tilt", "tilt_rate", "turn_rate", "turn_angle", "band", "min_range", "max_range", "min_height",
+                "scan_every", "settle_time", "obstacle_height", "crouch")
+        v = [float(fields.pop(k, -1)) for k in keys]
+        if fields:
+            raise TypeError(f"unknown fields {list(fields)}")
+        self.lib.rc_tofnav_tune((ctypes.c_float * 12)(*v), 1 if reset else 0)
+
+    def set_tof_mount(self, i, tilt_deg=None):
+        """Experiment: ToF sensor i looks tilt_deg down instead of its TOF_SENSORS tilt
+        (None: back to the model's). Call before set_terrain() / set_tof_nav()."""
+        self.lib.rc_tof_mount(int(i), -1.0 if tilt_deg is None else math.radians(tilt_deg))
+
+    def tof_scan(self):
+        """One ToF room scan now (`map scan`)."""
+        self.lib.rc_tofnav_scan()
 
     def lidar_bytes(self, data):
         """LD06 UART bytes into the firmware driver; returns the number of finished scans."""
@@ -295,8 +367,9 @@ class FirmwareCore:
         self.lib.rc_nav_stop()
 
     def nav_state(self):
-        v = self._floats(self.lib.rc_nav_state, 7)
+        v = self._floats(self.lib.rc_nav_state, 10)
         return {"state": self.NAV_STATES[int(v[0])], "blocked": bool(v[1]), "distance": float(v[2]),
+                "phase": self.TOF_PHASES[int(v[7])], "tilt": float(v[8]), "scan_points": int(v[9]),
                 "goal": v[3:5], "forward": float(v[5]), "yaw": float(v[6])}
 
     def nav_path(self):

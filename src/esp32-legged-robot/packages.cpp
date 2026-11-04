@@ -169,11 +169,16 @@ size_t pTof(uint8_t *out)
 }
 
 /**
- * Walk to a lidar map point from the web map view: [P_GOTO, x hi, x lo,
- * y hi, y lo] (i16 mm, map frame, big-endian); [P_GOTO] alone stops.
+ * Walk to a map point from the web map view: [P_GOTO, x hi, x lo,
+ * y hi, y lo] (i16 mm, map frame, big-endian); [P_GOTO] alone stops;
+ * [P_GOTO, 'S'] scans the room once (ToF room scans).
  */
 void pGoto(uint8_t *data, size_t len)
 {
+  if (len == 2 && data[1] == 'S') {
+    lidarScan();
+    return;
+  }
   if (len < 5) {
     lidarStop();
     return;

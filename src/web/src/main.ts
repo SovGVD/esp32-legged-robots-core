@@ -9,6 +9,7 @@ import {
   encodeCli,
   encodeGait,
   encodeGoto,
+  encodeScan,
   encodeMapRequest,
   encodeNavRequest,
   encodeLevel,
@@ -31,7 +32,7 @@ const TOF_INTERVAL_MS = 125;
 // the robot's state again; a gait change waits until the robot stands still
 const GAIT_CONFIRM_MS = 15000;
 const LEVEL_CONFIRM_MS = 2500;
-// lidar map view: pose, path and scan 4 times a second, the map (10 KB) once a second
+// map view (lidar / ToF room scans): pose, path and scan 4 times a second, the map (10 KB) once a second
 const NAV_INTERVAL_MS = 250;
 const MAP_INTERVAL_MS = 1000;
 
@@ -116,7 +117,11 @@ function showTof(on: boolean): void {
 }
 
 // the map and the ToF view share the space above the sticks: one at a time
-const map = new MapPanel(ui.map, (x, y) => connection.send(encodeGoto(x, y)));
+const map = new MapPanel(
+  ui.map,
+  (x, y) => connection.send(encodeGoto(x, y)),
+  () => connection.send(encodeScan()),
+);
 $('map-label').hidden = !config.lidar;
 function showMap(on: boolean): void {
   ui.mapToggle.checked = on;
