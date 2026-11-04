@@ -161,6 +161,7 @@ static void updateOdometry(float dt, float scanTilt)
 	odometryOut.tilt       = tilt;
 	odometryOut.floorZ     = legs[0].defaultFoot.z;   // TofNavigator adds its own crouch
 	odometryOut.gaitActive = motion.gait().isActive();
+	odometryOut.gapBlocked = terrainOn && motion.gait().isBlocked();
 	portEXIT_CRITICAL(&odometryLock);
 }
 
@@ -329,15 +330,21 @@ static void applyTerrainRequest()
  * tilt the gait didn't plan for the touchdown heights. The same steps as
  * sim/bridge/robot_core_bridge.cpp, which the sim results come from.
  */
-static void updateTerrain(float dt)
+static void updateTerrain(float dt, float scanTilt)
 {
 	if (!terrainOn) {
 		return;
 	}
-	terrainTilt.update(dt, IMU_DATA, imuCorrection, motion.gait().isActive(), &terrainMap);
+	// the commanded tilt includes a ToF room scan's nose up (BodyKinematics subtracts the correction)
+	LR_angle commanded = imuCorrection;
+	commanded.roll -= scanTilt;
+	// the map ages only while walking (not turning around for a room scan: paused then, below)
+	terrainTilt.update(dt, IMU_DATA, commanded, motion.gait().isActive() && scanTilt <= 0, &terrainMap);
 	uint32_t t = micros();
 	for (uint8_t i = 0; i < tofSensorCount() && i < 2; i++) {
-		if (!tofTakeFrame(i, tofSeq[i], tofMm)) {
+		if (!tofTakeFrame(i, tofSeq[i], tofMm) || scanTilt > 0) {
+			// (not during a ToF room scan: the robot turns on the ground it has mapped,
+			// and the nose up it may not quite reach would place the readings wrong)
 			continue;
 		}
 		const TofSensor &sensor = MODEL_TERRAIN.tof[i];
@@ -350,7 +357,7 @@ static void updateTerrain(float dt)
 	}
 	loopProfileMark(LOOP_STAGE_TOF, micros() - t);
 	// tilt the gait didn't ask for: measured minus commanded (-correction)
-	LR_angle unplanned = { IMU_DATA.pitch + imuCorrection.pitch, IMU_DATA.roll + imuCorrection.roll, 0 };
+	LR_angle unplanned = { IMU_DATA.pitch + commanded.pitch, IMU_DATA.roll + commanded.roll, 0 };
 	motion.gait().setTilt(unplanned);
 }
 
@@ -442,7 +449,7 @@ void updateMotion(float dt)
 	}
 
 	applyTerrainRequest();
-	updateTerrain(dt);
+	updateTerrain(dt, batteryState() != BATTERY_CRITICAL ? wantTilt : 0);
 
 	LR_moveVector cmd = getMoveCommand();
 	if (!navigate(cmd)) {

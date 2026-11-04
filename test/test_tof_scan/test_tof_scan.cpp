@@ -218,6 +218,50 @@ void test_goal_scans_then_walks()
 	TEST_ASSERT_FLOAT_WITHIN(NAV.goalTolerance + 60, 0, hypotf(p.x - 0, p.y - 1200));
 }
 
+/** A gap the terrain code stops at (gapAhead): no walking forward, after a second it goes into the map. */
+void test_gap_ahead_blocks_and_marks_the_map()
+{
+	LidarSlam slam;
+	TEST_ASSERT_TRUE(slam.begin(ORIGIN, MAP));
+	TofNavigator nav;
+	nav.begin(SCAN, NAV);
+	const float dt = 0.02f, maxYawRate = 1.0f;
+	LR_pose2 p = { 0, 0, 0 };
+	float mm[64];
+	TEST_ASSERT_TRUE(nav.setGoal(0, 1500));
+	// the first scan
+	for (int k = 0; k < 3000; k++) {
+		LR_moveVector cmd = nav.update(dt, slam, p, maxYawRate, false);
+		p.theta = lrWrapAngle(p.theta - cmd.rotate.yaw * maxYawRate * dt);
+		LR_angle tilt = { 0, nav.tilt(), 0 };
+		if (k % 3 == 0) {
+			frame(p, tilt, mm);
+			nav.addFrame(SENSOR, mm, p, tilt, FLOOR);
+		}
+		if (k > 10 && nav.phase() == TOF_SCAN_IDLE) break;
+	}
+	TEST_ASSERT_EQUAL(1, slam.scans());
+	// facing the goal, a gap 180 mm ahead
+	p.theta = 0;
+	int cx, cy;
+	TEST_ASSERT_TRUE(slam.grid().cellOf(0, 230, cx, cy));
+	TEST_ASSERT_TRUE(slam.grid().at(cx, cy) <= 0);
+	bool marked = false;
+	for (int k = 0; k < 100; k++) {   // 2 s
+		nav.gapAhead(NAV.stopDistance);
+		LR_moveVector cmd = nav.update(dt, slam, p, maxYawRate, false);
+		TEST_ASSERT_TRUE(nav.blocked());
+		TEST_ASSERT_TRUE(cmd.move.y <= 0.001f);   // no walking into it
+		marked = marked || slam.grid().at(cx, cy) > 0;
+	}
+	TEST_ASSERT_TRUE(marked);
+	// gone (the robot turned away): not blocked any more
+	for (int k = 0; k < 10; k++) {
+		nav.update(dt, slam, p, maxYawRate, false);
+	}
+	TEST_ASSERT_FALSE(nav.blocked());
+}
+
 int main(int, char **)
 {
 	UNITY_BEGIN();
@@ -227,5 +271,6 @@ int main(int, char **)
 	RUN_TEST(test_odometry_learns_gyro_bias_standing);
 	RUN_TEST(test_navigator_scan_cycle);
 	RUN_TEST(test_goal_scans_then_walks);
+	RUN_TEST(test_gap_ahead_blocks_and_marks_the_map);
 	return UNITY_END();
 }

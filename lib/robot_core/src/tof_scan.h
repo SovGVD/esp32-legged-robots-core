@@ -108,8 +108,8 @@ class TofNavigator {
 		bool active() const { return _phase != TOF_SCAN_IDLE || _nav.active(); }
 		TofScanPhase phase() const { return _phase; }
 		const Navigator &nav() const { return _nav; }
-		/** Something close ahead (live ToF), walking stopped. */
-		bool blocked() const { return _blocked; }
+		/** Something close ahead (live ToF) or a gap (gapAhead), walking stopped. */
+		bool blocked() const { return _blocked || _sinceGap < 0.1f; }
 		/** Nose up to command now, rad (0 while not scanning). */
 		float tilt() const { return _tilt; }
 		/** Body lowered by this now, mm (with the tilt). */
@@ -118,6 +118,13 @@ class TofNavigator {
 		uint16_t lastPoints() const { return _lastPoints; }
 		const TofScanBuilder &builder() const { return _builder; }
 
+		/**
+		 * The terrain code (GaitEngine::isBlocked) stopped the robot at a gap ahead:
+		 * call every tick while it does. Treated like an obstacle `distance` mm
+		 * ahead: walking stops, after a second it goes into the map and the path
+		 * goes around.
+		 */
+		void gapAhead(float distance) { _gap = { 0, distance, 0 }; _sinceGap = 0; }
 		/** A ToF frame with the odometry and tilt when it was measured (see TofScanBuilder::addFrame). */
 		void addFrame(const TofSensor &sensor, const float *mm, const LR_pose2 &odom, const LR_angle &tilt, float floorZ);
 		/**
@@ -142,6 +149,8 @@ class TofNavigator {
 		bool     _blocked = false;
 		float    _blockedTime = 0; // s blocked in a row
 		LR_point _obstacle = { 0, 0, 0 };   // closest obstacle ahead, body frame
+		LR_point _gap = { 0, 0, 0 };        // gap ahead (gapAhead), body frame
+		float    _sinceGap = 1;             // s since gapAhead
 		bool     _havePrev = false;
 		LR_pose2 _prev = { 0, 0, 0 };
 		uint16_t _lastPoints = 0;

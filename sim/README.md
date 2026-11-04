@@ -542,6 +542,29 @@ gaps (324 vs 700 mm in the test), hence the mixed mount, which crosses them and 
 step (695 vs 674 mm, a few footholds out of reach).
 Tests: `tests/test_lidar.py` (ToF room scans), `tests/test_terrain.py`, `test/test_tof_scan` (native).
 
+### Nav with terrain sensing
+
+The same ToF sensors can feed the terrain map and the room scans at once (`terrain on` plus a
+goal on the robot; `--nav tof --sensing tof` in `drive.py`). What works:
+
+* The room scan with terrain sensing on (`tests/test_lidar.py::test_tof_room_scan_with_terrain_sensing_on`).
+  Two fixes made that possible. The terrain map pauses during a scan (the hexapod can't fully
+  reach the nose up, and the map placed readings for a tilt the body didn't have). And the IMU tilt
+  filter (`TiltEstimator`) no longer makes up a tilt when the robot turns with its nose up: it
+  integrated the tilted gyro's X/Y rates, which a turn about the vertical shows on too, and
+  invented ~4 deg of sideways lean. That one matters on the real robots whenever they turn while tilted.
+* A gap the terrain code stops at goes into the nav map (`TofNavigator::gapAhead`) and the path
+  goes around it.
+* `terrain.rooms(floor=20)`: a rug, a door threshold, a low platform and uneven tiles.
+
+What doesn't yet: walking to a goal with terrain sensing on. The terrain map has no fixed
+reference (no foot switches), so on walks longer than the 8-12 s terrain tests it drifts: the
+dog's mapped floor creeps up ~2 mm per second of walking on a flat floor (RAW map tilt; the
+commanded tilt stops that, but then a real body roll goes into the map and it tips sideways
+in turns), and both robots end up stepping onto ground that isn't there. Until that is fixed,
+walk to goals with terrain sensing off (the default in `drive.py --nav`): both robots cross
+the rug and the threshold open loop, the hexapod also the 30 mm platform.
+
 ## Plan
 
 1. **Model (done).** Parametric MJCF, servo and IMU models, tests that

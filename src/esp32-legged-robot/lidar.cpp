@@ -219,6 +219,9 @@ static void tofNavTask(void *)
 			tofNav.scan();
 			scanRequest = false;
 		}
+		if (odo.gapBlocked) {
+			tofNav.gapAhead(tofNav.nav().params().stopDistance);   // terrain mode stopped at a gap: around it
+		}
 		LR_moveVector cmd = tofNav.update(dt, slam, odo.pose, odo.maxYawRate, odo.gaitActive);
 		bool active = tofNav.active();
 		float tilt = tofNav.tilt(), crouch = tofNav.crouch();

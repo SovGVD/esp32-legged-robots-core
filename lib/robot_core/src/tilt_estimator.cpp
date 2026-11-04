@@ -18,8 +18,12 @@ void TiltEstimator::update(float dt, const float accel[3], const float gyro[3])
 		return;
 	}
 
-	_aboutX += gyro[0] * dt;
-	_aboutY += gyro[1] * dt;
+	// a turn about the vertical while tilted shows on the sensor's X and Y gyros
+	// too (a ToF room scan: nose up, turning in place); taking out the part
+	// that only turns the tilt around keeps it from making up a tilt
+	float x0 = _aboutX;
+	_aboutX += (gyro[0] + _aboutY * gyro[2]) * dt;
+	_aboutY += (gyro[1] - x0 * gyro[2]) * dt;
 
 	// trust the accelerometer less the further |a| is from gravity
 	float off   = fabsf(norm - 1.0f);

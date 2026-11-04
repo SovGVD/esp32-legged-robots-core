@@ -17,7 +17,10 @@ hits as blue dots. The robot stops at a gap it can't step over until you let
 go of the stick (or steer away).
 
 --nav tof|lidar: the robot starts in two rooms (legsim.terrain.rooms) with the
-firmware's map, localization and walk-to-point. The control window shows the
+firmware's map, localization and walk-to-point, and things on the floor (a rug,
+a door threshold, a low platform, uneven tiles: --floor) that the terrain code
+the terrain code can step over with the same ToF sensors (--sensing tof; off by
+default for now, its map drifts on long walks). The control window shows the
 firmware's map (as the web UI would): click it to walk there, N scans the room
 (ToF), X stops; driving with the keys or a stick also cancels the walk.
 Green = true path, blue = the map's pose, red = odometry only, orange = plan.
@@ -58,11 +61,19 @@ ap.add_argument("--goal", nargs=2, type=float, metavar=("X", "Y"), help="with --
 ap.add_argument("--mount", type=float, metavar="DEG", help="with --nav tof: ToF sensors DEG down (TOF_SENSORS)")
 ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --nav tof: nose up while scanning")
 ap.add_argument("--gyro-bias", type=float, default=1.0, help="with --nav: gyro drift, deg/s (default 1)")
+ap.add_argument("--floor", type=float, metavar="MM",
+                help="with --nav: rug, threshold, platform and tiles up to MM high (default 20 dog / 30 hexapod, 0 = none)")
 args = ap.parse_args()
 
 model = "hexapod" if args.hexapod else "dog"
-rough = args.terrain != "flat" and not args.nav
-sensing = args.sensing or ("both" if rough else "none")
+if args.nav:
+    # terrain sensing (--sensing tof) works during the room scans, but its map drifts on
+    # walks longer than ~20 s (sim/README "Nav with terrain sensing"): off by default here
+    sensing = args.sensing or "none"
+    rough = sensing != "none"
+else:
+    rough = args.terrain != "flat"
+    sensing = args.sensing or ("both" if rough else "none")
 fw = FirmwareCore(model=model)
 fw.set_leveling(sensing != "none")
 fw.set_terrain(**scenario.SENSING[sensing])
@@ -74,7 +85,8 @@ if args.nav:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from lidar_nav import SCALE, draw_map
     k = SCALE[model]
-    ground = terrains.rooms(scale=k)
+    floor = args.floor if args.floor is not None else scenario.DEFAULTS[model]["scale"] * 20
+    ground = terrains.rooms(scale=k, floor=floor)
     fw.set_heading_sensors(gyro_bias_dps=args.gyro_bias, magnetometer=False)
     if args.nav == "tof":
         if args.mount is not None:

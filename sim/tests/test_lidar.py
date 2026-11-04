@@ -115,3 +115,45 @@ def test_tof_room_scans_map_and_walk_to_a_point(model):
         fw.tune_tof_scan(reset=True)
         fw.set_heading_sensors(None)
         fw.reset()
+
+
+@needs_cxx
+@pytest.mark.parametrize("model", ["dog", "hexapod"])
+def test_tof_room_scan_with_terrain_sensing_on(model):
+    """The same ToF sensors feed the terrain map and the room scan: the scan still
+    sees the walls (the terrain map pauses, the IMU doesn't make up a tilt while
+    the robot turns with its nose up)."""
+    fw = scenario.core(model)
+    try:
+        fw.tune_tof_scan(reset=True)
+        fw.set_heading_sensors(gyro_bias_dps=1.0, magnetometer=False)
+        fw.set_leveling(True)
+        fw.set_terrain(**scenario.SENSING["tof"])
+        fw.select_gait("rough")
+        fw.set_tof_nav(True, subrays=2, latency=0.04)
+        s = 1.0 if model == "dog" else 1.3
+        robot = fw.place(scenario.make_robot(model, terrain.rooms(scale=s)))
+        fw.drive(robot, duration=1.0)
+        fw.tof_scan()
+        t, tilts = 0.0, []
+        while t < 60:
+            fw.drive(robot)
+            t += fw.loop_dt
+            ns = fw.nav_state()
+            if ns["phase"] == "turn":
+                o = robot.body_orientation()
+                tilts.append(abs(o["roll"]))   # sideways
+            if t > 2 and ns["phase"] == "idle":
+                break
+        assert fw.nav_state()["phase"] == "idle" and fw.lidar_state()["scans"] == 1
+        pts = fw.lidar_points()
+        assert len(pts) > 200
+        assert np.hypot(pts[:, 0], pts[:, 1]).min() > 500          # no floor seen as walls
+        assert np.mean(tilts) < math.radians(3)                      # no made-up sideways lean
+    finally:
+        fw.set_tof_nav(False)
+        fw.set_terrain()
+        fw.set_leveling(False)
+        fw.select_gait("default")
+        fw.set_heading_sensors(None)
+        fw.reset()

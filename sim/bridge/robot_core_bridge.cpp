@@ -178,6 +178,9 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 		if (tofNav.active() && stick) {
 			tofNav.stop();
 		}
+		if (terrainOn && motion.gait().isBlocked()) {
+			tofNav.gapAhead(NAV_PARAMS.stopDistance);   // lidar.cpp: terrain mode stopped at a gap
+		}
 		tofCmd = tofNav.update(dt, slam, odom.pose(), motion.gait().params().maxYawRate, motion.gait().isActive());
 		scanTilt = tofNav.tilt();
 		motion.setHeightOffset(-tofNav.crouch(), 200.0f);
@@ -199,18 +202,21 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 		imuCorrection = leveler.update(dt, current, target, hold);
 	}
 
-	// map tilt filter, and the map ages only while walking
-	terrainTilt.update(dt, lastImu, imuCorrection, motion.gait().isActive(), &terrainMap);
+	// the commanded tilt includes a ToF room scan's nose up (BodyKinematics subtracts the correction)
+	LR_angle commanded = imuCorrection;
+	commanded.roll -= scanTilt;
+	// map tilt filter, and the map ages only while walking (not turning around for a room scan:
+	// the map is paused then, see rc_tof_frame)
+	terrainTilt.update(dt, lastImu, commanded, motion.gait().isActive() && scanTilt <= 0, &terrainMap);
 	// tilt the gait didn't ask for: measured minus commanded (-correction)
-	LR_angle unplanned = { (lastImu.pitch + imuCorrection.pitch) * tiltGain, (lastImu.roll + imuCorrection.roll) * tiltGain, 0 };
+	LR_angle unplanned = { (lastImu.pitch + commanded.pitch) * tiltGain, (lastImu.roll + commanded.roll) * tiltGain, 0 };
 	motion.gait().setTilt(unplanned);
 	if (headingFed && headingHold.enabled() && !navigating) {
 		// motion.cpp steer(): the hold writes the yaw of the command
 		bool moving = fabsf(cmd.move.x) > 0.05f || fabsf(cmd.move.y) > 0.05f;
 		cmd.rotate.yaw = headingHold.update(cmd.rotate.yaw, headingEst.heading(), motion.gait().params().maxYawRate, moving);
 	}
-	LR_angle correction = imuCorrection;
-	correction.roll -= scanTilt;   // BodyKinematics subtracts the correction: nose up
+	LR_angle correction = commanded;   // with the scan's nose up
 	int unsolved = motion.update(dt, cmd, correction);
 	// odometry for the lidar: gait velocity, turned by the gyro (or the gait's own yaw without one)
 	// the gyro's z axis tilts with the body (the scan's nose up): a turn about the
@@ -544,7 +550,11 @@ RC_API void rc_tof_frame(int i, const float *distances)
 	LR_figure pose = motion.body();
 	pose.orientation.pitch = terrainTilt.tilt().pitch;
 	pose.orientation.roll  = terrainTilt.tilt().roll;
-	for (uint8_t z = 0; z < t.zones * t.zones; z++) {
+	// not during a room scan (motion.cpp updateTerrain): the robot turns on the
+	// ground it has mapped, and the nose up it may not quite reach would place
+	// the readings wrong
+	bool scanning = tofNavOn && tofNav.tilt() > 0;
+	for (uint8_t z = 0; z < t.zones * t.zones && !scanning; z++) {
 		terrainMap.addReading(t, z, distances[z], pose);
 	}
 	if (tofNavOn) {

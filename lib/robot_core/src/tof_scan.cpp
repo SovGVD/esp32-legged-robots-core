@@ -123,6 +123,7 @@ void TofNavigator::begin(const TofScanParams &scan, const NavParams &nav)
 	_tilt = 0;
 	_havePrev = false;
 	_blocked = false;
+	_sinceGap = 1;
 }
 
 void TofNavigator::startScan()
@@ -192,6 +193,8 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 	if (_sinceFrame > 0.5f) {
 		_blocked = false;   // no frames: nothing known ahead
 	}
+	_sinceGap += dt;
+	bool gap = _sinceGap < 0.1f;
 	_time += dt;
 
 	switch (_phase) {
@@ -251,7 +254,11 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 		return cmd;
 	}
 	_walked += step;
-	_blockedTime = _blocked ? _blockedTime + dt : 0;
+	bool blocked = _blocked || gap;
+	if (gap && !_blocked) {
+		_obstacle = _gap;
+	}
+	_blockedTime = blocked ? _blockedTime + dt : 0;
 	if (_blockedTime > 1.0f) {
 		// stopped by something the map doesn't have (too low for the scan, or
 		// that scan was thrown away): put it in, the planner goes around
@@ -269,7 +276,7 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 		startScan();
 		return cmd;
 	}
-	cmd = _nav.update(dt, slam, slam.pose(odom), maxYawRate, _blocked ? 1 : 0, _obstacle.x);
+	cmd = _nav.update(dt, slam, slam.pose(odom), maxYawRate, blocked ? 1 : 0, _obstacle.x);
 	if (_nav.state() == NAV_NO_PATH && _walked > 0) {
 		// maybe the map was wrong here: look again before giving up
 		_nav.setGoal(_nav.goalX(), _nav.goalY());

@@ -188,6 +188,8 @@ class FirmwareCore:
         self.heading_sim = None   # set_heading_sensors()
         self.lidar = None         # legsim.lidar.LidarLD06 while the lidar is on (set_lidar)
         self.tof_nav = False      # ToF room scans feed the map (set_tof_nav)
+        self._terrain_tof = None  # ToFArray args while set_terrain(tof=True)
+        self._nav_tof = None      # (sensors, ToFArray args) while set_tof_nav(True)
         self.reset()
 
     # ----------------------------------------------------------------- heading
@@ -294,14 +296,17 @@ class FirmwareCore:
         from .tof import ToFArray
         if not on:
             self.tof_nav = False
-            self.tof = None
             self.lib.rc_tofnav_enable(0)
+            # back to the terrain map's own sensors, if those are on
+            self.tof = ToFArray(self.tof_sensors(), **self._terrain_tof) if self._terrain_tof is not None else None
             return
         if not self.lib.rc_tofnav_enable(1):
             raise MemoryError("map allocation failed")
         self.tof_nav = True
         reach = sensor_range or self.tof_scan_params()["max_range"] + 500
         sensors = [dict(s, max_range=reach) for s in self.tof_sensors()]
+        # one set of sensors for both: the terrain map ignores readings beyond its TOF_SENSORS range
+        self._nav_tof = (sensors, tof_args)
         self.tof = ToFArray(sensors, **tof_args)
         self.reset()
 
@@ -401,7 +406,12 @@ class FirmwareCore:
         from .tof import ToFArray
         adapt = (contacts or tof) if adapt is None else adapt
         self.contacts = switch_threshold if contacts else None
-        self.tof = ToFArray(self.tof_sensors(), **tof_args) if tof else None
+        self._terrain_tof = dict(tof_args) if tof else None
+        if self.tof_nav:
+            # the room scans' sensors (longer reach) feed the terrain map too
+            self.tof = ToFArray(self._nav_tof[0], **self._nav_tof[1])
+        else:
+            self.tof = ToFArray(self.tof_sensors(), **tof_args) if tof else None
         self.lib.rc_set_contact_sensing(1 if contacts else 0)
         self.lib.rc_set_terrain(1 if adapt else 0, 1 if tof else 0)
 

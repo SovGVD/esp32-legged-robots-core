@@ -116,6 +116,7 @@ struct MotionOdometry {
 	LR_angle tilt;         // body tilt now (IMU, firmware convention: roll = nose up)
 	float    floorZ;       // mm, the floor below the body origin (< 0)
 	bool     gaitActive;   // the legs are stepping
+	bool     gapBlocked;   // terrain mode: a gap too wide ahead stopped the robot (GaitEngine::isBlocked)
 };
 MotionOdometry motionOdometry();
 float motionOdometryBias();   // rad/s, gyro bias the odometry learned while standing

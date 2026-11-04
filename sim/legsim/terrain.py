@@ -211,12 +211,15 @@ def course(scale=1.0, y0=250.0):
     return t
 
 
-def rooms(scale=1.0, wall=250.0, thick=60.0, door=800.0):
+def rooms(scale=1.0, wall=250.0, thick=60.0, door=800.0, floor=0.0, seed=0):
     """Two rooms of a flat (lidar mapping and walking to a point): the robot starts
     in the lower room facing +Y; a wall with a doorway (`door` mm wide, at x ~ 1 m)
     leads to the upper room. Furniture: a sofa, a cabinet, a table on four legs
     (the lidar sees the legs only) and a box. Walls `wall` mm high, over the lidar's
-    scan plane. scale > 1 makes the rooms bigger (the hexapod is wider)."""
+    scan plane. scale > 1 makes the rooms bigger (the hexapod is wider).
+    floor > 0: things on the floor for the terrain code, up to `floor` mm high (the
+    robot steps over them, the room scan doesn't see them): a rug (0.4 x), a door
+    threshold (0.5 x), a low platform (1 x) and a patch of uneven tiles (up to 0.7 x)."""
     s = scale
     t = Terrain(f"rooms{scale:g}")
     x0, x1 = -1600 * s, 1800 * s      # side walls
@@ -239,6 +242,17 @@ def rooms(scale=1.0, wall=250.0, thick=60.0, door=800.0):
         for ly in (3300 * s, 3900 * s):
             t.add_box(lx, ly, 400, 40, 40)
     t.add_box(1300 * s, 3300 * s, 300, 400, 500, yaw=0.4)
+    if floor > 0:
+        t.name += f"-floor{floor:g}"
+        t.add_box(500 * s, 1000 * s, 0.4 * floor, 1400 * s, 900 * s)          # rug, lower room
+        t.add_box(dc, ym, 0.5 * floor, door, thick + 80)                      # door threshold
+        t.add_box(200 * s, 3000 * s, floor, 700 * s, 600 * s)                 # low platform, upper room
+        rng = np.random.default_rng(seed)
+        tile = 40.0
+        for ix in range(int(500 * s / tile)):                                 # uneven tiles by the door
+            for iy in range(int(400 * s / tile)):
+                t.add_box(1150 * s + (ix + 0.5) * tile, 2550 * s + (iy + 0.5) * tile,
+                          rng.uniform(0, 0.7 * floor), tile, tile)
     return t
 
 
