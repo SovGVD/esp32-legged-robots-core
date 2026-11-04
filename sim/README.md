@@ -570,7 +570,7 @@ goal on the robot; `--nav tof --sensing tof` in `drive.py`). What works:
   * Without foot switches the body is only planned to be at its height: where the feet land short
     (a platform edge), it is lower, the next frame mapped the ground higher, the body followed it
     up, and so on. Each frame is now lined up with the heights the map already has (median
-    over the overlapping cells, `TerrainMap::frameOffset`, 3 mm deadband).
+    over the overlapping cells, `TerrainMap::frameOffset`, 2 mm deadband).
   * Walls and furniture: the ToF hits their faces low and high, and the feet took the low hits as
     steps and climbed the wall. A cell hit at heights more than 3 x `jump` apart is now a vertical
     face, never a foothold.

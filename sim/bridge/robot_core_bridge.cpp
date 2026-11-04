@@ -58,7 +58,7 @@ static TerrainTiltMode mapTiltMode = TERRAIN_TILT_MODE;
 static bool floorTiltOn = true;    // ToF frames placed with the floor's own tilt (FrameTilt); rc_set_floor_tilt
 static FrameTilt frameTilt;
 static float frameGain = 1.0f;    // FrameTilt gain; rc_set_frame_gain
-static float regDeadband = 3.0f;
+static float regDeadband = 2.0f;
 static bool registerOn = true;    // frames placed at the map's height (TerrainMap::frameOffset); rc_set_frame_register
 static float biasTau = 1.5f;
 static float unplannedTau = 0.3f;

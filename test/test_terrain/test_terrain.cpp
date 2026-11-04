@@ -470,7 +470,7 @@ void test_frame_offset_lines_frames_up_with_the_map()
 	body.position.z = 10;
 	TEST_ASSERT_FLOAT_WITHIN(0.5f, 10, map.frameOffset(s, mm, body));
 	// within the deadband: map noise, left alone
-	body.position.z = 2;
+	body.position.z = 1.5f;
 	TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0, map.frameOffset(s, mm, body));
 }
 

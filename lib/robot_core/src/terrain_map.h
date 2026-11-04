@@ -80,7 +80,7 @@ class TerrainMap
 		 * frame would map the ground that much higher, the body would follow
 		 * it up, and so on, a few mm a step.
 		 */
-		float frameOffset(const TofSensor &s, const float *mm, const LR_figure &body, float deadband = 3.0f) const;
+		float frameOffset(const TofSensor &s, const float *mm, const LR_figure &body, float deadband = 2.0f) const;
 
 		/**
 		 * Add one zone reading.
