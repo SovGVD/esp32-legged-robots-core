@@ -86,6 +86,13 @@
 //#define TOF_ZONE_MIRROR_X    1
 //#define TOF_ZONE_MIRROR_Y    0
 
+// 2D lidar (LD06 / LD19, LIDAR_PARAMS in model_data.h): its TX wire to GPIO 34
+// (input only, free on the dog, not a strapping pin), 5 V, GND, its PWM pin
+// to GND. Only receives (UART2, 230400 baud). Comment out LIDAR_TYPE to drop
+// the driver; without a lidar connected it costs no map memory.
+#define LIDAR_TYPE           LD06
+#define LIDAR_RX_PIN         34
+
 //Cores loop time
 #define LOOP_TIME 4400   // microseconds (10^-6 seconds)
 #define SERVICE_LOOP_TIME 100000

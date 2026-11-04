@@ -168,6 +168,21 @@ size_t pTof(uint8_t *out)
 	return p - out;
 }
 
+/**
+ * Walk to a lidar map point from the web map view: [P_GOTO, x hi, x lo,
+ * y hi, y lo] (i16 mm, map frame, big-endian); [P_GOTO] alone stops.
+ */
+void pGoto(uint8_t *data, size_t len)
+{
+  if (len < 5) {
+    lidarStop();
+    return;
+  }
+  int16_t x = (int16_t)((data[1] << 8) | data[2]);
+  int16_t y = (int16_t)((data[3] << 8) | data[4]);
+  lidarGoto(x, y);
+}
+
 void int16ToBytes(int value, uint8_t _offset)
 {
   telemetryPackage[_offset]   = (value >> 8) & 0xFF;

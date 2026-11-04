@@ -153,6 +153,7 @@ class Mpu9250Imu : public Imu {
 
 		bool hasMagnetometer() const override { return _mag; }
 		float yawRate() const override { return _yawRate; }
+		float gyroBias() const override { return _heading.gyroBias(); }
 		bool headingAbsolute() const override { return _heading.absolute(); }
 
 		float magField(bool &accepted) const override

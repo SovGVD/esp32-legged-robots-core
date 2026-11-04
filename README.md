@@ -26,6 +26,7 @@ Universal code for any kind of legged robots (not only legged now) and mobile fr
    - MPU9250 (GY-91): accelerometer, gyro and the AK8963 magnetometer (heading)
  - Distance
    - VL53L5CX 8x8 multizone ToF (terrain map: obstacles and gaps)
+   - LDROBOT LD06 / LD19 360° lidar (indoor map, localization, walking to a point)
  - Other sensors
    - IMA219 - power sensor
 
@@ -131,6 +132,25 @@ default GPIO 14, an assumption). Check the zone order with `tof print`: cover th
 left columns must get short, cover the top half and the top rows; fix with `TOF_ZONE_MIRROR_X` /
 `TOF_ZONE_MIRROR_Y`. Facing a flat wall the corner zones should read ~10 % more than the middle (distance along
 each zone's ray); if they read the same, set `TOF_DISTANCE_PERPENDICULAR 1`.
+
+**Lidar map and walking to a point (LD06 / LD19).** A 360° lidar on top of the body, above every part of the
+robot (the scan plane must not cross the legs or the head; readings closer than `minRange`, dog 100 mm,
+hexapod 150 mm, count as the robot itself and are dropped). Wiring: lidar TX to `LIDAR_RX_PIN` (dog GPIO 34,
+input only and free; hexapod GPIO 15, free on the ESP32-CAM without an SD card), 5 V (~180 mA), GND, and the
+lidar's PWM pin to GND so it runs its own 10 rev/s speed control. It only sends (UART2, 230400 baud). A task on
+core 0 parses the packets, builds a 10 x 10 m map (5 cm cells, 40 KB, allocated when the first lidar data
+arrives) and corrects the odometry (gait velocity turned by the gyro) by matching each revolution against the
+map; the motion task only takes the result, so the loop timing doesn't change. `goto <x m> <y m>` walks to a
+map point (map frame: x right, y forward of where the map started; `lidar reset` starts a new map here):
+a path around the walls and furniture is replanned every second, the robot turns toward it and walks, and
+stops forward motion with something closer than `stopDistance` ahead. Moving the stick, `lidar stop` or the
+web page's Stop cancels it; without a web client (failsafe) the robot stands. The web page's **Map** toggle
+shows the map, the robot, the scan and the path; tap the map to walk there. `lidar state` prints the data
+rate, CRC errors, match quality, pose and goal; `lidar print` the closest reading in 8 directions: put a box
+30 cm in front of the robot and it must show as `front`, else fix `LIDAR_PARAMS.yaw` in `model_data.h`.
+`lidar freeze` toggles keeping the map as it is (localize only). The lidar sees only its own height
+(~12-15 cm): lower things (steps, cables) are for the ToF terrain map. Parameters: `LIDAR_PARAMS`,
+`LIDAR_MAP_PARAMS`, `NAV_PARAMS` in `model_data.h`. Simulator only so far (`sim/README.md`, "Lidar").
 
 **Battery protection.** The INA219 voltage is read at 10 Hz and filtered (servo current makes it sag every
 step). Below `BATTERY_PARAMS.lowVoltage` for 3 s the robot warns (CLI, web page); below `criticalVoltage` it

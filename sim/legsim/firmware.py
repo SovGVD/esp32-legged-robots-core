@@ -150,6 +150,25 @@ class FirmwareCore:
         L.rc_terrain_cells.restype = ctypes.c_int
         L.rc_terrain_state.restype = None
         L.rc_terrain_state.argtypes = [f32p]
+        u8p = ctypes.POINTER(ctypes.c_uint8)
+        L.rc_lidar_enable.restype = ctypes.c_int
+        L.rc_lidar_enable.argtypes = [ctypes.c_int]
+        L.rc_lidar_bytes.restype = ctypes.c_int
+        L.rc_lidar_bytes.argtypes = [u8p, ctypes.c_int]
+        for name in ("rc_lidar_params", "rc_lidar_pose", "rc_lidar_state", "rc_lidar_grid", "rc_nav_state"):
+            getattr(L, name).restype = None
+            getattr(L, name).argtypes = [f32p]
+        L.rc_lidar_map.restype = None
+        L.rc_lidar_map.argtypes = [ctypes.POINTER(ctypes.c_int8)]
+        L.rc_lidar_points.restype = ctypes.c_int
+        L.rc_lidar_points.argtypes = [f32p]
+        L.rc_nav_path.restype = ctypes.c_int
+        L.rc_nav_path.argtypes = [f32p]
+        L.rc_lidar_freeze.restype = None
+        L.rc_lidar_freeze.argtypes = [ctypes.c_int]
+        L.rc_nav_goal.restype = ctypes.c_int
+        L.rc_nav_goal.argtypes = [ctypes.c_float, ctypes.c_float]
+        L.rc_nav_stop.restype = None
         self.legs = L.rc_leg_count()
         self.dof = L.rc_leg_dof()
         self.loop_dt = float(L.rc_loop_dt())
@@ -158,6 +177,7 @@ class FirmwareCore:
         self.contacts = None      # foot switch threshold (N) while contact sensing is on
         self.tof = None           # legsim.tof.ToFArray while the terrain map is fed
         self.heading_sim = None   # set_heading_sensors()
+        self.lidar = None         # legsim.lidar.LidarLD06 while the lidar is on (set_lidar)
         self.reset()
 
     # ----------------------------------------------------------------- heading
@@ -204,6 +224,85 @@ class FirmwareCore:
         self.unsolved = 0
         if self.tof is not None:
             self.tof.reset()
+        if self.lidar is not None:
+            self.lidar.reset()
+
+    # ------------------------------------------------------------------ lidar
+    NAV_STATES = ("idle", "active", "arrived", "no path", "no memory")
+    MATCHES = ("none", "ok", "new area", "rejected", "few points")
+
+    def lidar_params(self):
+        """The model's lidar mount (LIDAR_PARAMS): position (mm, body frame), yaw (rad), clockwise, ranges (mm)."""
+        v = self._floats(self.lib.rc_lidar_params, 7)
+        return {"position": v[:3], "yaw": float(v[3]), "clockwise": bool(v[4]), "min_range": float(v[5]),
+                "max_range": float(v[6])}
+
+    def set_lidar(self, on=True, **lidar_args):
+        """Simulated LD06 lidar on the robot feeding the firmware's lidar driver, map and
+        localization (kept across reset(), which clears the map). lidar_args go to
+        legsim.lidar.LidarLD06 (noise_mm, noise_rel, seed, ...). on=False turns it off."""
+        from .lidar import LidarLD06
+        if not on:
+            self.lidar = None
+            self.lib.rc_lidar_enable(0)
+            return
+        if not self.lib.rc_lidar_enable(1):
+            raise MemoryError("lidar map allocation failed")
+        self.lidar = LidarLD06(self.lidar_params(), **lidar_args)
+        self.reset()
+
+    def lidar_bytes(self, data):
+        """LD06 UART bytes into the firmware driver; returns the number of finished scans."""
+        if not data:
+            return 0
+        buf = (ctypes.c_uint8 * len(data)).from_buffer_copy(data)
+        return int(self.lib.rc_lidar_bytes(buf, len(data)))
+
+    def lidar_pose(self):
+        """(map pose, odometry pose): each (x mm, y mm, theta rad CCW, 0 = facing +y)."""
+        v = self._floats(self.lib.rc_lidar_pose, 6)
+        return v[:3], v[3:]
+
+    def lidar_state(self):
+        v = self._floats(self.lib.rc_lidar_state, 9)
+        return {"match": self.MATCHES[int(v[0])], "score": float(v[1]), "scans": int(v[2]), "rejected": int(v[3]),
+                "occupied": int(v[4]), "jump": float(v[5]), "turn": float(v[6]), "packets": int(v[7]),
+                "crc_errors": int(v[8])}
+
+    def lidar_map(self):
+        """(log-odds grid [y, x] int8, cell size mm): cell (ix, iy) covers x from (ix - n/2) * cell."""
+        g = self._floats(self.lib.rc_lidar_grid, 2)
+        n = int(g[0])
+        buf = (ctypes.c_int8 * (n * n))()
+        self.lib.rc_lidar_map(buf)
+        return np.frombuffer(buf, dtype=np.int8).reshape(n, n).copy(), float(g[1])
+
+    def lidar_points(self):
+        buf = (ctypes.c_float * 720)()
+        n = self.lib.rc_lidar_points(buf)
+        return np.array(buf[:2 * n]).reshape(n, 2)
+
+    def lidar_freeze(self, on=True):
+        """Keep the map as it is (localize only)."""
+        self.lib.rc_lidar_freeze(1 if on else 0)
+
+    def nav_goal(self, x, y):
+        """`goto`: walk to map point (x, y), mm. The move command passed to update()/drive() must be
+        zero meanwhile (a stick command cancels it, like on the robot)."""
+        return bool(self.lib.rc_nav_goal(float(x), float(y)))
+
+    def nav_stop(self):
+        self.lib.rc_nav_stop()
+
+    def nav_state(self):
+        v = self._floats(self.lib.rc_nav_state, 7)
+        return {"state": self.NAV_STATES[int(v[0])], "blocked": bool(v[1]), "distance": float(v[2]),
+                "goal": v[3:5], "forward": float(v[5]), "yaw": float(v[6])}
+
+    def nav_path(self):
+        buf = (ctypes.c_float * 128)()
+        n = self.lib.rc_nav_path(buf)
+        return np.array(buf[:2 * n]).reshape(n, 2)
 
     # ------------------------------------------------------------ rough ground
     def tof_sensors(self):
@@ -266,6 +365,8 @@ class FirmwareCore:
         if self.contacts is not None:
             sw = robot.foot_switches(self.contacts)
             self.lib.rc_set_contacts((ctypes.c_int * self.legs)(*[1 if c else 0 for c in sw]))
+        if self.lidar is not None:
+            self.lidar_bytes(self.lidar.poll(robot, self.loop_dt if dt is None else dt))
         if self.tof is not None:
             frames = self.tof.poll(robot, self.loop_dt if dt is None else dt)
             if frames is not None:

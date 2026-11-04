@@ -51,6 +51,8 @@ class Imu {
 		virtual bool hasMagnetometer() const { return false; }
 		// turn rate about the body's up axis, rad/s, counter-clockwise > 0
 		virtual float yawRate() const { return 0; }
+		// gyro bias the heading estimator learned (rad/s, subtract from yawRate())
+		virtual float gyroBias() const { return 0; }
 		// the magnetometer has set the heading (it is a compass heading)
 		virtual bool headingAbsolute() const { return false; }
 		// last magnetometer field strength, uT, and whether it was trusted

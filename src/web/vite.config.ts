@@ -45,7 +45,7 @@ function robotDevServer(): Plugin {
       const tof = Number(process.env.TOF ?? 2);
       // mounting as in model_data.h TOF_SENSORS: dog nose, hexapod front left/right
       const m = tof === 1 ? '[[0,88,0,0,0.7,0.785]]' : '[[-25,90,10,0.35,0.61,0.785],[25,90,10,-0.35,0.61,0.785]]';
-      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1,t:${tof},r:450,m:${m}};`);
+      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1,t:${tof},r:450,n:1,m:${m}};`);
     });
   };
   return {

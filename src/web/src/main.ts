@@ -8,6 +8,9 @@ import {
   batteryState,
   encodeCli,
   encodeGait,
+  encodeGoto,
+  encodeMapRequest,
+  encodeNavRequest,
   encodeLevel,
   encodeMove,
   encodeTelemetryRequest,
@@ -15,6 +18,7 @@ import {
   zeroVector,
   type Telemetry,
 } from './protocol.ts';
+import { MapPanel } from './map.ts';
 import { RemoteToggle } from './toggle.ts';
 import { TofPanel } from './tof.ts';
 
@@ -27,6 +31,9 @@ const TOF_INTERVAL_MS = 125;
 // the robot's state again; a gait change waits until the robot stands still
 const GAIT_CONFIRM_MS = 15000;
 const LEVEL_CONFIRM_MS = 2500;
+// lidar map view: pose, path and scan 4 times a second, the map (10 KB) once a second
+const NAV_INTERVAL_MS = 250;
+const MAP_INTERVAL_MS = 1000;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -46,6 +53,8 @@ const ui = {
   cli: $('cli'),
   tofToggle: $<HTMLInputElement>('tof-toggle'),
   tof: $('tof'),
+  mapToggle: $<HTMLInputElement>('map-toggle'),
+  map: $('map'),
 };
 
 const stateText: Record<ConnectionState, string> = {
@@ -63,6 +72,7 @@ const connection = new Connection(config.wsUrl, {
     if (state !== 'online') {
       telemetry = null;
       tof.clear();
+      map.clear();
     }
     renderTelemetry();
   },
@@ -72,6 +82,10 @@ const connection = new Connection(config.wsUrl, {
       renderTelemetry();
     } else if (msg.type === 'tof') {
       if (!ui.tof.hidden) tof.update(msg.sensors);
+    } else if (msg.type === 'map') {
+      if (!ui.map.hidden) map.setMap(msg.map);
+    } else if (msg.type === 'nav') {
+      if (!ui.map.hidden) map.setNav(msg.nav);
     } else if (msg.type === 'cli') {
       cli.write(msg.text);
     }
@@ -95,9 +109,30 @@ $('level-label').hidden = !config.levelToggle;
 
 const tof = new TofPanel(ui.tof, ui.control, config.tofSensors, config.tofRange, config.tofMounts);
 $('tof-label').hidden = config.tofSensors === 0;
+function showTof(on: boolean): void {
+  ui.tofToggle.checked = on;
+  ui.tof.hidden = !on;
+  tof.show(on);
+}
+
+// the map and the ToF view share the space above the sticks: one at a time
+const map = new MapPanel(ui.map, (x, y) => connection.send(encodeGoto(x, y)));
+$('map-label').hidden = !config.lidar;
+function showMap(on: boolean): void {
+  ui.mapToggle.checked = on;
+  ui.map.hidden = !on;
+  if (on) {
+    connection.send(encodeMapRequest());
+    connection.send(encodeNavRequest());
+  }
+}
 ui.tofToggle.addEventListener('change', () => {
-  ui.tof.hidden = !ui.tofToggle.checked;
-  tof.show(ui.tofToggle.checked);
+  if (ui.tofToggle.checked) showMap(false);
+  showTof(ui.tofToggle.checked);
+});
+ui.mapToggle.addEventListener('change', () => {
+  if (ui.mapToggle.checked) showTof(false);
+  showMap(ui.mapToggle.checked);
 });
 
 const batteryText = { unknown: '', ok: '', low: 'battery low', critical: 'battery empty' } as const;
@@ -199,6 +234,13 @@ setInterval(() => connection.send(encodeTelemetryRequest()), TELEMETRY_INTERVAL_
 setInterval(() => {
   if (!ui.tof.hidden && document.visibilityState === 'visible') connection.send(encodeTofRequest());
 }, TOF_INTERVAL_MS);
+
+setInterval(() => {
+  if (!ui.map.hidden && document.visibilityState === 'visible') connection.send(encodeNavRequest());
+}, NAV_INTERVAL_MS);
+setInterval(() => {
+  if (!ui.map.hidden && document.visibilityState === 'visible') connection.send(encodeMapRequest());
+}, MAP_INTERVAL_MS);
 
 $('version').textContent = `v${config.version}`;
 renderTelemetry();

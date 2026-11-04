@@ -18,6 +18,7 @@
 #define INA219   104
 #define DCMOTOR  105
 #define VL53L5CX 106
+#define LD06     107   // LDROBOT LD06 / LD19 2D lidar (same protocol)
 
 /**
  * Robot models
@@ -64,6 +65,11 @@
 #define P_LEVEL        76  //       "L" [id, on]: IMU leveling on/off
 #define P_TOF          68  //       "D" [id] request: newest ToF zone distances (packages.cpp pTof)
 
+#define P_MAP          80  //       "P" [id] request: lidar map (lidar.cpp pMap)
+#define P_NAV          78  //       "N" [id] request: lidar pose, goal, path, scan (lidar.cpp pNav)
+#define P_GOTO         87  //       "W" [id, x i16, y i16] walk to map point (mm, big-endian); [id] alone stops
+#define P_MAP_MAX_LEN  (6 + 200 * 200 / 4)
+#define P_NAV_MAX_LEN  (19 + 4 * 64 + 4 * 180)
 #define P_TOF_MAX_SENSORS 2
 #define P_TOF_ZONES       64
 #define P_TOF_LEN(n)      (2 + (n) * (2 + P_TOF_ZONES * 2))

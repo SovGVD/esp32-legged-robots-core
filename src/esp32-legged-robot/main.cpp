@@ -80,6 +80,7 @@ static void robotSetup()
 		vTaskDelay(100);
 
 		initTof();   // starts its own task: the sensors take a while to boot
+		initLidar(); // own task on core 0
 
 		robotLoopReady = true;
 		Serial.println("MainSetup complete");

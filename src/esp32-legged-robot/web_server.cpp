@@ -79,6 +79,12 @@ static void initWebServerConfig()
 	// ToF view: t = number of sensors (0 = none), r = range of the colour scale, mm
 	addIntToWebServerConfig("t", tofSensorCount());
 	addIntToWebServerConfig("r", tofMaxRange());
+	// n = 1: lidar map view (LIDAR_TYPE and a model with LIDAR_PARAMS)
+#if defined(LIDAR_TYPE)
+	addIntToWebServerConfig("n", MODEL_LIDAR.lidar != nullptr ? 1 : 0);
+#else
+	addIntToWebServerConfig("n", 0);
+#endif
 	// m = ToF mounting for the 3D view, per sensor [x, y, z (mm, body frame), yaw, tilt, fov (rad)]
 	webConfig += ",m:[";
 	for (uint8_t i = 0; i < tofSensorCount(); i++) {
@@ -196,6 +202,28 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 				}
 				break;
 			}
+			case P_MAP:
+			case P_NAV: {
+				// asked once a second (map) / a few times a second (pose) while the map view is open;
+				// built in a temporary buffer (binary() copies it), skipped while the send queue is full
+				size_t room = data[0] == P_MAP ? P_MAP_MAX_LEN : P_NAV_MAX_LEN;
+				if (!client->canSend()) {
+					break;
+				}
+				uint8_t *buf = (uint8_t *)malloc(room);
+				if (buf == nullptr) {
+					break;
+				}
+				size_t n = data[0] == P_MAP ? pMap(buf, room, len > 1 ? data[1] : 0) : pNav(buf, room);
+				if (n > 0) {
+					client->binary(buf, n);
+				}
+				free(buf);
+				break;
+			}
+			case P_GOTO:
+				pGoto(data, len);
+				break;
 			#ifdef CAMERAENABLED
 			case P_START_VIDEO:
 				mainCameraStream = true;

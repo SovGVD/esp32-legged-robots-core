@@ -66,6 +66,12 @@ MotionStatus motionStatus()
 	return st;
 }
 
+MotionOdometry motionOdometry()
+{
+	MotionOdometry o = {};
+	return o;
+}
+
 void cliTerrain() { cliSerial->println("Tracks: no terrain mode."); }
 void cliHeading() { cliSerial->println("Tracks: no heading hold yet."); }
 void cliTurnTo()  { cliSerial->println("Tracks: no heading hold yet."); }
@@ -113,6 +119,51 @@ static volatile int8_t  calRequest    = -1;       // CAL_TURN or CAL_HAND
 static volatile uint8_t calState      = CAL_IDLE;
 static float            calTurned     = 0;
 static float            calTime       = 0;
+
+// Odometry for the lidar (motionOdometry), written every tick
+static Odometry2D     odometry;
+static MotionOdometry odometryOut = {};
+static portMUX_TYPE   odometryLock = portMUX_INITIALIZER_UNLOCKED;
+
+MotionOdometry motionOdometry()
+{
+	portENTER_CRITICAL(&odometryLock);
+	MotionOdometry o = odometryOut;
+	portEXIT_CRITICAL(&odometryLock);
+	return o;
+}
+
+static void updateOdometry(float dt)
+{
+	// the gait's velocity, turned by the gyro (the gait's own yaw is only what it was told)
+	float yawRate = imu().ready() ? imu().yawRate() - imu().gyroBias() : motion.gait().yawRate();
+	odometry.update(dt, motion.gait().velocity(), yawRate);
+	portENTER_CRITICAL(&odometryLock);
+	odometryOut.pose       = odometry.pose();
+	odometryOut.maxYawRate = motion.gait().params().maxYawRate;
+	portEXIT_CRITICAL(&odometryLock);
+}
+
+/**
+ * Walking to a lidar map point (`goto`, web map view): the navigator's
+ * command replaces the operator's. Moving the stick cancels it; without a
+ * client (failsafe) the robot stands. Returns true while navigating.
+ */
+static bool navigate(LR_moveVector &cmd)
+{
+	LR_moveVector nav;
+	if (!lidarNavCommand(nav)) {
+		return false;
+	}
+	if (fabsf(cmd.move.x) > 0.1f || fabsf(cmd.move.y) > 0.1f || fabsf(cmd.rotate.yaw) > 0.1f) {
+		lidarNavCancel();
+		return false;
+	}
+	if (!FS_FAIL && batteryState() != BATTERY_CRITICAL) {
+		cmd = nav;
+	}
+	return true;
+}
 
 static volatile bool levelRequest =
 #ifdef HORIZON_LEVEL
@@ -370,7 +421,12 @@ void updateMotion(float dt)
 	applyTerrainRequest();
 	updateTerrain(dt);
 
-	motion.update(dt, batteryGuard(steer(dt, getMoveCommand())), imuCorrection);
+	LR_moveVector cmd = getMoveCommand();
+	if (!navigate(cmd)) {
+		cmd = steer(dt, cmd);   // heading hold: not while the navigator steers
+	}
+	motion.update(dt, batteryGuard(cmd), imuCorrection);
+	updateOdometry(dt);
 }
 
 void cliTerrain()

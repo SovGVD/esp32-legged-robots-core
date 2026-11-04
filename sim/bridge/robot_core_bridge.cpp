@@ -62,6 +62,18 @@ static HeadingEstimator headingEst;
 static HeadingHold      headingHold;
 static bool             headingFed = false;
 static const HeadingHoldParams HEADING_HOLD = { 1.5f, 0.6f, 0.07f, 0.05f };   // motion.cpp HEADING_HOLD_PARAMS
+// Lidar mapping and walking to a point, as in lidar.cpp / motion.cpp
+static Ld06Parser       lidarParser;
+static LidarScanBuilder lidarScans;
+static LidarSlam        slam;
+static Navigator        nav;
+static Odometry2D       odom;
+static LR_pose2         scanStartOdom = { 0, 0, 0 };
+static LR_moveVector    navCmd = {};
+static bool             lidarOn = false;
+static float            lastYawRate = 0;
+static float            simTime = 0;
+static float            lastScanTime = 0;
 // TERRAIN_PARAMS, tunable from Python (rc_tune_terrain); kept across rc_init()
 static TerrainParams terrainParams = TERRAIN_PARAMS;
 
@@ -105,6 +117,16 @@ RC_API void rc_init()
 	headingEst.begin({ 2.0f, 0.25f });   // sensors.cpp HEADING_MAG_TAU, HEADING_FIELD_TOLERANCE
 	headingHold.begin(HEADING_HOLD);
 	headingFed = false;
+	odom.reset();
+	scanStartOdom = { 0, 0, 0 };
+	navCmd = {};
+	nav.stop();
+	simTime = lastScanTime = 0;
+	if (lidarOn) {
+		slam.reset();
+		lidarParser.reset();
+		lidarScans.reset();
+	}
 	applyTerrain();
 	LR_moveVector zero = {};
 	motion.update(0.0f, zero, imuCorrection);
@@ -127,6 +149,17 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 		{ command[0], command[1], command[2] },
 		{ command[3], command[4], command[5] }
 	};
+	simTime += dt;
+	// walking to a point (motion.cpp navigate()): the stick takes over and cancels it
+	bool navigating = false;
+	if (nav.active()) {
+		if (fabsf(cmd.move.x) > 0.1f || fabsf(cmd.move.y) > 0.1f || fabsf(cmd.rotate.yaw) > 0.1f) {
+			nav.stop();
+		} else {
+			cmd = navCmd;
+			navigating = true;
+		}
+	}
 	if (imu || !leveler.enabled()) {
 		LR_angle current = { 0, 0, 0 };
 		if (imu) {
@@ -145,12 +178,14 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 	// tilt the gait didn't ask for: measured minus commanded (-correction)
 	LR_angle unplanned = { (lastImu.pitch + imuCorrection.pitch) * tiltGain, (lastImu.roll + imuCorrection.roll) * tiltGain, 0 };
 	motion.gait().setTilt(unplanned);
-	if (headingFed && headingHold.enabled()) {
+	if (headingFed && headingHold.enabled() && !navigating) {
 		// motion.cpp steer(): the hold writes the yaw of the command
 		bool moving = fabsf(cmd.move.x) > 0.05f || fabsf(cmd.move.y) > 0.05f;
 		cmd.rotate.yaw = headingHold.update(cmd.rotate.yaw, headingEst.heading(), motion.gait().params().maxYawRate, moving);
 	}
 	int unsolved = motion.update(dt, cmd, imuCorrection);
+	// odometry for the lidar: gait velocity, turned by the gyro (or the gait's own yaw without one)
+	odom.update(dt, motion.gait().velocity(), headingFed ? lastYawRate - headingEst.gyroBias() : motion.gait().yawRate());
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		lrLegPulses(legs[i], LEG_DOF, servoMainProfile, &pulses[i * LEG_DOF]);
 	}
@@ -259,6 +294,7 @@ RC_API void rc_heading_feed(float dt, float yawRate, const float *mag)
 {
 	headingEst.update(dt, yawRate, lastImu, mag);
 	headingFed = true;
+	lastYawRate = yawRate;
 }
 
 RC_API void rc_heading_hold(int on) { headingHold.setEnabled(on != 0); }
@@ -523,4 +559,115 @@ RC_API void rc_set_map_tilt_mode(int m)
 	}
 	terrainTilt.setMode(mapTiltMode);
 	terrainTilt.setTimeConstants(biasTau, unplannedTau);
+}
+
+/* ------------------------------------------------------------------ lidar */
+
+/** Lidar on (1) / off (0): LD06 bytes from rc_lidar_bytes() feed the map. Kept across rc_init() (which clears the map). */
+RC_API int rc_lidar_enable(int on)
+{
+	lidarOn = on != 0;
+	if (lidarOn) {
+		lidarScans.begin(LIDAR_PARAMS);
+		lidarParser.reset();
+		nav.begin(NAV_PARAMS);
+		if (!slam.begin(LIDAR_PARAMS, LIDAR_MAP_PARAMS)) return 0;
+	}
+	return 1;
+}
+
+/** Lidar mount: position xyz (mm), yaw (rad), clockwise, min range, max range (mm). */
+RC_API void rc_lidar_params(float *out)
+{
+	out[0] = LIDAR_PARAMS.position.x; out[1] = LIDAR_PARAMS.position.y; out[2] = LIDAR_PARAMS.position.z;
+	out[3] = LIDAR_PARAMS.yaw; out[4] = LIDAR_PARAMS.clockwise ? 1 : 0;
+	out[5] = LIDAR_PARAMS.minRange; out[6] = LIDAR_PARAMS.maxRange;
+}
+
+static void lidarScanDone()
+{
+	slam.addScan(lidarScans.scan(), scanStartOdom, odom.pose());
+	scanStartOdom = odom.pose();
+	float dt = simTime - lastScanTime;
+	lastScanTime = simTime;
+	navCmd = nav.update(dt, slam, slam.pose(odom.pose()), motion.gait().params().maxYawRate);
+}
+
+/** Bytes from the lidar's UART (LD06 packets), as they arrive. Returns the number of finished scans. */
+RC_API int rc_lidar_bytes(const uint8_t *data, int n)
+{
+	int scans = 0;
+	if (!lidarOn) return 0;
+	for (int k = 0; k < n; k++) {
+		if (!lidarParser.feed(data[k])) continue;
+		for (uint8_t i = 0; i < LD06_POINTS; i++) {
+			if (lidarScans.add(lidarParser.angle(i), lidarParser.distance(i), lidarParser.intensity(i))) {
+				lidarScanDone();
+				scans++;
+			}
+		}
+	}
+	return scans;
+}
+
+/** Map pose now (x, y mm, theta rad) and the odometry pose (x, y, theta). */
+RC_API void rc_lidar_pose(float *out)
+{
+	LR_pose2 p = slam.pose(odom.pose());
+	out[0] = p.x; out[1] = p.y; out[2] = p.theta;
+	out[3] = odom.pose().x; out[4] = odom.pose().y; out[5] = odom.pose().theta;
+}
+
+/** match, score, scans, rejected, occupied cells, last jump (mm), last turn (rad), packets, CRC errors */
+RC_API void rc_lidar_state(float *out)
+{
+	out[0] = slam.lastMatch(); out[1] = slam.lastScore(); out[2] = slam.scans(); out[3] = slam.rejected();
+	out[4] = slam.ready() ? slam.grid().occupiedCells() : 0;
+	out[5] = slam.lastJump(); out[6] = slam.lastTurn();
+	out[7] = lidarParser.packets(); out[8] = lidarParser.crcErrors();
+}
+
+/** Grid size (cells per side) and cell size (mm). */
+RC_API void rc_lidar_grid(float *out)
+{
+	out[0] = LR_LIDAR_GRID;
+	out[1] = LIDAR_MAP_PARAMS.cellSize;
+}
+
+/** The map, LR_LIDAR_GRID^2 log-odds, row y = 0 first (map y grows with the row). */
+RC_API void rc_lidar_map(int8_t *out)
+{
+	if (slam.ready()) memcpy(out, slam.grid().cells(), LR_LIDAR_GRID * LR_LIDAR_GRID);
+}
+
+/** Last scan's points, body frame at its end (mm): out x0, y0, x1, ... Returns the count. */
+RC_API int rc_lidar_points(float *out)
+{
+	const float *x, *y;
+	uint16_t n = slam.points(x, y);
+	for (uint16_t i = 0; i < n; i++) { out[2 * i] = x[i]; out[2 * i + 1] = y[i]; }
+	return n;
+}
+
+RC_API void rc_lidar_freeze(int on) { slam.setFrozen(on != 0); }
+
+/** Walk to (x, y), mm in the map frame (`goto`). */
+RC_API int rc_nav_goal(float x, float y) { return nav.setGoal(x, y) ? 1 : 0; }
+RC_API void rc_nav_stop() { nav.stop(); navCmd = {}; }
+
+/** state (NavState), blocked, distance (mm), goal x, goal y, forward command, yaw command */
+RC_API void rc_nav_state(float *out)
+{
+	out[0] = nav.state(); out[1] = nav.blocked(); out[2] = nav.distance();
+	out[3] = nav.goalX(); out[4] = nav.goalY();
+	out[5] = navCmd.move.y; out[6] = navCmd.rotate.yaw;
+}
+
+/** Planned path, map frame mm: out x0, y0, ... Returns the count. */
+RC_API int rc_nav_path(float *out)
+{
+	const float *x, *y;
+	uint8_t n = nav.path(x, y);
+	for (uint8_t i = 0; i < n; i++) { out[2 * i] = x[i]; out[2 * i + 1] = y[i]; }
+	return n;
 }

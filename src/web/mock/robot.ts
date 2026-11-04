@@ -6,7 +6,7 @@ import type { Server as HttpServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { TofMount } from '../src/config.ts';
 import { zoneDirection } from '../src/tofgeom.ts';
-import { P_CLI, P_GAIT, P_LEVEL, P_MOVE, P_TELEMETRY, P_TOF, TOF_ZONES, TS, decodeAxis } from '../src/protocol.ts';
+import { P_CLI, P_GAIT, P_GOTO, P_LEVEL, P_MAP, P_MOVE, P_NAV, P_TELEMETRY, P_TOF, TOF_ZONES, TS, decodeAxis } from '../src/protocol.ts';
 
 const FAILSAFE_MS = 500;
 
@@ -69,6 +69,113 @@ export function tofPackage(count: number, frame: number, t = Date.now() / 1000, 
   return b;
 }
 
+/** Mock flat for the lidar view: two rooms (5 cm cells, 200 x 200), walls as segments in mm. */
+const WALLS: [number, number, number, number][] = [
+  [-1600, -900, 1800, -900], [-1600, 4800, 1800, 4800], [-1600, -900, -1600, 4800], [1800, -900, 1800, 4800],
+  [-1600, 2200, 600, 2200], [1400, 2200, 1800, 2200], [-1450, 0, -850, 0], [-850, 0, -850, 1400],
+];
+const MAP_N = 200;
+const MAP_CELL = 50;
+
+export function mapPackage(): Buffer {
+  const b = Buffer.alloc(6 + (MAP_N * MAP_N) / 4);
+  b[0] = P_MAP;
+  b[1] = 1;
+  b.writeUInt16BE(MAP_N, 2);
+  b.writeUInt16BE(MAP_CELL, 4);
+  const set = (x: number, y: number, code: number) => {
+    const ix = Math.floor(x / MAP_CELL) + MAP_N / 2;
+    const iy = Math.floor(y / MAP_CELL) + MAP_N / 2;
+    if (ix < 0 || iy < 0 || ix >= MAP_N || iy >= MAP_N) return;
+    const i = iy * MAP_N + ix;
+    b[6 + (i >> 2)] = (b[6 + (i >> 2)] & ~(3 << ((i & 3) * 2))) | (code << ((i & 3) * 2));
+  };
+  for (let x = -1600; x < 1800; x += MAP_CELL) for (let y = -900; y < 4800; y += MAP_CELL) set(x, y, 1);
+  for (const [x0, y0, x1, y1] of WALLS) {
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 25);
+    for (let k = 0; k <= n; k++) set(x0 + ((x1 - x0) * k) / n, y0 + ((y1 - y0) * k) / n, 3);
+  }
+  return b;
+}
+
+/** Robot walking straight toward the goal (no planning), with a fake scan of the nearest walls. */
+export class MockNav {
+  x = 0;
+  y = 0;
+  heading = 0;
+  goal: [number, number] | null = null;
+  state = 0;
+  private last = Date.now();
+
+  step(): void {
+    const now = Date.now();
+    const dt = (now - this.last) / 1000;
+    this.last = now;
+    if (!this.goal || this.state !== 1) return;
+    const dx = this.goal[0] - this.x;
+    const dy = this.goal[1] - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 100) {
+      this.state = 2;
+      return;
+    }
+    this.heading = Math.atan2(-dx, dy);
+    const v = Math.min(d, 200 * dt);
+    this.x += (dx / d) * v;
+    this.y += (dy / d) * v;
+  }
+
+  package(): Buffer {
+    this.step();
+    const scan: [number, number][] = [];
+    for (let a = 0; a < 360; a += 4) {
+      const r = (a * Math.PI) / 180;
+      const [dx, dy] = [-Math.sin(r), Math.cos(r)];
+      let best = Infinity;
+      for (const [x0, y0, x1, y1] of WALLS) {
+        const ex = x1 - x0;
+        const ey = y1 - y0;
+        const den = dx * ey - dy * ex;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((x0 - this.x) * ey - (y0 - this.y) * ex) / den;
+        const u = ((x0 - this.x) * dy - (y0 - this.y) * dx) / den;
+        if (t > 0 && u >= 0 && u <= 1) best = Math.min(best, t);
+      }
+      if (best > 8000) continue;
+      // robot frame
+      const c = Math.cos(-this.heading);
+      const s = Math.sin(-this.heading);
+      scan.push([best * (dx * c - dy * s), best * (dx * s + dy * c)]);
+    }
+    const path = this.goal && this.state === 1 ? [[this.x, this.y], this.goal] : [];
+    const b = Buffer.alloc(19 + path.length * 4 + scan.length * 4);
+    b[0] = P_NAV;
+    b[1] = 1;
+    b[2] = this.state;
+    b[3] = 1;
+    b.writeInt16BE(Math.round(this.x), 4);
+    b.writeInt16BE(Math.round(this.y), 6);
+    b.writeInt16BE(Math.round((this.heading * 18000) / Math.PI), 8);
+    b.writeInt16BE(Math.round(this.goal?.[0] ?? 0), 10);
+    b.writeInt16BE(Math.round(this.goal?.[1] ?? 0), 12);
+    b[16] = path.length;
+    let o = 17;
+    for (const [x, y] of path) {
+      b.writeInt16BE(Math.round(x), o);
+      b.writeInt16BE(Math.round(y), o + 2);
+      o += 4;
+    }
+    b.writeUInt16BE(scan.length, o);
+    o += 2;
+    for (const [x, y] of scan) {
+      b.writeInt16BE(Math.round(x), o);
+      b.writeInt16BE(Math.round(y), o + 2);
+      o += 4;
+    }
+    return b;
+  }
+}
+
 export function attachMockRobot(httpServer: HttpServer, log = console.log): void {
   const wss = new WebSocketServer({ noServer: true });
   let controller: WebSocket | null = null;
@@ -90,6 +197,7 @@ export function attachMockRobot(httpServer: HttpServer, log = console.log): void
     let walk = false;
     let level = false;
     let moving = false;
+    const nav = new MockNav();
     const watchdog = setInterval(() => {
       if (moving && Date.now() - lastMove > FAILSAFE_MS) {
         moving = false;
@@ -122,6 +230,22 @@ export function attachMockRobot(httpServer: HttpServer, log = console.log): void
           break;
         case P_TOF:
           ws.send(tofPackage(Number(process.env.TOF ?? 2), Math.floor(Date.now() / 66)));
+          break;
+        case P_MAP:
+          ws.send(mapPackage());
+          break;
+        case P_NAV:
+          ws.send(nav.package());
+          break;
+        case P_GOTO:
+          if (raw.length >= 5) {
+            nav.goal = [raw.readInt16BE(1), raw.readInt16BE(3)];
+            nav.state = 1;
+            log(`[mock robot] goto ${nav.goal[0]} ${nav.goal[1]} mm`);
+          } else {
+            nav.state = 0;
+            log('[mock robot] goto stop');
+          }
           break;
         case P_GAIT:
           walk = raw[1] === 1;

@@ -16,6 +16,9 @@
  *   'L' level      [0x4C, on]    IMU leveling on/off (ignored without an IMU)
  *   'D' tof        [0x44] request, answered with a ToF package (ToF builds only)
  *   'V' / 'v'      start / stop camera stream (camera builds only)
+ *   'P' map        [0x50] request, answered with a map package (lidar builds only)
+ *   'N' nav        [0x4E] request, answered with a nav package (lidar builds only)
+ *   'W' goto       [0x57, x:i16, y:i16] walk to a map point (mm); [0x57] alone stops
  *
  * Robot -> client
  *   text "Ok"      sent once after connecting
@@ -25,6 +28,12 @@
  *                  version 3 adds: heading*10:u16, headingTarget*10:u16 (deg, compass, 0xFFFF none)  26 bytes
  *   'D' tof        [0x44, count:u8, per sensor: running:u8, frame:u8, 64 x mm:u16]  2 + 130 * count bytes
  *                  zones row-major, row 0 = top of the sensor's view, col 0 = left; 0 mm = no target
+ *   'P' map        [0x50, running:u8, n:u16, cell(mm):u16, n*n/4 bytes] 2 bits per cell, first cell
+ *                  in the low bits, rows from map y = min up: 0 unknown, 1 free, 2 seen once, 3 occupied
+ *   'N' nav        [0x4E, flags:u8, state:u8, match:u8, x:i16, y:i16, heading*100:i16, goalX:i16, goalY:i16,
+ *                  scans:u16, p:u8, p x (x:i16, y:i16), s:u16, s x (x:i16, y:i16)]
+ *                  mm and deg (counter-clockwise, 0 = facing +y) in the map frame; scan points in the
+ *                  robot frame (x right, y forward). flags: 1 lidar data, 2 frozen, 4 blocked, 8 no memory
  *   'C' cli        [0x43, ...utf8 output]
  */
 
@@ -34,6 +43,9 @@ export const P_CLI = 0x43; // 'C'
 export const P_GAIT = 0x47; // 'G'
 export const P_LEVEL = 0x4c; // 'L'
 export const P_TOF = 0x44; // 'D'
+export const P_MAP = 0x50; // 'P'
+export const P_NAV = 0x4e; // 'N'
+export const P_GOTO = 0x57; // 'W'
 export const P_START_VIDEO = 0x56; // 'V'
 export const P_STOP_VIDEO = 0x76; // 'v'
 
@@ -110,8 +122,37 @@ export interface TofSensorFrame {
   mm: Uint16Array;
 }
 
+export interface LidarMap {
+  running: boolean;
+  /** cells per side */
+  n: number;
+  /** mm */
+  cell: number;
+  /** n*n codes, row 0 = lowest map y: 0 unknown, 1 free, 2 seen once, 3 occupied */
+  cells: Uint8Array;
+}
+
+export const NAV_STATES = ['idle', 'walking', 'arrived', 'no path', 'no memory'] as const;
+
+export interface NavInfo {
+  flags: number;
+  state: number;
+  match: number;
+  x: number;
+  y: number;
+  /** rad, counter-clockwise, 0 = facing +y */
+  heading: number;
+  goal: [number, number];
+  scans: number;
+  path: [number, number][];
+  /** robot frame, mm */
+  scan: [number, number][];
+}
+
 export type Incoming =
   | { type: 'telemetry'; telemetry: Telemetry }
+  | { type: 'map'; map: LidarMap }
+  | { type: 'nav'; nav: NavInfo }
   | { type: 'tof'; sensors: TofSensorFrame[] }
   | { type: 'cli'; text: string }
   | { type: 'unknown'; id: number };
@@ -156,6 +197,26 @@ export function encodeLevel(on: boolean): Uint8Array {
 
 export function encodeTofRequest(): Uint8Array {
   return Uint8Array.of(P_TOF);
+}
+
+export function encodeMapRequest(): Uint8Array {
+  return Uint8Array.of(P_MAP);
+}
+
+export function encodeNavRequest(): Uint8Array {
+  return Uint8Array.of(P_NAV);
+}
+
+/** Walk to map point (x, y) mm; no point: stop. */
+export function encodeGoto(x?: number, y?: number): Uint8Array {
+  if (x === undefined || y === undefined) return Uint8Array.of(P_GOTO);
+  const b = new Uint8Array(5);
+  const v = new DataView(b.buffer);
+  const c = (a: number) => Math.max(-32768, Math.min(32767, Math.round(a)));
+  b[0] = P_GOTO;
+  v.setInt16(1, c(x));
+  v.setInt16(3, c(y));
+  return b;
 }
 
 export function encodeVideo(start: boolean): Uint8Array {
@@ -223,6 +284,48 @@ export function decodeTof(data: Uint8Array): TofSensorFrame[] | null {
   return sensors;
 }
 
+export function decodeMap(data: Uint8Array): LidarMap | null {
+  if (data.length < 2) return null;
+  if (data[1] !== 1) return { running: false, n: 0, cell: 0, cells: new Uint8Array(0) };
+  if (data.length < 6) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const n = view.getUint16(2);
+  if (data.length < 6 + (n * n) / 4) return null;
+  const cells = new Uint8Array(n * n);
+  for (let i = 0; i < n * n; i++) cells[i] = (data[6 + (i >> 2)] >> ((i & 3) * 2)) & 3;
+  return { running: true, n, cell: view.getUint16(4), cells };
+}
+
+export function decodeNav(data: Uint8Array): NavInfo | null {
+  if (data.length < 19) return null;
+  const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let o = 17;
+  const points = (count: number, size: number): [number, number][] | null => {
+    if (data.length < o + count * 4 + size) return null;
+    const out: [number, number][] = [];
+    for (let i = 0; i < count; i++, o += 4) out.push([v.getInt16(o), v.getInt16(o + 2)]);
+    return out;
+  };
+  const path = points(data[16], 2);
+  if (!path) return null;
+  const count = v.getUint16(o);
+  o += 2;
+  const scan = points(count, 0);
+  if (!scan) return null;
+  return {
+    flags: data[1],
+    state: data[2],
+    match: data[3],
+    x: v.getInt16(4),
+    y: v.getInt16(6),
+    heading: (v.getInt16(8) / 100) * (Math.PI / 180),
+    goal: [v.getInt16(10), v.getInt16(12)],
+    scans: v.getUint16(14),
+    path,
+    scan,
+  };
+}
+
 export function decode(data: Uint8Array): Incoming | null {
   if (data.length === 0) return null;
   switch (data[0]) {
@@ -233,6 +336,14 @@ export function decode(data: Uint8Array): Incoming | null {
     case P_TOF: {
       const sensors = decodeTof(data);
       return sensors ? { type: 'tof', sensors } : null;
+    }
+    case P_MAP: {
+      const map = decodeMap(data);
+      return map ? { type: 'map', map } : null;
+    }
+    case P_NAV: {
+      const nav = decodeNav(data);
+      return nav ? { type: 'nav', nav } : null;
     }
     case P_CLI:
       return { type: 'cli', text: decoder.decode(data.subarray(1), { stream: true }) };

@@ -187,3 +187,55 @@ test('tof package decodes like the firmware pTof() writes it', () => {
 test('short tof package is rejected', () => {
   assert.equal(decode(Uint8Array.of(P_TOF, 1, 1, 0, 0)), null);
 });
+
+test('goto, map and nav packages', async () => {
+  const { encodeGoto, encodeMapRequest, encodeNavRequest, P_GOTO, P_MAP, P_NAV } = await import('../src/protocol.ts');
+  assert.deepEqual([...encodeGoto(-1500, 2300)], [P_GOTO, 0xfa, 0x24, 0x08, 0xfc]);
+  assert.deepEqual([...encodeGoto()], [P_GOTO]);
+  assert.deepEqual([...encodeMapRequest()], [P_MAP]);
+  assert.deepEqual([...encodeNavRequest()], [P_NAV]);
+
+  // map: 4 x 4 cells, codes 0..3 packed 4 per byte, first cell in the low bits
+  const m = new Uint8Array(6 + 4);
+  m.set([P_MAP, 1, 0, 4, 0, 50]);
+  m[6] = 0b11100100; // cells 0..3 = 0, 1, 2, 3
+  const map = decode(m);
+  assert.equal(map?.type, 'map');
+  if (map?.type === 'map') {
+    assert.equal(map.map.n, 4);
+    assert.equal(map.map.cell, 50);
+    assert.deepEqual([...map.map.cells.subarray(0, 4)], [0, 1, 2, 3]);
+  }
+  assert.deepEqual(decode(Uint8Array.of(P_MAP, 0)), { type: 'map', map: { running: false, n: 0, cell: 0, cells: new Uint8Array(0) } });
+
+  // nav: pose, goal, one path point, two scan points
+  const n = new Uint8Array(19 + 4 + 8);
+  const v = new DataView(n.buffer);
+  n.set([P_NAV, 5, 1, 1]);
+  v.setInt16(4, -120);
+  v.setInt16(6, 3400);
+  v.setInt16(8, 9000);
+  v.setInt16(10, 500);
+  v.setInt16(12, -700);
+  v.setUint16(14, 42);
+  n[16] = 1;
+  v.setInt16(17, 10);
+  v.setInt16(19, 20);
+  v.setUint16(21, 2);
+  v.setInt16(23, 100);
+  v.setInt16(25, -200);
+  v.setInt16(27, 300);
+  v.setInt16(29, 400);
+  const nav = decode(n);
+  assert.equal(nav?.type, 'nav');
+  if (nav?.type === 'nav') {
+    assert.equal(nav.nav.x, -120);
+    assert.equal(nav.nav.y, 3400);
+    assert.ok(Math.abs(nav.nav.heading - Math.PI / 2) < 1e-6);
+    assert.deepEqual(nav.nav.goal, [500, -700]);
+    assert.equal(nav.nav.scans, 42);
+    assert.deepEqual(nav.nav.path, [[10, 20]]);
+    assert.deepEqual(nav.nav.scan, [[100, -200], [300, 400]]);
+  }
+  assert.equal(decode(n.subarray(0, 25)), null); // cut short
+});
