@@ -38,8 +38,9 @@ model, run `python -m mujoco.viewer --mjcf models/dog.xml`. Linux and Windows
 ## Commands
 
 ```
-python -m pytest -q tests            # 82 checks, ~60 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 88 checks, ~90 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
+python examples/drive.py --nav tof   # live: two rooms, the firmware's map, click it to walk there
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
 python examples/snapshot.py dog.png  # still images of the standing robot
@@ -463,6 +464,7 @@ firmware's own driver as UART bytes. The firmware code (`lib/robot_core` `lidar`
 (map and odometry pose), `lidar_map()` read it back. The scene `terrain.rooms()` is two rooms
 joined by an 80 cm doorway, with a sofa, a cabinet, table legs and boxes.
 
+    python examples/drive.py --nav lidar              # live: viewer + map window, click the map to walk there
     python examples/lidar_nav.py                      # dog: three goals, through the door and back
     python examples/lidar_nav.py --model hexapod
     MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --video out/dog-lidar.mp4 --png out/map.png
@@ -502,7 +504,9 @@ Walking to a goal it scans first, then every metre. The simulated VL53L5CX repor
 target of 2 x 2 rays per zone, out to 3 m, ~40 ms late. `set_tof_mount(i, deg)` and
 `tune_tof_scan(...)` try other mounts and scan settings.
 
-    python examples/lidar_nav.py --tof                                          # dog
+    python examples/drive.py --nav tof                                          # live: click the map, N scans, X stops
+    python examples/drive.py --hexapod --nav tof --mount 40 --scan-tilt 15      # live, the old mount
+    python examples/lidar_nav.py --tof                                          # dog, three goals, prints the result
     python examples/lidar_nav.py --tof --model hexapod
     python examples/lidar_nav.py --tof --mount 40 --scan-tilt 15                # the old, steeper mount
     MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --tof --video out/dog-tof.mp4 --speedup 6
