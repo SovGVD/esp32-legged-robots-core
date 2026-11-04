@@ -60,6 +60,8 @@ struct ModelLidar {
 	const LidarParams    *lidar;
 	const LidarMapParams *map;
 	const NavParams      *nav;
+	const TofScanParams  *tofScan;   // ToF room scans (no LIDAR_TYPE), nullptr = not supported
+	const LidarMapParams *tofMap;
 };
 extern const ModelLidar MODEL_LIDAR;
 extern const cliCommand *modelCliCommands;
@@ -107,12 +109,17 @@ void printGaitState();                        // CLI: active gait parameters
 void cliTerrain();                            // CLI: terrain on|off|state
 void cliHeading();                            // CLI: heading on|off|state|cal|hand
 void cliTurnTo();                             // CLI: turnto <deg>
-// Odometry for the lidar (motion.cpp): gait velocity turned by the gyro, any task
+// Odometry for the lidar / ToF room scans (motion.cpp): gait velocity turned by the gyro, any task
 struct MotionOdometry {
 	LR_pose2 pose;         // mm, rad (counter-clockwise), since boot
 	float    maxYawRate;   // rad/s of the current gait at yaw command 1
+	LR_angle tilt;         // body tilt now (IMU, firmware convention: roll = nose up)
+	float    floorZ;       // mm, the floor below the body origin (< 0)
+	bool     gaitActive;   // the legs are stepping
+	bool     gapBlocked;   // terrain mode: a gap too wide ahead stopped the robot (GaitEngine::isBlocked)
 };
 MotionOdometry motionOdometry();
+float motionOdometryBias();   // rad/s, gyro bias the odometry learned while standing
 
 /**
  * HAL (hal.cpp, servo.cpp, hal_*.cpp)
@@ -182,14 +189,23 @@ bool    tofTakeFrame(uint8_t i, uint32_t &seq, float *mm);   // true and the 64 
 bool    tofPeekFrame(uint8_t i, uint32_t &seq, int16_t *mm);   // newest frame (mm, 0 = none), any task; false if not running
 uint16_t tofMaxRange();   // mm, sensor 0 (MODEL_TERRAIN.tof), 0 without ToF
 void    cliTof();
-// Lidar (lidar.cpp), LD06 / LD19 with LIDAR_TYPE: map, localization, walking to a point
+// Indoor map, localization, walking to a point (lidar.cpp): LD06 / LD19 lidar with
+// LIDAR_TYPE, else ToF room scans (TOF_SCAN_PARAMS and a VL53L5CX)
+// (and a model with LIDAR_PARAMS / TOF_SCAN_PARAMS: MODEL_LIDAR, checked at run time)
+#if defined(LIDAR_TYPE) && LIDAR_TYPE == LD06
+	#define NAV_LIDAR 1
+#elif defined(TOF_TYPE) && TOF_TYPE == VL53L5CX
+	#define NAV_TOF 1
+#endif
 void initLidar();
-bool lidarNavCommand(LR_moveVector &cmd);   // motion task: the navigator's command while it walks to a goal
+bool lidarNavCommand(LR_moveVector &cmd);   // motion task: the navigator's command while it walks to a goal (or scans)
+bool lidarNavBody(float &tilt, float &crouch);   // motion task: ToF scan nose up (rad) and body lowered (mm); false: no ToF scans
 void lidarNavCancel();                      // motion task: the operator took over
-size_t pMap(uint8_t *out, size_t room, uint8_t part);   // P_MAP package (packages.cpp format), 0: no lidar
+size_t pMap(uint8_t *out, size_t room, uint8_t part);   // P_MAP package (packages.cpp format), 0: no map
 size_t pNav(uint8_t *out, size_t room);                 // P_NAV package
 bool lidarGoto(float x, float y);           // map frame, mm
 void lidarStop();
+bool lidarScan();                           // ToF: one room scan now (false: not ToF / no map)
 void cliLidar();
 void cliGoto();
 void initPowerSensor();

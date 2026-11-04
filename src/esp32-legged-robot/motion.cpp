@@ -72,6 +72,8 @@ MotionOdometry motionOdometry()
 	return o;
 }
 
+float motionOdometryBias() { return 0; }
+
 void cliTerrain() { cliSerial->println("Tracks: no terrain mode."); }
 void cliHeading() { cliSerial->println("Tracks: no heading hold yet."); }
 void cliTurnTo()  { cliSerial->println("Tracks: no heading hold yet."); }
@@ -97,6 +99,7 @@ static BodyLeveler leveler;
 // Rough ground: ToF terrain map (terrain mode, `terrain on`)
 static TerrainMap  terrainMap;
 static TerrainTilt terrainTilt;
+static FrameTilt   frameTilt;     // the IMU tilt's offset from the floor the ToF sees
 static bool        terrainOn = false;
 static volatile int8_t terrainRequest = -1;   // 1 on, 0 off; applied while standing (core 0 -> motion task)
 static uint32_t    tofSeq[2] = { 0, 0 };
@@ -133,14 +136,33 @@ MotionOdometry motionOdometry()
 	return o;
 }
 
-static void updateOdometry(float dt)
+float motionOdometryBias()
+{
+	return odometry.bias();   // a float: read whole on the ESP32
+}
+
+static void updateOdometry(float dt, float scanTilt)
 {
 	// the gait's velocity, turned by the gyro (the gait's own yaw is only what it was told)
-	float yawRate = imu().ready() ? imu().yawRate() - imu().gyroBias() : motion.gait().yawRate();
-	odometry.update(dt, motion.gait().velocity(), yawRate);
+	bool gyro = imu().ready();
+	LR_angle tilt = { 0, scanTilt, 0 };
+	float yawRate = motion.gait().yawRate();
+	if (gyro) {
+		tilt.pitch = IMU_DATA.pitch;
+		tilt.roll  = IMU_DATA.roll;
+		// the gyro's z axis tilts with the body (a ToF scan's nose up): a turn
+		// about the vertical shows on it as rate * cos(tilt)
+		yawRate = (imu().yawRate() - imu().gyroBias()) / (cosf(tilt.pitch) * cosf(tilt.roll));
+	}
+	bool standing = gyro && !motion.gait().isActive();   // still: the odometry learns the gyro's bias
+	odometry.update(dt, motion.gait().velocity(), yawRate, standing);
 	portENTER_CRITICAL(&odometryLock);
 	odometryOut.pose       = odometry.pose();
 	odometryOut.maxYawRate = motion.gait().params().maxYawRate;
+	odometryOut.tilt       = tilt;
+	odometryOut.floorZ     = legs[0].defaultFoot.z;   // TofNavigator adds its own crouch
+	odometryOut.gaitActive = motion.gait().isActive();
+	odometryOut.gapBlocked = terrainOn && motion.gait().isBlocked();
 	portEXIT_CRITICAL(&odometryLock);
 }
 
@@ -292,6 +314,7 @@ static void applyTerrainRequest()
 	if (req == 1) {
 		terrainMap.clear();
 		terrainTilt.begin(MODEL_TERRAIN.tilt);
+		frameTilt.reset();
 		motion.gait().setParams(*MODEL_TERRAIN.roughGait);
 		motion.gait().setTerrain(MODEL_TERRAIN.terrain, &terrainMap);
 		levelRequest = true;   // the terrain code needs the body level (feet stand at different heights)
@@ -309,28 +332,39 @@ static void applyTerrainRequest()
  * tilt the gait didn't plan for the touchdown heights. The same steps as
  * sim/bridge/robot_core_bridge.cpp, which the sim results come from.
  */
-static void updateTerrain(float dt)
+static void updateTerrain(float dt, float scanTilt)
 {
 	if (!terrainOn) {
 		return;
 	}
-	terrainTilt.update(dt, IMU_DATA, imuCorrection, motion.gait().isActive(), &terrainMap);
+	// the commanded tilt includes a ToF room scan's nose up (BodyKinematics subtracts the correction)
+	LR_angle commanded = imuCorrection;
+	commanded.roll -= scanTilt;
+	// the map ages only while walking (not turning around for a room scan: paused then, below)
+	terrainTilt.update(dt, IMU_DATA, commanded, motion.gait().isActive() && scanTilt <= 0, &terrainMap);
 	uint32_t t = micros();
 	for (uint8_t i = 0; i < tofSensorCount() && i < 2; i++) {
-		if (!tofTakeFrame(i, tofSeq[i], tofMm)) {
+		if (!tofTakeFrame(i, tofSeq[i], tofMm) || scanTilt > 0) {
+			// (not during a ToF room scan: the robot turns on the ground it has mapped,
+			// and the nose up it may not quite reach would place the readings wrong)
 			continue;
 		}
 		const TofSensor &sensor = MODEL_TERRAIN.tof[i];
 		LR_figure pose = motion.body();
-		pose.orientation.pitch = terrainTilt.tilt().pitch;
-		pose.orientation.roll  = terrainTilt.tilt().roll;
+		// the floor's own tilt in this frame where there is a floor: the IMU's is
+		// 1-2 deg off while trotting, which made the map creep up on long walks
+		LR_angle tilt = frameTilt.place(sensor, tofMm, terrainTilt.tilt());
+		pose.orientation.pitch = tilt.pitch;
+		pose.orientation.roll  = tilt.roll;
+		// and at the height the map already has: the body is only planned to be at pose z
+		pose.position.z -= terrainMap.frameOffset(sensor, tofMm, pose);
 		for (uint8_t z = 0; z < sensor.zones * sensor.zones && z < 64; z++) {
 			terrainMap.addReading(sensor, z, tofMm[z], pose);
 		}
 	}
 	loopProfileMark(LOOP_STAGE_TOF, micros() - t);
 	// tilt the gait didn't ask for: measured minus commanded (-correction)
-	LR_angle unplanned = { IMU_DATA.pitch + imuCorrection.pitch, IMU_DATA.roll + imuCorrection.roll, 0 };
+	LR_angle unplanned = { IMU_DATA.pitch + commanded.pitch, IMU_DATA.roll + commanded.roll, 0 };
 	motion.gait().setTilt(unplanned);
 }
 
@@ -406,7 +440,10 @@ void updateMotion(float dt)
 		loopProfileMark(LOOP_STAGE_IMU, micros() - t);
 	}
 	leveler.setEnabled(levelRequest && imu().ready());
-	static const LR_angle levelTarget = { 0, 0, 0 };
+	// a ToF room scan wants the nose up: not something to level away
+	float wantTilt = 0, wantCrouch = 0;
+	lidarNavBody(wantTilt, wantCrouch);
+	const LR_angle levelTarget = { 0, wantTilt, 0 };
 	// (on rough ground it keeps working: the feet stand at different heights)
 	bool hold = motion.gait().isActive() && !motion.gait().params().staticStability && !terrainOn;
 	imuCorrection = leveler.update(dt, IMU_DATA, levelTarget, hold);
@@ -419,14 +456,21 @@ void updateMotion(float dt)
 	}
 
 	applyTerrainRequest();
-	updateTerrain(dt);
+	updateTerrain(dt, batteryState() != BATTERY_CRITICAL ? wantTilt : 0);
 
 	LR_moveVector cmd = getMoveCommand();
 	if (!navigate(cmd)) {
 		cmd = steer(dt, cmd);   // heading hold: not while the navigator steers
 	}
-	motion.update(dt, batteryGuard(cmd), imuCorrection);
-	updateOdometry(dt);
+	// ToF room scan: nose up (and the body a little lower) while it turns around
+	LR_angle correction = imuCorrection;
+	float scanTilt = 0, crouch = 0;
+	if (lidarNavBody(scanTilt, crouch) && batteryState() != BATTERY_CRITICAL) {
+		correction.roll -= scanTilt;   // BodyKinematics subtracts the correction: nose up
+		motion.setHeightOffset(-crouch, 200.0f);
+	}
+	motion.update(dt, batteryGuard(cmd), correction);
+	updateOdometry(dt, scanTilt);
 }
 
 void cliTerrain()

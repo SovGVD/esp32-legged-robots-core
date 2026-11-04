@@ -1,5 +1,6 @@
 """Lidar (LD06) mapping and walking to a point: the firmware's driver, map,
-scan matching and planner against the simulated lidar (legsim/lidar.py)."""
+scan matching and planner against the simulated lidar (legsim/lidar.py).
+And the same map and planner fed by ToF room scans (tof_scan.h) instead."""
 import math
 
 import numpy as np
@@ -29,7 +30,7 @@ def test_lidar_maps_the_room_and_walks_to_a_point(model):
         fw.drive(robot, duration=1.0)
         st = fw.lidar_state()
         assert st["crc_errors"] == 0 and st["packets"] > 300   # ~375 packets/s
-        assert st["scans"] >= 8 and st["occupied"] > 200
+        assert st["scans"] >= 8 and st["occupied"] > 80   # 10 cm cells
         # the map has the walls: the back wall is 900 mm behind the dog (1170 the hexapod)
         grid, cell = fw.lidar_map()
         n = grid.shape[0]
@@ -71,4 +72,127 @@ def test_stick_cancels_the_goal():
         assert fw.nav_state()["state"] == "idle"
     finally:
         fw.set_lidar(False)
+        fw.reset()
+
+
+@needs_cxx
+@pytest.mark.parametrize("model", ["dog", "hexapod"])
+def test_tof_room_scans_map_and_walk_to_a_point(model):
+    fw = scenario.core(model)
+    try:
+        fw.tune_tof_scan(reset=True)   # the model's TOF_SENSORS mounts and TOF_SCAN_PARAMS
+        fw.set_heading_sensors(gyro_bias_dps=1.0, magnetometer=False)
+        fw.set_tof_nav(True, subrays=2, latency=0.04)
+        s = 1.0 if model == "dog" else 1.3
+        robot = fw.place(scenario.make_robot(model, terrain.rooms(scale=s)))
+        fw.drive(robot, duration=1.0)
+        goal = (-500 * s, 1500 * s)
+        assert fw.nav_goal(*goal)
+        phases = set()
+        for _ in range(int(120 / fw.loop_dt)):
+            fw.drive(robot)
+            ns = fw.nav_state()
+            phases.add(ns["phase"])
+            if ns["state"] != "active" and ns["phase"] == "idle":
+                break
+        assert {"stop", "tilt", "turn", "level"} <= phases
+        assert fw.nav_state()["state"] == "arrived"
+        st = fw.lidar_state()
+        assert st["scans"] >= 2 and st["rejected"] <= 1
+        p = robot.body_position_mm()
+        assert math.hypot(p[0] - goal[0], p[1] - goal[1]) < 350
+        mp, op = fw.lidar_pose()
+        assert math.hypot(mp[0] - p[0], mp[1] - p[1]) < 250
+        yaw = robot.body_orientation()["yaw"]
+        assert abs((mp[2] - yaw + math.pi) % (2 * math.pi) - math.pi) < math.radians(8)
+        # the back wall is in the map
+        grid, cell = fw.lidar_map()
+        n = grid.shape[0]
+        row = int(math.floor(-900 * s / cell)) + n // 2
+        assert (grid[row - 2:row + 3, n // 2 - 8:n // 2 + 8] > 0).sum() >= 5
+    finally:
+        fw.set_tof_nav(False)
+        fw.tune_tof_scan(reset=True)
+        fw.set_heading_sensors(None)
+        fw.reset()
+
+
+@needs_cxx
+@pytest.mark.parametrize("model", ["dog", "hexapod"])
+def test_tof_room_scan_with_terrain_sensing_on(model):
+    """The same ToF sensors feed the terrain map and the room scan: the scan still
+    sees the walls (the terrain map pauses, the IMU doesn't make up a tilt while
+    the robot turns with its nose up)."""
+    fw = scenario.core(model)
+    try:
+        fw.tune_tof_scan(reset=True)
+        fw.set_heading_sensors(gyro_bias_dps=1.0, magnetometer=False)
+        fw.set_leveling(True)
+        fw.set_terrain(**scenario.SENSING["tof"])
+        fw.select_gait("rough")
+        fw.set_tof_nav(True, subrays=2, latency=0.04)
+        s = 1.0 if model == "dog" else 1.3
+        robot = fw.place(scenario.make_robot(model, terrain.rooms(scale=s)))
+        fw.drive(robot, duration=1.0)
+        fw.tof_scan()
+        t, tilts = 0.0, []
+        while t < 60:
+            fw.drive(robot)
+            t += fw.loop_dt
+            ns = fw.nav_state()
+            if ns["phase"] == "turn":
+                o = robot.body_orientation()
+                tilts.append(abs(o["roll"]))   # sideways
+            if t > 2 and ns["phase"] == "idle":
+                break
+        assert fw.nav_state()["phase"] == "idle" and fw.lidar_state()["scans"] == 1
+        pts = fw.lidar_points()
+        assert len(pts) > 200
+        assert np.hypot(pts[:, 0], pts[:, 1]).min() > 500          # no floor seen as walls
+        assert np.mean(tilts) < math.radians(3)                      # no made-up sideways lean
+    finally:
+        fw.set_tof_nav(False)
+        fw.set_terrain()
+        fw.set_leveling(False)
+        fw.select_gait("default")
+        fw.set_heading_sensors(None)
+        fw.reset()
+
+
+@needs_cxx
+def test_dog_walks_to_a_goal_with_terrain_sensing_on():
+    """Room scans, the nav and the ToF terrain map together: the dog walks from the
+    lower room through the door (over the threshold, past the uneven tiles) to a
+    goal in the upper room without tipping over."""
+    fw = scenario.core("dog")
+    try:
+        fw.tune_tof_scan(reset=True)
+        fw.set_heading_sensors(gyro_bias_dps=1.0, magnetometer=False)
+        fw.set_leveling(True)
+        fw.set_terrain(**scenario.SENSING["tof"])
+        fw.select_gait("rough")
+        fw.set_tof_nav(True, subrays=2, latency=0.04)
+        robot = fw.place(scenario.make_robot("dog", terrain.rooms(floor=20)))
+        fw.drive(robot, duration=1.0)
+        goal = (1100, 2900)
+        fw.nav_goal(*goal)
+        t, worst = 0.0, 0.0
+        while t < 150:
+            fw.drive(robot)
+            t += fw.loop_dt
+            o = robot.body_orientation()
+            worst = max(worst, abs(o["pitch"]), abs(o["roll"]))
+            ns = fw.nav_state()
+            if ns["state"] != "active" and ns["phase"] == "idle":
+                break
+        p = robot.body_position_mm()
+        assert ns["state"] == "arrived"
+        assert math.hypot(p[0] - goal[0], p[1] - goal[1]) < 500
+        assert worst < math.radians(30)
+    finally:
+        fw.set_tof_nav(False)
+        fw.set_terrain()
+        fw.set_leveling(False)
+        fw.select_gait("default")
+        fw.set_heading_sensors(None)
         fw.reset()

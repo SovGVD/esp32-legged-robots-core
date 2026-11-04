@@ -106,6 +106,20 @@ void test_tilt_estimator_ignores_acceleration_and_follows_gyro()
 	TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.1f, t.aboutX());
 }
 
+void test_tilt_estimator_turning_while_tilted()
+{
+	// nose up 0.15 rad (about X), turning about the vertical at 0.5 rad/s for 10 s:
+	// the tilt stays, the turn doesn't make up any
+	TiltEstimator t(1.0f);
+	float a = 0.15f;
+	float up[3] = { 0, sinf(a), cosf(a) };   // gravity reading, sensor frame
+	float w = 0.5f;
+	float gyro[3] = { up[0] * w, up[1] * w, up[2] * w };   // a turn about the world vertical, seen by the tilted sensor
+	for (int i = 0; i < 2500; i++) t.update(0.004f, up, gyro);
+	TEST_ASSERT_FLOAT_WITHIN(0.005f, a, t.aboutX());
+	TEST_ASSERT_FLOAT_WITHIN(0.005f, 0, t.aboutY());
+}
+
 int main()
 {
 	UNITY_BEGIN();
@@ -116,5 +130,6 @@ int main()
 	RUN_TEST(test_leveler_disabled_ramps_back);
 	RUN_TEST(test_tilt_estimator_static_angles);
 	RUN_TEST(test_tilt_estimator_ignores_acceleration_and_follows_gyro);
+	RUN_TEST(test_tilt_estimator_turning_while_tilted);
 	return UNITY_END();
 }

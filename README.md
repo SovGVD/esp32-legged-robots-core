@@ -25,8 +25,8 @@ Universal code for any kind of legged robots (not only legged now) and mobile fr
  - IMU
    - MPU9250 (GY-91): accelerometer, gyro and the AK8963 magnetometer (heading)
  - Distance
-   - VL53L5CX 8x8 multizone ToF (terrain map: obstacles and gaps)
-   - LDROBOT LD06 / LD19 360° lidar (indoor map, localization, walking to a point)
+   - VL53L5CX 8x8 multizone ToF (terrain map: obstacles and gaps; indoor map by room scans)
+   - LDROBOT LD06 / LD19 360° lidar (indoor map, localization, walking to a point), optional
  - Other sensors
    - IMA219 - power sensor
 
@@ -133,24 +133,39 @@ left columns must get short, cover the top half and the top rows; fix with `TOF_
 `TOF_ZONE_MIRROR_Y`. Facing a flat wall the corner zones should read ~10 % more than the middle (distance along
 each zone's ray); if they read the same, set `TOF_DISTANCE_PERPENDICULAR 1`.
 
-**Lidar map and walking to a point (LD06 / LD19).** A 360° lidar on top of the body, above every part of the
-robot (the scan plane must not cross the legs or the head; readings closer than `minRange`, dog 100 mm,
-hexapod 150 mm, count as the robot itself and are dropped). Wiring: lidar TX to `LIDAR_RX_PIN` (dog GPIO 34,
-input only and free; hexapod GPIO 15, free on the ESP32-CAM without an SD card), 5 V (~180 mA), GND, and the
-lidar's PWM pin to GND so it runs its own 10 rev/s speed control. It only sends (UART2, 230400 baud). A task on
-core 0 parses the packets, builds a 10 x 10 m map (5 cm cells, 40 KB, allocated when the first lidar data
-arrives) and corrects the odometry (gait velocity turned by the gyro) by matching each revolution against the
-map; the motion task only takes the result, so the loop timing doesn't change. `goto <x m> <y m>` walks to a
-map point (map frame: x right, y forward of where the map started; `lidar reset` starts a new map here):
-a path around the walls and furniture is replanned every second, the robot turns toward it and walks, and
-stops forward motion with something closer than `stopDistance` ahead. Moving the stick, `lidar stop` or the
-web page's Stop cancels it; without a web client (failsafe) the robot stands. The web page's **Map** toggle
-shows the map, the robot, the scan and the path; tap the map to walk there. `lidar state` prints the data
-rate, CRC errors, match quality, pose and goal; `lidar print` the closest reading in 8 directions: put a box
-30 cm in front of the robot and it must show as `front`, else fix `LIDAR_PARAMS.yaw` in `model_data.h`.
-`lidar freeze` toggles keeping the map as it is (localize only). The lidar sees only its own height
-(~12-15 cm): lower things (steps, cables) are for the ToF terrain map. Parameters: `LIDAR_PARAMS`,
-`LIDAR_MAP_PARAMS`, `NAV_PARAMS` in `model_data.h`. Simulator only so far (`sim/README.md`, "Lidar").
+**Indoor map and walking to a point.** The robot keeps a 20 x 20 m map of the walls and furniture around
+where it started (10 cm cells, 40 KB, allocated when the first sensor data arrives), corrects its odometry
+(gait velocity turned by the gyro) by matching scans against it, and walks to a map point on a path planned
+around what it knows (a 10 x 10 m window of the map around the robot and the goal, 30 KB, replanned every
+second). All of it runs on core 0; the motion task only takes the result, so the loop timing doesn't change.
+`goto <x m> <y m>` walks to a map point (map frame: x right, y forward of where the map started; `lidar reset`
+starts a new map here). Moving the stick, `lidar stop` or the web page's Stop cancels it; without a web
+client (failsafe) the robot stands. The web page's **Map** toggle shows the map, the robot, the last scan and
+the path; tap the map to walk there. `lidar state` prints the match quality, pose and goal, `lidar freeze`
+toggles keeping the map as it is (localize only). Parameters: `NAV_PARAMS` and the map parameters in
+`model_data.h`. Simulator only so far (`sim/README.md`, "Lidar" and "ToF room scans"). Two ways to scan:
+
+- *ToF room scans* (the default, no extra hardware: no `LIDAR_TYPE` in `config.h`). The terrain ToF sensors
+  look down at the ground, so a scan stops the robot, tilts its nose up until the sensors' top zone row looks
+  level, turns it once around (~15 s) and puts what they saw near level into the map; walking to a goal it
+  scans again every metre (`TOF_SCAN_PARAMS.scanEvery`) and walks on odometry in between, stopping for
+  anything higher than 4 cm right ahead (and marking it in the map). `lidar scan` (or the Map view's **Scan**)
+  scans once. The gyro's bias is learned whenever the robot stands. The sensors are mounted flatter than for
+  terrain alone (`TOF_SENSORS`): the legs only tilt the dog's nose ~15° and the hexapod's ~10°, and the scan
+  wants the top row's lower edge level (nose up = mount angle - 17°). **Dog: the nose sensor 25° down** (nose
+  up 8° to scan). **Hexapod: the right sensor 22° down** (6°), the left one stays 35° down for terrain (both
+  at 22° missed 70 mm gaps). In the sim both reached every goal (dog's map pose ~10 cm off, hexapod's ~30 cm and 6-11° with one sensor scanning); at 40° / 35° walls further than
+  ~1 m are lost and the robots got lost, and a middle ground (dog 30°, hexapod 27°) got lost too. The VL53L5CX reaches ~2.5 m indoors: rooms are mapped from the middle
+  out, wide halls poorly. Parameters: `TOF_SCAN_PARAMS`, `TOF_MAP_PARAMS`.
+- *Lidar* (LD06 / LD19, `#define LIDAR_TYPE LD06` in `config.h`, or `pio run -e robot-dog-lidar`): scans 10
+  times a second while walking, cm accurate. On top of the body, above every part of the robot (the scan
+  plane must not cross the legs or the head; readings closer than `minRange`, dog 100 mm, hexapod 150 mm,
+  count as the robot itself and are dropped). Wiring: lidar TX to `LIDAR_RX_PIN` (dog GPIO 34, input only and
+  free; hexapod GPIO 15, free on the ESP32-CAM without an SD card), 5 V (~180 mA), GND, and the lidar's PWM
+  pin to GND so it runs its own 10 rev/s speed control. It only sends (UART2, 230400 baud). `lidar print`
+  prints the closest reading in 8 directions: put a box 30 cm in front of the robot and it must show as
+  `front`, else fix `LIDAR_PARAMS.yaw` in `model_data.h`. The lidar sees only its own height (~12-15 cm):
+  lower things (steps, cables) are for the ToF terrain map. Parameters: `LIDAR_PARAMS`, `LIDAR_MAP_PARAMS`.
 
 **Battery protection.** The INA219 voltage is read at 10 Hz and filtered (servo current makes it sag every
 step). Below `BATTERY_PARAMS.lowVoltage` for 3 s the robot warns (CLI, web page); below `criticalVoltage` it

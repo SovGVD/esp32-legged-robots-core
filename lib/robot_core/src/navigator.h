@@ -2,8 +2,9 @@
  * Walk to a point of the lidar map: path planning on the occupancy grid and
  * a simple follower that writes the move command.
  *
- * Planning works on a coarser copy of the map (LR_NAV_FACTOR x the map
- * cell, 10 cm): cells closer than robotRadius to a wall are blocked, cells
+ * Planning works on a window of the map (LR_NAV_GRID cells per side at
+ * LR_NAV_FACTOR x the map cell: 100 x 10 cm = 10 x 10 m), placed around the
+ * robot and the goal at every replan: cells closer than robotRadius to a wall are blocked, cells
  * a little further cost more (the path keeps to the middle of a doorway),
  * unknown cells cost more than free ones but are allowed (the goal may be
  * behind a corner the lidar hasn't seen yet). A distance field from the goal
@@ -21,9 +22,12 @@
 #include "lidar_slam.h"
 
 #ifndef LR_NAV_FACTOR
-	#define LR_NAV_FACTOR 2   // planning cell = 2 map cells
+	#define LR_NAV_FACTOR 1   // planning cell = map cells (10 cm)
 #endif
-#define LR_NAV_GRID (LR_LIDAR_GRID / LR_NAV_FACTOR)
+#ifndef LR_NAV_GRID
+	#define LR_NAV_GRID 100   // planning window, cells per side (10 x 10 m, 30 KB)
+#endif
+#define LR_NAV_FULL (LR_LIDAR_GRID / LR_NAV_FACTOR)   // planning cells across the whole map
 #define LR_NAV_PATH 64        // path points kept for the web map view
 
 typedef struct {
@@ -67,9 +71,14 @@ class Navigator {
 		 * Plan (every replanPeriod) and steer. Call after each scan.
 		 * @param pose       robot pose in the map now
 		 * @param maxYawRate rad/s the gait turns at a yaw command of 1
-		 * @return move command (move.y forward, rotate.yaw > 0 clockwise), zero unless active
+		 * @param blockedAhead -1: check the last scan's points (a lidar, scanning
+		 *                   all the time); 0 / 1: the caller knows (the ToF room
+		 *                   scan, whose last scan is from where the robot stopped)
+		 * @param obstacleX  with blockedAhead 1: body x (mm, right > 0) of what blocks
+		 * @return move command (move.y forward, move.x right, rotate.yaw > 0 clockwise), zero unless active
 		 */
-		LR_moveVector update(float dt, const LidarSlam &slam, const LR_pose2 &pose, float maxYawRate);
+		LR_moveVector update(float dt, const LidarSlam &slam, const LR_pose2 &pose, float maxYawRate,
+		                     int8_t blockedAhead = -1, float obstacleX = 0);
 
 		/** Path from the robot toward the goal at the last update, map frame mm. */
 		uint8_t path(const float *&x, const float *&y) const { x = _pathX; y = _pathY; return _pathLen; }
@@ -91,6 +100,8 @@ class Navigator {
 		float     _pathY[LR_NAV_PATH];
 		uint8_t   _pathLen = 0;
 		float     _cell = 100;        // planning cell, mm
+		int       _ox = 0, _oy = 0;   // window origin, planning cells from the map's corner
+		void placeWindow(const LR_pose2 &pose);
 
 		bool allocate();
 		void buildCost(const OccupancyGrid &grid);

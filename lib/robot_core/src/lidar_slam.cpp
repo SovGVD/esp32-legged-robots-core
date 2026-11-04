@@ -127,13 +127,21 @@ uint32_t OccupancyGrid::knownCells() const
 
 /* --------------------------------------------------------------- Odometry2D */
 
-void Odometry2D::update(float dt, const LR_point &v, float yawRate)
+void Odometry2D::update(float dt, const LR_point &v, float yawRate, bool standing)
 {
-	float mid = _pose.theta + yawRate * dt * 0.5f;
+	_still = standing ? _still + dt : 0;
+	if (_still > 0.3f) {
+		// standing for a moment (the last step settled): what the gyro reads now is its bias
+		_learned += dt;
+		float w = dt / (_learned < _tau ? _learned : _tau);
+		_bias += (yawRate - _bias) * w;
+	}
+	float rate = yawRate - _bias;
+	float mid = _pose.theta + rate * dt * 0.5f;
 	LR_point w = lrRotateZ(v, sinf(mid), cosf(mid));
 	_pose.x += w.x * dt;
 	_pose.y += w.y * dt;
-	_pose.theta = lrWrapAngle(_pose.theta + yawRate * dt);
+	_pose.theta = lrWrapAngle(_pose.theta + rate * dt);
 }
 
 /* ---------------------------------------------------------------- LidarSlam */
@@ -285,7 +293,7 @@ float LidarSlam::score(const LR_pose2 &pose, float &known, float &freeShare) con
 void LidarSlam::insert(const LR_pose2 &pose)
 {
 	float ox, oy;
-	lrPoseApply(pose, _lidar.position.x, _lidar.position.y, ox, oy);
+	lrPoseApply(pose, _originX, _originY, ox, oy);
 	float s = sinf(pose.theta), c = cosf(pose.theta);
 	for (uint16_t i = 0; i < _n; i++) {
 		float wx = pose.x + _px[i] * c - _py[i] * s;
@@ -295,13 +303,51 @@ void LidarSlam::insert(const LR_pose2 &pose)
 	_lastInsert = pose;
 }
 
+void LidarSlam::markOccupied(float x, float y)
+{
+	int ix, iy;
+	if (_frozen || !_grid.ready() || !_grid.cellOf(x, y, ix, iy)) {
+		return;
+	}
+	int8_t &c = _grid._cells[iy * LR_LIDAR_GRID + ix];
+	int v = c < 0 ? 0 : c;
+	v += 2 * _params.hit;
+	c = (int8_t)(v > _params.maxLogOdds ? _params.maxLogOdds : v);
+}
+
 LidarMatch LidarSlam::addScan(const LidarScan &scan, const LR_pose2 &odomStart, const LR_pose2 &odomEnd)
 {
 	if (!_grid.ready()) {
 		return LIDAR_MATCH_NONE;
 	}
-	_scans++;
 	deskew(scan, odomStart, odomEnd);
+	_originX = _lidar.position.x;
+	_originY = _lidar.position.y;
+	return process(odomEnd);
+}
+
+LidarMatch LidarSlam::addPoints(const float *x, const float *y, uint16_t n, const LR_pose2 &odomEnd)
+{
+	if (!_grid.ready()) {
+		return LIDAR_MATCH_NONE;
+	}
+	_n = 0;
+	for (uint16_t i = 0; i < n && _n < LR_LIDAR_BINS; i++) {
+		if (hypotf(x[i], y[i]) > _params.mapRange) {
+			continue;
+		}
+		_px[_n] = x[i];
+		_py[_n] = y[i];
+		_n++;
+	}
+	_originX = 0;
+	_originY = 0;
+	return process(odomEnd);
+}
+
+LidarMatch LidarSlam::process(const LR_pose2 &odomEnd)
+{
+	_scans++;
 	LR_pose2 guess = lrPoseCompose(_mapFromOdom, odomEnd);
 	if (_n < 30) {
 		_pose = guess;

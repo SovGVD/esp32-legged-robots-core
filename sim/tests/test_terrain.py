@@ -90,7 +90,9 @@ def test_hexapod_climbs_a_30mm_step_level_with_tof_and_switches():
     # level and in step: less tilt and drift than stumbling up open loop
     assert both.mean_tilt < 2 and both.mean_tilt < blind.mean_tilt
     assert both.distance > blind.distance
-    assert both.rejects["reach"] == 0
+    # the flatter right ToF (22 deg, for room scans) sees the step top further ahead:
+    # a few footholds out of reach (16 in a 6 s walk), clamped, no stumble
+    assert both.rejects["reach"] < 30
 
 
 @needs_cxx
@@ -101,6 +103,35 @@ def test_terrain_mode_on_flat_ground_walks_like_open_loop():
         b = run(model, terrain.flat(), "both", gait="rough", speed=1.0, duration=4)
         assert b.distance > 0.9 * a.distance
         assert b.mean_tilt < 2.5, model
+
+
+@needs_cxx
+@pytest.mark.parametrize("model", ["dog", "hexapod"])
+def test_terrain_map_stays_on_the_floor_on_a_long_walk(model):
+    """40 s straight on a flat floor with the ToF terrain map (no foot switches):
+    the map's floor stays under the feet. The IMU's tilt is 1-2 deg off while
+    the robot trots; placed with it, the dog's floor crept up ~2 mm/s, and the
+    feet stepped onto ground that isn't there (FrameTilt fixes the tilt from the
+    floor the ToF sees, TerrainMap::frameOffset the height)."""
+    from legsim import scenario
+    fw = scenario.core(model)
+    try:
+        fw.set_leveling(True)
+        fw.set_terrain(**scenario.SENSING["tof"])
+        fw.select_gait("rough")
+        robot = fw.place(scenario.make_robot(model, terrain.flat()))
+        t, worst = 0.0, 0.0
+        while t < 40:
+            fw.drive(robot, (0, 0.8, 0, 0, 0, 0))
+            t += fw.loop_dt
+            worst = max(worst, abs(fw.terrain_state()["body"]))
+        assert robot.body_position_mm()[1] > 2000
+        assert worst < 6
+    finally:
+        fw.set_terrain()
+        fw.set_leveling(False)
+        fw.select_gait("default")
+        fw.reset()
 
 
 def test_rubble_has_mixed_heights_everywhere():

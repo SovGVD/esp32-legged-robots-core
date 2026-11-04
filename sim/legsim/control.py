@@ -93,7 +93,9 @@ class ManualControl:
     poll() returns (Command, events) where events is a set of "reset", "pause", "quit".
     """
 
-    def __init__(self, title="robot control", window=True):
+    def __init__(self, title="robot control", window=True, panel=None):
+        """panel: (width, height) of an extra picture right of the text (draw(..., panel=img));
+        clicks on it come back from poll() as ("click", x, y) events, x / y in panel pixels."""
         import pygame
         import pygame._sdl2.controller as controller
         self.pg = pygame
@@ -102,7 +104,9 @@ class ManualControl:
         pygame.display.init()
         pygame.font.init()
         controller.init()
-        self.screen = pygame.display.set_mode((460, 300)) if window else None
+        self.panel = panel
+        size = (460, 300) if panel is None else (460 + panel[0], max(300, panel[1]))
+        self.screen = pygame.display.set_mode(size) if window else None
         if window:
             pygame.display.set_caption(title)
             self.font = pygame.font.SysFont(None, 22)
@@ -136,6 +140,14 @@ class ManualControl:
                     events.add("pause")
                 elif e.key == pg.K_g:
                     events.add("gait")
+                elif e.key == pg.K_n:
+                    events.add("scan")
+                elif e.key == pg.K_x:
+                    events.add("stop")
+            elif e.type == pg.MOUSEBUTTONDOWN and e.button == 1 and self.panel is not None:
+                x, y = e.pos[0] - 460, e.pos[1]
+                if 0 <= x < self.panel[0] and 0 <= y < self.panel[1]:
+                    events.add(("click", x, y))
             elif e.type == pg.KEYUP:
                 self.held.discard(e.key)
             elif e.type == pg.CONTROLLERDEVICEADDED:
@@ -164,7 +176,8 @@ class ManualControl:
         self.command = cmd
         return cmd, events
 
-    def draw(self, status_lines=()):
+    def draw(self, status_lines=(), help_lines=(), panel=None):
+        """panel: RGB picture (PIL image or HxWx3 uint8 array) shown right of the text."""
         if self.screen is None:
             return
         pg = self.pg
@@ -174,6 +187,7 @@ class ManualControl:
             "Focus this window to drive with the keyboard.",
             "WASD/arrows move+turn, Q/E turn, IJKL tilt, Shift slow",
             "G gait, R reset, P pause, Esc quit. Pad: sticks, LB tilt, Y gait",
+            *help_lines,
             "gamepads: " + (", ".join(self.gamepad_names()) or "none"),
             "",
             f"move x {c[0]:+.2f}   y {c[1]:+.2f}   yaw {c[5]:+.2f}",
@@ -183,6 +197,10 @@ class ManualControl:
         ]
         for i, text in enumerate(lines):
             self.screen.blit(self.font.render(text, True, (220, 220, 220)), (12, 10 + i * 22))
+        if panel is not None:
+            import numpy as np
+            a = np.ascontiguousarray(np.asarray(panel, dtype=np.uint8)[:, :, :3])
+            self.screen.blit(pg.image.frombuffer(a.tobytes(), (a.shape[1], a.shape[0]), "RGB"), (460, 0))
         pg.display.flip()
 
     def close(self):

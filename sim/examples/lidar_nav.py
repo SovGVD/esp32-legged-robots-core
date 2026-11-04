@@ -12,6 +12,8 @@ writes the move command. The robot starts in the lower of two rooms
   python examples/lidar_nav.py --model hexapod
   python examples/lidar_nav.py --goal -600 3600 --goal 0 0 --png out/map.png
   MUJOCO_GL=egl python examples/lidar_nav.py --video out/dog-lidar.mp4
+  python examples/lidar_nav.py --tof                             # no lidar: ToF room scans
+  MUJOCO_GL=egl python examples/lidar_nav.py --tof --video out/dog-tof.mp4 --speedup 6
 
 Map frame = the robot's start pose = the sim's world frame (the robots start
 at the origin facing +Y), so the map pose can be compared with the truth.
@@ -109,17 +111,34 @@ def main():
     ap.add_argument("--goal", nargs=2, type=float, action="append", metavar=("X", "Y"),
                     help="map point in mm (repeat for several); default: through the doorway and back")
     ap.add_argument("--gyro-bias", type=float, default=1.0, help="gyro drift, deg/s (default 1)")
-    ap.add_argument("--timeout", type=float, default=90.0, help="s per goal")
+    ap.add_argument("--timeout", type=float, help="s per goal (default 90, 300 with --tof)")
     ap.add_argument("--png", help="write the final map with the tracks")
     ap.add_argument("--video", help="write a video (needs MUJOCO_GL=egl or xvfb-run)")
+    ap.add_argument("--speedup", type=float, default=1.0, help="video plays this many times faster than real time")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--tof", action="store_true",
+                    help="no lidar: room scans with the terrain ToF sensors (stop, nose up, turn around)")
+    ap.add_argument("--mount", type=float, metavar="DEG",
+                    help="with --tof: the ToF sensors look DEG down instead of their TOF_SENSORS angle")
+    ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --tof: nose up while scanning (TOF_SCAN_PARAMS tilt)")
     args = ap.parse_args()
 
     model = args.model
     goals = [tuple(g) for g in args.goal] if args.goal else GOALS[model]
     fw = FirmwareCore(model=model)
     fw.set_heading_sensors(gyro_bias_dps=args.gyro_bias, magnetometer=False, seed=args.seed)
-    fw.set_lidar(True, seed=args.seed)
+    if args.tof:
+        if args.mount is not None:
+            for i in range(len(fw.tof_sensors())):
+                fw.set_tof_mount(i, args.mount)
+        if args.scan_tilt is not None:
+            fw.tune_tof_scan(tilt=math.radians(args.scan_tilt))
+        # VL53L5CX: 8x8 at 15 Hz, closest target in each zone (2x2 rays), frames reach the firmware ~40 ms late
+        fw.set_tof_nav(True, seed=args.seed, subrays=2, latency=0.04)
+        sensor = "ToF room scans"
+    else:
+        fw.set_lidar(True, seed=args.seed)
+        sensor = "LD06 lidar"
     scene = terrain.rooms(scale=SCALE[model])
     robot = fw.place(scenario.make_robot(model, scene))
     dt = fw.loop_dt
@@ -148,7 +167,7 @@ def main():
             map_path.append((mp[0], mp[1]))
             odom_path.append((op[0], op[1]))
         if rec is not None and t >= rec["next"]:
-            rec["next"] += 1 / 15
+            rec["next"] += args.speedup / 15
             frame(goal)
 
     def frame(goal):
@@ -156,7 +175,7 @@ def main():
         r, cam = rec["r"], rec["cam"]
         cam.lookat[:] = robot.data.xpos[robot._torso]
         r.update_scene(robot.data, cam)
-        fw.lidar.draw(robot, r.scene)
+        (fw.tof if args.tof else fw.lidar).draw(robot, r.scene)
         left = Image.fromarray(r.render())
         grid, cell = fw.lidar_map()
         mp, _ = fw.lidar_pose()
@@ -167,20 +186,28 @@ def main():
         img.paste(left, (0, 0))
         img.paste(right, (540, 0))
         d = ImageDraw.Draw(img)
-        d.text((12, 10), f"{model}: LD06 lidar map + walk to point", font=FONT, fill=(255, 255, 255),
+        d.text((12, 10), f"{model}: {sensor}: map + walk to point", font=FONT, fill=(255, 255, 255),
                stroke_width=3, stroke_fill=(0, 0, 0))
-        d.text((12, 40), f"t {t:4.1f} s   nav: {ns['state']}{'  (blocked ahead)' if ns['blocked'] else ''}",
+        phase = f"  scan: {ns['phase']}" if args.tof and ns["phase"] != "idle" else ""
+        fast = f"  ({args.speedup:g}x)" if args.speedup != 1 else ""
+        d.text((12, 40), f"t {t:4.1f} s{fast}   nav: {ns['state']}{phase}{'  (blocked ahead)' if ns['blocked'] else ''}",
                font=SMALL, fill=(255, 255, 255), stroke_width=3, stroke_fill=(0, 0, 0))
         rec["frames"].append(np.asarray(img))
 
     for _ in range(int(1.0 / dt)):   # stand: first scans
         tick(None)
+    if args.tof:
+        fw.tof_scan()                 # the first room scan before any goal (goals start with one anyway)
+        while fw.nav_state()["phase"] == "idle":
+            tick(None)
+        while fw.nav_state()["phase"] != "idle":
+            tick(None)
     for goal in goals:
         fw.nav_goal(*goal)
         start = t
-        while t - start < args.timeout:
+        while t - start < (args.timeout or (300.0 if args.tof else 90.0)):
             tick(goal)
-            if fw.nav_state()["state"] not in ("active",):
+            if fw.nav_state()["state"] not in ("active",) and fw.nav_state()["phase"] == "idle":
                 break
         for _ in range(int(0.5 / dt)):
             tick(goal)
@@ -201,7 +228,10 @@ def main():
               f"true distance to goal {res['to_goal']:4.0f} mm | lidar pose error {res['map_err']:4.0f} mm "
               f"{res['map_yaw_err']:4.1f} deg | odometry only {res['odom_err']:5.0f} mm {res['odom_yaw_err']:5.1f} deg")
     ls = fw.lidar_state()
-    print(f"scans {ls['scans']}, rejected {ls['rejected']}, packets {ls['packets']}, CRC errors {ls['crc_errors']}")
+    if args.tof:
+        print(f"scans {ls['scans']}, rejected {ls['rejected']}, total time {t:.0f} s")
+    else:
+        print(f"scans {ls['scans']}, rejected {ls['rejected']}, packets {ls['packets']}, CRC errors {ls['crc_errors']}")
 
     if args.png:
         grid, cell = fw.lidar_map()

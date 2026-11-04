@@ -38,8 +38,9 @@ model, run `python -m mujoco.viewer --mjcf models/dog.xml`. Linux and Windows
 ## Commands
 
 ```
-python -m pytest -q tests            # 82 checks, ~60 s (builds the firmware bridges on first run)
+python -m pytest -q tests            # 88 checks, ~90 s (builds the firmware bridges on first run)
 python examples/drive.py             # drive the firmware by keyboard or Xbox 360 pad (needs a display)
+python examples/drive.py --nav tof   # live: two rooms, the firmware's map, click it to walk there
 python examples/trot.py --view       # Python demo trot in the viewer (needs a display)
 python examples/trot.py --video trot.mp4
 python examples/snapshot.py dog.png  # still images of the standing robot
@@ -375,8 +376,9 @@ so the real robots keep walking open loop until sensors are fitted:
 
 `TERRAIN_PARAMS` and `TERRAIN_MAP_PARAMS` in each `model_data.h` hold the
 numbers. Sensor mounts (simulated, nothing is fitted yet): dog, one 8x8 ToF on
-the nose looking 40 deg down; hexapod, two on the front turned 20 deg left and
-right, 35 deg down.
+the nose looking 25 deg down; hexapod, two on the front turned 20 deg left and
+right, the left 35 deg down, the right 22 deg (flatter for the room scans, see
+"ToF room scans"; until PR #25 the dog's was 40 deg and both hexapod ones 35).
 
 In the sim (`legsim/terrain.py`, `legsim/tof.py`): obstacles are static boxes
 (bumps, rocks, rubble, bars, step, drop = walk off a platform); a foot switch is
@@ -462,28 +464,123 @@ firmware's own driver as UART bytes. The firmware code (`lib/robot_core` `lidar`
 (map and odometry pose), `lidar_map()` read it back. The scene `terrain.rooms()` is two rooms
 joined by an 80 cm doorway, with a sofa, a cabinet, table legs and boxes.
 
+    python examples/drive.py --nav lidar              # live: viewer + map window, click the map to walk there
     python examples/lidar_nav.py                      # dog: three goals, through the door and back
     python examples/lidar_nav.py --model hexapod
     MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --video out/dog-lidar.mp4 --png out/map.png
 
-Results (gyro drifting 1 deg/s, no magnetometer: indoors it is thrown off by steel and wiring):
+Results (gyro drifting 1 deg/s, no magnetometer: indoors it is thrown off by steel and wiring;
+10 cm map cells):
 
 | robot   | goal              | reached | lidar pose error | odometry only   |
 |---------|-------------------|---------|------------------|-----------------|
-| dog     | (-0.7, 3.0) m     | 35 s    | 69 mm, 0.1 deg   | 1080 mm, 34 deg |
-| dog     | (1.1, 2.9) m      | 17 s    | 56 mm, 0.3 deg   | 968 mm, 47 deg  |
-| dog     | back to (0.3, 0)  | 26 s    | 36 mm, 0.0 deg   | 1986 mm, 75 deg |
-| hexapod | (-0.9, 3.9) m     | 37 s    | 63 mm, 0.7 deg   | 1278 mm, 40 deg |
-| hexapod | (1.3, 3.7) m      | 17 s    | 47 mm, 0.8 deg   | 1311 mm, 58 deg |
-| hexapod | back to (0.5, 0)  | 27 s    | 52 mm, 0.5 deg   | 3343 mm, 85 deg |
+| dog     | (-0.7, 3.0) m     | 35 s    | 24 mm, 0.6 deg   | 304 mm, 0.1 deg |
+| dog     | (1.1, 2.9) m      | 17 s    | 26 mm, 0.5 deg   | 326 mm, 0.5 deg |
+| dog     | back to (0.3, 0)  | 27 s    | 72 mm, 0.0 deg   | 64 mm, 1.3 deg  |
+| hexapod | (-0.9, 3.9) m     | 38 s    | 87 mm, 0.1 deg   | 121 mm, 0.8 deg |
+| hexapod | (1.3, 3.7) m      | 17 s    | 78 mm, 0.0 deg   | 155 mm, 0.9 deg |
+| hexapod | back to (0.5, 0)  | 27 s    | 58 mm, 0.2 deg   | 139 mm, 1.0 deg |
 
-The odometry alone is useless after a few metres (the dog's feet slip, the gyro drifts); with
-the lidar the pose stays within a few cm. The remaining error is mostly the 5 cm map cells:
-the matcher pulls points toward cell centres, up to half a cell. No rejected scans, no CRC
-errors. Limits: the map is 10 x 10 m around the start (larger flats need a bigger grid or a
-moving map), no loop closure (a long loop through several rooms can come back a little off),
-things below the scan plane are invisible to it, and moving people leave marks that fade as
-the lidar sees through them again. Tests: `tests/test_lidar.py`, `test/test_lidar` (native).
+With the lidar the pose stays within a few cm; the remaining error is mostly the map cells
+(the matcher pulls points toward cell centres, up to half a cell). No rejected scans, no CRC
+errors. The odometry alone drifts a few cm per metre here, but the sim's feet don't slip like
+real ones and the gyro's bias is learned while standing (`Odometry2D`): on the robot expect
+worse. (The sim gyro reports the mean turn rate of each tick, like an IMU behind its low-pass
+filter; the instantaneous rate sampled once a tick aliased with the foot impacts and read
+2-3 % short over a turn.) Limits: the map is 20 x 20 m around the start, the planner sees
+10 x 10 m of it around the robot and the goal at a time, no loop closure (a long loop through
+several rooms can come back a little off), things below the scan plane are invisible to it,
+and moving people leave marks that fade as the lidar sees through them again. Tests:
+`tests/test_lidar.py`, `test/test_lidar` (native).
+
+## ToF room scans: the same map without a lidar
+
+`FirmwareCore.set_tof_nav(True)` feeds the map from the terrain ToF sensors instead
+(`tof_scan.h`, `TofNavigator`): to scan, the robot stops, tilts its nose up (and crouches 15 mm,
+the legs reach further), turns once around at ~0.45 rad/s and puts every zone ray within 4 deg
+of level that hit something higher than 4 cm above the floor into a 360 deg scan (one point per
+degree, odometry of the frame's moment), which goes into the same `LidarSlam` matcher and map.
+Walking to a goal it scans first, then every metre. The simulated VL53L5CX reports the closest
+target of 2 x 2 rays per zone, out to 3 m, ~40 ms late. `set_tof_mount(i, deg)` and
+`tune_tof_scan(...)` try other mounts and scan settings.
+
+    python examples/drive.py --nav tof                                          # live: click the map, N scans, X stops
+    python examples/drive.py --hexapod --nav tof --mount 40 --scan-tilt 15      # live, the old mount
+    python examples/lidar_nav.py --tof                                          # dog, three goals, prints the result
+    python examples/lidar_nav.py --tof --model hexapod
+    python examples/lidar_nav.py --tof --mount 40 --scan-tilt 15                # the old, steeper mount
+    MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --tof --video out/dog-tof.mp4 --speedup 6
+
+The legs can tilt the dog's nose up ~15 deg (with the crouch; 20 deg runs the legs out of reach)
+and the hexapod's ~10 deg (servo ranges). The sensors' top zone row looks 19.7 +- 2.8 deg above
+their axis, and a zone reports the floor under its lower edge before a wall further away, so the
+lower edge has to look level: nose up = mount angle - 17 deg. With the old mounts (dog 40 deg,
+hexapod 35 deg down) that is out of reach, walls beyond ~1 m are lost and the robots got lost
+(dog 1 of 3 goals, ~1 m off; hexapod none); dog 30 / hexapod 27 deg (nose up 13 / 10, the legs'
+limit) got lost too. So `TOF_SENSORS` now has the dog's sensor 25 deg down and the hexapod's
+right one 22 deg (the left stays 35 for terrain):
+
+| robot (mount)    | goal              | reached | map pose error   | odometry only    |
+|------------------|-------------------|---------|------------------|------------------|
+| dog (25 deg)     | (-0.7, 3.0) m     | 230 s   | 125 mm, 4.5 deg  | 1325 mm, 39 deg  |
+| dog              | (1.1, 2.9) m      | 48 s    | 127 mm, 3.1 deg  | 1773 mm, 45 deg  |
+| dog              | back to (0.3, 0)  | 74 s    | 90 mm, 2.9 deg   | 1527 mm, 58 deg  |
+| hexapod (35+22)  | (-0.9, 3.9) m     | 179 s   | 350 mm, 6 deg    | 292 mm, 10 deg   |
+| hexapod          | (1.3, 3.7) m      | 51 s    | 357 mm, 7 deg    | 370 mm, 12 deg   |
+| hexapod          | back to (0.5, 0)  | 94 s    | 259 mm, 11 deg   | 640 mm, 16 deg   |
+
+Every goal is reached, slowly (each scan is ~16 s standing and turning; the first goal is behind
+a wall the robot hasn't seen, it walks into the corner first). The dog's odometry suffers from the
+scan turns (a few degrees off per turn), which the scans then correct. The hexapod's map pose is
+~30 cm off, about what its odometry alone is: the sparse scans hardly improve on it at 10 cm
+cells (with 5 cm cells it was 1-10 cm). With only its right sensor scanning, half its scans are
+rejected and the heading is 6-11 deg off (with both at 22 deg: under 2 deg). What the flatter mounts cost on rough ground (`terrain_walk.py`, ToF sensing, 25 vs 40 deg):
+the dog still climbs the step, bars and rubble and walks as far or further (step 317 vs 268 mm,
+rubble 706 vs 641), but its body brushes the obstacles more often (step 31 vs 0 ticks, bars 40
+vs 0). The dog's gap runs are poor at either angle. Both hexapod sensors at 22 deg walked into 70 mm
+gaps (324 vs 700 mm in the test), hence the mixed mount, which crosses them and climbs the 30 mm
+step (695 vs 674 mm, a few footholds out of reach).
+Tests: `tests/test_lidar.py` (ToF room scans), `tests/test_terrain.py`, `test/test_tof_scan` (native).
+
+### Nav with terrain sensing
+
+The same ToF sensors can feed the terrain map and the room scans at once (`terrain on` plus a
+goal on the robot; `--nav tof --sensing tof` in `drive.py`). What works:
+
+* The room scan with terrain sensing on (`tests/test_lidar.py::test_tof_room_scan_with_terrain_sensing_on`).
+  Two fixes made that possible. The terrain map pauses during a scan (the hexapod can't fully
+  reach the nose up, and the map placed readings for a tilt the body didn't have). And the IMU tilt
+  filter (`TiltEstimator`) no longer makes up a tilt when the robot turns with its nose up: it
+  integrated the tilted gyro's X/Y rates, which a turn about the vertical shows on too, and
+  invented ~4 deg of sideways lean. That one matters on the real robots whenever they turn while tilted.
+* A gap the terrain code stops at goes into the nav map (`TofNavigator::gapAhead`) and the path
+  goes around it.
+* `terrain.rooms(floor=20)`: a rug, a door threshold, a low platform and uneven tiles.
+
+* Walking to goals with terrain sensing on: the dog reaches all three goals in the rooms, plain
+  and with `floor=20` (`tests/test_lidar.py::test_dog_walks_to_a_goal_with_terrain_sensing_on`,
+  and `drive.py --nav tof`, where terrain sensing is now the dog's default). Before, the terrain
+  map crept up on long walks and the robots stepped onto ground that isn't there. Three causes,
+  three fixes (none needs new hardware):
+  * The IMU's tilt is 1-2 deg off while the robot trots, so the floor ahead was mapped a little
+    high, a few mm a step. A frame that sees mostly one plane now uses that floor's own tilt
+    (`TerrainMap::floorTilt`, `FrameTilt`); frames that don't (a step, an obstacle) use the IMU's
+    plus the last offset. The dog's mapped floor stays at 0 mm over a 40 s walk
+    (`tests/test_terrain.py::test_terrain_map_stays_on_the_floor_on_a_long_walk`).
+  * Without foot switches the body is only planned to be at its height: where the feet land short
+    (a platform edge), it is lower, the next frame mapped the ground higher, the body followed it
+    up, and so on. Each frame is now lined up with the heights the map already has (median
+    over the overlapping cells, `TerrainMap::frameOffset`, 2 mm deadband).
+  * Walls and furniture: the ToF hits their faces low and high, and the feet took the low hits as
+    steps and climbed the wall. A cell hit at heights more than 3 x `jump` apart is now a vertical
+    face (`TerrainMap::isFace`), never a foothold; its height still updates as before (a gap's
+    bottom must stay low for the gap checks).
+
+What doesn't yet: the hexapod with the rough gait gets lost in the rooms (its room scans get
+rejected more, the map pose ends up 1-2 m off), terrain sensing or not; it reached 2 of 3
+goals on the plain floor and none with `floor=30`. That is the nav with the slower gait, not the
+terrain map (it stays upright). `drive.py --nav` keeps the hexapod's terrain sensing
+off for now. Follow-up: issue #27.
 
 ## Plan
 

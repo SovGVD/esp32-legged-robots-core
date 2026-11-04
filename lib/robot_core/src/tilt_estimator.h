@@ -6,7 +6,9 @@
  * the raw accelerometer angle feeds those accelerations back into the body
  * (in the simulator this rocked the dog by up to 15 deg on flat ground). The
  * gyro is integrated for the fast part and the accelerometer only pulls the
- * estimate back slowly, with less trust while |a| is far from 1 g.
+ * estimate back slowly, with less trust while |a| is far from 1 g. The
+ * gyro's Z rate turns the tilt around (small angle form): turning in place
+ * with the nose up doesn't make up a sideways tilt.
  *
  * Sensor frame, right handed. Outputs the rotation about the sensor X and Y
  * axes; with the sensor mounted X right, Y forward, Z up these are the

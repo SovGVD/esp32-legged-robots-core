@@ -26,6 +26,30 @@ enum TerrainTiltMode : uint8_t {
 	TERRAIN_TILT_RAW       = 2,
 };
 
+/**
+ * The tilt to place ToF frames with: the IMU based one (TerrainTilt) plus its
+ * offset from the floor's own tilt, learned from the frames that see a plain
+ * floor (TerrainMap::floorTilt). The IMU's tilt is 1-2 deg off while the
+ * robot trots, and without foot switches the map built with it crept up a few
+ * mm per step (5-10 cm on a 40 s walk); the offset takes that out but keeps
+ * the IMU's fast rocking. A floor tilted more than maxDiff from the IMU (a
+ * ramp) teaches nothing, so slopes stay in the map.
+ */
+class FrameTilt {
+	public:
+		void reset() { _offset = { 0, 0, 0 }; }
+		/**
+		 * One frame: learn from it, return the tilt to place it with. gain: how
+		 * much of the offset one frame's floor sets (1: a frame that sees a
+		 * plain floor is placed with the floor's own tilt).
+		 */
+		LR_angle place(const TofSensor &s, const float *mm, const LR_angle &tilt, float gain = 1.0f, float maxDiff = 0.07f);
+		const LR_angle &offset() const { return _offset; }
+
+	private:
+		LR_angle _offset = { 0, 0, 0 };
+};
+
 class TerrainTilt {
 	public:
 		void begin(TerrainTiltMode mode, float biasTau = 1.5f, float unplannedTau = 0.3f);

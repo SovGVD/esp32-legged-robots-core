@@ -217,12 +217,13 @@ const float SIT_HEIGHT = -30;
  * the terrain code (sim/examples/terrain_walk.py).
  *
  * One VL53L5CX (8x8 zones, 45 deg field of view) on the front of the body,
- * looking 40 deg down: from the dog's height it sees the ground ~40 to ~250 mm
- * ahead of the nose.
+ * looking 25 deg down: it sees the ground from just ahead of the nose and, with
+ * the top zone rows, nearly level (the room scan, TOF_SCAN_PARAMS, needs that:
+ * at 40 deg down the legs can't tilt the nose up far enough).
  */
 const TofSensor TOF_SENSORS[] = {
 	// position (mm, body frame), yaw, tilt down (rad), field of view (rad), zones per side, max range (mm)
-	{ { 0, 88, 0 }, 0.0, 0.70, 0.785, 8, 400 },
+	{ { 0, 88, 0 }, 0.0, 0.436, 0.785, 8, 400 },
 };
 #define TOF_SENSOR_COUNT 1
 
@@ -268,7 +269,7 @@ const LidarParams LIDAR_PARAMS = {
 };
 
 const LidarMapParams LIDAR_MAP_PARAMS = {
-	50,     // cell size, mm (200 x 200 cells: 10 x 10 m, 40 KB)
+	100,    // cell size, mm (200 x 200 cells: 20 x 20 m, 40 KB)
 	6000,   // readings up to 6 m go into the map
 	20, 5,  // log-odds: + 20 where a beam ends, - 5 where it passes
 	100,    // cells stay within +-100
@@ -289,6 +290,43 @@ const NavParams NAV_PARAMS = {
 	0.6,   // turn in place for heading errors over 35 deg
 	180,   // stop walking forward with something closer than 180 mm ahead
 	1.0    // replan every second
+};
+
+/**
+ * Room scans with the ToF sensors instead of a lidar (tof_scan.h, used when
+ * LIDAR_TYPE is not set in config.h): the robot stops, tilts its nose up so
+ * the nose sensor (TOF_SENSORS) look level, turns once around and
+ * puts what they saw into the same map. Walking to a goal it scans every
+ * scanEvery mm. Simulator only so far (sim/examples/lidar_nav.py --tof).
+ */
+#define TOF_SCAN_SUPPORTED 1
+const TofScanParams TOF_SCAN_PARAMS = {
+	0.14,   // nose up 8 deg while scanning. The top zone row looks 19.7 +- 2.8 deg above the
+	        // sensor's axis: nose up = mount angle (25) - 17 deg puts its lower edge level. The legs
+	        // reach ~15 deg at most (with the crouch), so the mount can't be much steeper than 30 deg
+	0.3,    // tilt rate, rad/s
+	0.45,   // turning while scanning, rad/s (slow: the sensor's frames lag a little)
+	6.7,    // turn a full circle plus 23 deg of overlap
+	0.07,   // zone rays within 4 deg of level are used
+	120,    // min range, mm
+	2500,   // max range, mm (VL53L5CX 8x8 indoors; further readings are unreliable)
+	40,     // hits lower than 40 mm above the floor are the floor
+	1000,   // scan again after walking this far, mm
+	0.5,    // stand still 0.5 s before tilting up
+	40,     // walking: anything over 40 mm high ahead stops the robot
+	15      // body 15 mm lower while scanning: the legs reach a steeper tilt
+};
+
+const LidarMapParams TOF_MAP_PARAMS = {
+	100,    // cell size, mm (200 x 200 cells: 20 x 20 m, 40 KB)
+	2500,   // readings up to 2.5 m go into the map
+	20, 5,  // log-odds: + 20 where a beam ends, - 5 where it passes
+	100,    // cells stay within +-100
+	50,     // map update after 50 mm...
+	0.1,    // ...or 6 deg
+	0.25,   // matches with a mean occupancy under the points below 0.25 are thrown away
+	250,    // ...or that move the odometry guess more than 250 mm (a metre walked on odometry alone is ~150 mm off)
+	0.35    // ...or 20 deg
 };
 
 #endif

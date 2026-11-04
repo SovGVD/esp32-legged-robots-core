@@ -50,14 +50,38 @@ void test_map_cells_store_heights_and_forget_them()
 	map.heightAt(3, 4, z);
 	TEST_ASSERT_FLOAT_WITHIN(1e-3f, -83, z);
 	// something on top replaces it at once
-	LR_point top = { 3, 4, -60 };
+	LR_point top = { 3, 4, -70 };
 	map.addPoint(top);
 	map.heightAt(3, 4, z);
-	TEST_ASSERT_FLOAT_WITHIN(1e-4f, -60, z);
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, -70, z);
 	// old cells are forgotten
 	map.tick(3.1f);
 	TEST_ASSERT_FALSE(map.heightAt(3, 4, z));
 	TEST_ASSERT_EQUAL(0, map.knownCells());
+}
+
+void test_map_marks_vertical_faces()
+{
+	TerrainMap map;
+	map.begin(MAP);
+	float z;
+	// a wall's face: one cell hit low and high (more than 3 x jump apart)
+	LR_point low = { 3, 4, -80 }, high = { 3, 4, -40 };
+	map.addPoint(low);
+	TEST_ASSERT_FALSE(map.isFace(3, 4));
+	map.addPoint(high);
+	TEST_ASSERT_TRUE(map.isFace(3, 4));               // not a foothold
+	TEST_ASSERT_TRUE(map.heightAt(3, 4, z));
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, -40, z);          // its top, for the swing and the edges
+	// lower hits on it later don't make it ground again
+	map.addPoint(low);
+	TEST_ASSERT_TRUE(map.isFace(3, 4));
+	// a plain cell next to it is ground
+	LR_point floor = { 13, 4, -80 };
+	map.addPoint(floor);
+	TEST_ASSERT_FALSE(map.isFace(13, 4));
+	map.heightAt(13, 4, z);
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, -80, z);
 }
 
 void test_map_scrolls_with_negative_and_far_coordinates()
@@ -385,10 +409,79 @@ void test_cliff_the_sensors_cannot_see_down_also_stops_it()
 	TEST_ASSERT_TRUE(gait.isBlocked());
 }
 
+/** Zone distances of a sensor on a body tilted by `tilt`, floor `floorZ` below the body origin, a box (x0..x1, y0..y1, top) on it. */
+static void floorFrame(const TofSensor &s, const LR_angle &tilt, float floorZ, float *mm,
+                       float bx0 = 0, float bx1 = 0, float by0 = 0, float by1 = 0, float btop = 0)
+{
+	LR_point o = lrRotateBody(s.position, tilt);
+	for (uint8_t z = 0; z < s.zones * s.zones; z++) {
+		LR_point d = lrRotateBody(TerrainMap::zoneDirection(s, z), tilt);
+		float t = d.z < -1e-6f ? (floorZ - o.z) / d.z : 1e9f;
+		if (btop > 0 && d.z < -1e-6f) {
+			float tb = (floorZ + btop - o.z) / d.z;   // the box top
+			float x = o.x + d.x * tb, y = o.y + d.y * tb;
+			if (x > bx0 && x < bx1 && y > by0 && y < by1) t = tb;
+		}
+		mm[z] = t < s.maxRange ? t : 0;
+	}
+}
+
+void test_floor_tilt_from_the_tof_zones()
+{
+	const TofSensor s = { { 0, 88, 0 }, 0.0f, 0.436f, 0.785f, 8, 400 };   // the dog's nose sensor
+	float mm[64];
+	const float tilts[][2] = { { 0, 0 }, { 0.035f, 0 }, { -0.035f, 0 }, { 0, 0.05f }, { 0, -0.04f }, { 0.03f, -0.03f } };
+	for (const auto &t : tilts) {
+		LR_angle tilt = { t[0], t[1], 0 };
+		floorFrame(s, tilt, -80, mm);
+		LR_angle got;
+		LR_angle prior = { tilt.pitch + 0.03f, tilt.roll - 0.03f, 0 };   // the IMU, 2 deg off
+		TEST_ASSERT_TRUE(TerrainMap::floorTilt(s, mm, prior, got));
+		TEST_ASSERT_FLOAT_WITHIN(0.002f, tilt.pitch, got.pitch);
+		TEST_ASSERT_FLOAT_WITHIN(0.002f, tilt.roll, got.roll);
+	}
+	// a 20 mm step across the far part of the view: those zones are dropped
+	LR_angle tilt = { 0.02f, -0.03f, 0 };
+	floorFrame(s, tilt, -80, mm, -500, 500, 300, 900, 20);
+	LR_angle got;
+	TEST_ASSERT_TRUE(TerrainMap::floorTilt(s, mm, tilt, got));
+	TEST_ASSERT_FLOAT_WITHIN(0.002f, tilt.pitch, got.pitch);
+	TEST_ASSERT_FLOAT_WITHIN(0.002f, tilt.roll, got.roll);
+	// nothing in range: no tilt
+	for (float &d : mm) d = 0;
+	TEST_ASSERT_FALSE(TerrainMap::floorTilt(s, mm, tilt, got));
+}
+
+void test_frame_offset_lines_frames_up_with_the_map()
+{
+	const TofSensor s = { { 0, 88, 0 }, 0.0f, 0.436f, 0.785f, 8, 400 };
+	const TerrainMapParams params = { 12, 10.0f, 0.3f, 8 };
+	TerrainMap map;
+	map.begin(params);
+	float mm[64];
+	LR_angle level = { 0, 0, 0 };
+	floorFrame(s, level, -80, mm);
+	LR_figure body = {};
+	// nothing mapped yet: nothing to line up with
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0, map.frameOffset(s, mm, body));
+	for (uint8_t z = 0; z < 64; z++) map.addReading(s, z, mm[z], body);
+	// the same frame again, in the same tick: only this frame's cells, nothing to compare
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0, map.frameOffset(s, mm, body));
+	map.tick(0.1f);
+	// the body thinks it is 10 mm higher than it is (it sank): the frame maps 10 mm high
+	body.position.z = 10;
+	TEST_ASSERT_FLOAT_WITHIN(0.5f, 10, map.frameOffset(s, mm, body));
+	// within the deadband: map noise, left alone
+	body.position.z = 1.5f;
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0, map.frameOffset(s, mm, body));
+}
+
 int main()
 {
 	UNITY_BEGIN();
 	RUN_TEST(test_map_cells_store_heights_and_forget_them);
+	RUN_TEST(test_map_marks_vertical_faces);
+	RUN_TEST(test_frame_offset_lines_frames_up_with_the_map);
 	RUN_TEST(test_map_scrolls_with_negative_and_far_coordinates);
 	RUN_TEST(test_zone_rays_follow_tilt_and_yaw);
 	RUN_TEST(test_readings_land_on_the_ground_even_when_tilted);
@@ -400,5 +493,6 @@ int main()
 	RUN_TEST(test_narrow_gap_is_stepped_over);
 	RUN_TEST(test_wide_gap_stops_the_robot_until_the_command_lets_go);
 	RUN_TEST(test_cliff_the_sensors_cannot_see_down_also_stops_it);
+	RUN_TEST(test_floor_tilt_from_the_tof_zones);
 	return UNITY_END();
 }
