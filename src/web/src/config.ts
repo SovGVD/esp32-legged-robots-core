@@ -11,7 +11,7 @@ interface FirmwareConfig {
   l?: number; // 1 = IMU leveling available
   t?: number; // number of ToF sensors, 0 = none
   r?: number; // ToF range, mm (colour scale)
-  n?: number; // 1 = lidar map and navigation
+  n?: number; // 1 = map and navigation (lidar or ToF room scans)
   m?: number[][]; // ToF mounting per sensor: [x, y, z (mm, body frame), yaw, tilt, fov (rad)]
 }
 
