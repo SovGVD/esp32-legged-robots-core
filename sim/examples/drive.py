@@ -19,8 +19,9 @@ go of the stick (or steer away).
 --nav tof|lidar: the robot starts in two rooms (legsim.terrain.rooms) with the
 firmware's map, localization and walk-to-point, and things on the floor (a rug,
 a door threshold, a low platform, uneven tiles: --floor) that the terrain code
-the terrain code can step over with the same ToF sensors (--sensing tof; off by
-default for now, its map drifts on long walks). The control window shows the
+steps over with the same ToF sensors (--sensing tof: the dog's default; the
+hexapod's is none for now, its rooms walks get lost with the rough gait). The
+control window shows the
 firmware's map (as the web UI would): click it to walk there, N scans the room
 (ToF), X stops; driving with the keys or a stick also cancels the walk.
 Green = true path, blue = the map's pose, red = odometry only, orange = plan.
@@ -67,9 +68,9 @@ args = ap.parse_args()
 
 model = "hexapod" if args.hexapod else "dog"
 if args.nav:
-    # terrain sensing (--sensing tof) works during the room scans, but its map drifts on
-    # walks longer than ~20 s (sim/README "Nav with terrain sensing"): off by default here
-    sensing = args.sensing or "none"
+    # nav + ToF terrain sensing together (sim/README "Nav with terrain sensing"): the dog
+    # walks to goals with it; the hexapod loses its place with the rough gait, off for now
+    sensing = args.sensing or ("tof" if model == "dog" else "none")
     rough = sensing != "none"
 else:
     rough = args.terrain != "flat"

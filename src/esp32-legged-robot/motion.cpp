@@ -99,6 +99,7 @@ static BodyLeveler leveler;
 // Rough ground: ToF terrain map (terrain mode, `terrain on`)
 static TerrainMap  terrainMap;
 static TerrainTilt terrainTilt;
+static FrameTilt   frameTilt;     // the IMU tilt's offset from the floor the ToF sees
 static bool        terrainOn = false;
 static volatile int8_t terrainRequest = -1;   // 1 on, 0 off; applied while standing (core 0 -> motion task)
 static uint32_t    tofSeq[2] = { 0, 0 };
@@ -313,6 +314,7 @@ static void applyTerrainRequest()
 	if (req == 1) {
 		terrainMap.clear();
 		terrainTilt.begin(MODEL_TERRAIN.tilt);
+		frameTilt.reset();
 		motion.gait().setParams(*MODEL_TERRAIN.roughGait);
 		motion.gait().setTerrain(MODEL_TERRAIN.terrain, &terrainMap);
 		levelRequest = true;   // the terrain code needs the body level (feet stand at different heights)
@@ -349,8 +351,13 @@ static void updateTerrain(float dt, float scanTilt)
 		}
 		const TofSensor &sensor = MODEL_TERRAIN.tof[i];
 		LR_figure pose = motion.body();
-		pose.orientation.pitch = terrainTilt.tilt().pitch;
-		pose.orientation.roll  = terrainTilt.tilt().roll;
+		// the floor's own tilt in this frame where there is a floor: the IMU's is
+		// 1-2 deg off while trotting, which made the map creep up on long walks
+		LR_angle tilt = frameTilt.place(sensor, tofMm, terrainTilt.tilt());
+		pose.orientation.pitch = tilt.pitch;
+		pose.orientation.roll  = tilt.roll;
+		// and at the height the map already has: the body is only planned to be at pose z
+		pose.position.z -= terrainMap.frameOffset(sensor, tofMm, pose);
 		for (uint8_t z = 0; z < sensor.zones * sensor.zones && z < 64; z++) {
 			terrainMap.addReading(sensor, z, tofMm[z], pose);
 		}

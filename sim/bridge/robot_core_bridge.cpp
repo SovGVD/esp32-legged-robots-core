@@ -55,6 +55,11 @@ static float tiltGain = 1.0f;
 // (TERRAIN_TILT_MODE in model_data.h; rc_set_map_tilt_mode for experiments)
 static TerrainTilt terrainTilt;
 static TerrainTiltMode mapTiltMode = TERRAIN_TILT_MODE;
+static bool floorTiltOn = true;    // ToF frames placed with the floor's own tilt (FrameTilt); rc_set_floor_tilt
+static FrameTilt frameTilt;
+static float frameGain = 1.0f;    // FrameTilt gain; rc_set_frame_gain
+static float regDeadband = 3.0f;
+static bool registerOn = true;    // frames placed at the map's height (TerrainMap::frameOffset); rc_set_frame_register
 static float biasTau = 1.5f;
 static float unplannedTau = 0.3f;
 // Heading (gyro + magnetometer) and heading hold, as in sensors.cpp / motion.cpp
@@ -120,6 +125,7 @@ RC_API void rc_init()
 	terrainMap.begin(TERRAIN_MAP_PARAMS);
 	lastImu = { 0, 0, 0 };
 	terrainTilt.begin(mapTiltMode, biasTau, unplannedTau);
+	frameTilt.reset();
 	headingEst.begin({ 2.0f, 0.25f });   // sensors.cpp HEADING_MAG_TAU, HEADING_FIELD_TOLERANCE
 	headingHold.begin(HEADING_HOLD);
 	headingFed = false;
@@ -548,8 +554,13 @@ RC_API void rc_tof_frame(int i, const float *distances)
 	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
 	const TofSensor &t = tofSensor(i);
 	LR_figure pose = motion.body();
-	pose.orientation.pitch = terrainTilt.tilt().pitch;
-	pose.orientation.roll  = terrainTilt.tilt().roll;
+	// the floor's own tilt in this frame where there is a floor (motion.cpp updateTerrain)
+	LR_angle tilt = floorTiltOn ? frameTilt.place(t, distances, terrainTilt.tilt(), frameGain)
+	                            : terrainTilt.tilt();
+	pose.orientation.pitch = tilt.pitch;
+	pose.orientation.roll  = tilt.roll;
+	// and at the height the map already has (motion.cpp updateTerrain)
+	if (registerOn) pose.position.z -= terrainMap.frameOffset(t, distances, pose, regDeadband);
 	// not during a room scan (motion.cpp updateTerrain): the robot turns on the
 	// ground it has mapped, and the nose up it may not quite reach would place
 	// the readings wrong
@@ -608,6 +619,12 @@ RC_API void rc_tune_terrain(int index, float value)
 		reinterpret_cast<float *>(&terrainParams)[index] = value;
 	}
 }
+
+/** Experiments: place ToF frames with the floor's tilt (1, the firmware) or only the map tilt (0). */
+RC_API void rc_set_floor_tilt(int on) { floorTiltOn = on != 0; }
+
+RC_API void rc_set_frame_register(int on, float deadband) { registerOn = on != 0; regDeadband = deadband; }
+RC_API void rc_set_frame_gain(float g) { frameGain = g; }
 
 /**
  * Experiments: body tilt for the terrain map. m 0..2: mode (see mapTiltMode);

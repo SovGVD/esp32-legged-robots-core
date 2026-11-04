@@ -19,7 +19,7 @@
 #include "geometry.h"
 
 #ifndef LR_TERRAIN_GRID
-	#define LR_TERRAIN_GRID 40   // cells per side (40 x 40 x 12 bytes = 19 KB)
+	#define LR_TERRAIN_GRID 40   // cells per side (40 x 40 x 16 bytes = 25 KB)
 #endif
 
 /**
@@ -59,6 +59,30 @@ class TerrainMap
 		static LR_point zoneDirection(const TofSensor &s, uint8_t zone);
 
 		/**
+		 * Body tilt relative to the floor the sensor sees: a plane fitted to the
+		 * zones' points (body frame) on the most common level (seen with the
+		 * `prior` tilt, the IMU's), the ones off it (an obstacle, a step) dropped. The IMU's tilt is 1-2 deg off while the robot trots, and the
+		 * map built from it creeps up a few mm per step without foot switches
+		 * to say where the ground is; the floor's own tilt has no such bias.
+		 * @param tilt  pitch / roll (firmware convention, as BodyKinematics); yaw 0
+		 * @return false: too few zones on one plane (or the plane is not floor-like)
+		 */
+		static bool floorTilt(const TofSensor &s, const float *mm, const LR_angle &prior, LR_angle &tilt);
+
+		/**
+		 * How much higher one frame, placed with `body`, puts the ground than
+		 * the map already has it (median over the zones that land on cells
+		 * known from earlier frames, within 4 x `jump`; 0 if fewer than 8 do, or
+		 * if it is within `deadband`: map noise, and following it would let the
+		 * map wander). Lower the pose by it to place the frame. Without foot switches the
+		 * body is only planned to be at body.position.z: where the feet land
+		 * short of the mapped ground (an edge, a soft spot) it is lower, the
+		 * frame would map the ground that much higher, the body would follow
+		 * it up, and so on, a few mm a step.
+		 */
+		float frameOffset(const TofSensor &s, const float *mm, const LR_figure &body, float deadband = 3.0f) const;
+
+		/**
 		 * Add one zone reading.
 		 * @param body    body pose in the gait world frame: position (mm) and
 		 *                yaw from the gait, pitch/roll = the measured tilt
@@ -69,7 +93,13 @@ class TerrainMap
 		/** Add a point (gait world frame, mm). */
 		void addPoint(const LR_point &p);
 
-		/** Ground height at (x, y); false if the cell is unknown or too old. */
+		/**
+		 * Ground height at (x, y); false if the cell is unknown or too old.
+		 * A vertical face (a wall, furniture: one frame's zones hit the cell at
+		 * heights more than 3 x `jump` apart) reads WALL_HEIGHT above the highest
+		 * point seen on it: its top is out of the sensor's view, and the lower
+		 * points on it are not a foothold (the body would climb the wall).
+		 */
 		bool heightAt(float x, float y, float &z) const;
 		/**
 		 * Highest known point within `radius` mm of the segment a-b (XY).
@@ -87,12 +117,16 @@ class TerrainMap
 		uint16_t knownCells() const;
 		const TerrainMapParams &params() const { return _params; }
 
+		static constexpr float WALL_HEIGHT = 1000.0f;
+
 	private:
 		typedef struct {
 			int16_t ix;
 			int16_t iy;
 			float   z;
 			float   time;   // < 0: empty
+			int16_t lo;     // mm, the lowest point seen on it
+			bool    wall;   // hit at heights far apart: a vertical face
 		} cell;
 
 		TerrainMapParams _params = { 20.0f, 3.0f, 0.3f, 8.0f };
@@ -100,6 +134,7 @@ class TerrainMap
 		float _time = 0;
 
 		int16_t index(float v) const { return (int16_t)floorf(v / _params.cellSize); }
+		static LR_point readingPoint(const TofSensor &s, uint8_t zone, float distance, const LR_figure &body);
 		const cell *find(int16_t ix, int16_t iy) const;
 };
 

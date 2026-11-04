@@ -557,13 +557,29 @@ goal on the robot; `--nav tof --sensing tof` in `drive.py`). What works:
   goes around it.
 * `terrain.rooms(floor=20)`: a rug, a door threshold, a low platform and uneven tiles.
 
-What doesn't yet: walking to a goal with terrain sensing on. The terrain map has no fixed
-reference (no foot switches), so on walks longer than the 8-12 s terrain tests it drifts: the
-dog's mapped floor creeps up ~2 mm per second of walking on a flat floor (RAW map tilt; the
-commanded tilt stops that, but then a real body roll goes into the map and it tips sideways
-in turns), and both robots end up stepping onto ground that isn't there. Until that is fixed,
-walk to goals with terrain sensing off (the default in `drive.py --nav`): both robots cross
-the rug and the threshold open loop, the hexapod also the 30 mm platform.
+* Walking to goals with terrain sensing on: the dog reaches all three goals in the rooms, plain
+  and with `floor=20` (`tests/test_lidar.py::test_dog_walks_to_a_goal_with_terrain_sensing_on`,
+  and `drive.py --nav tof`, where terrain sensing is now the dog's default). Before, the terrain
+  map crept up on long walks and the robots stepped onto ground that isn't there. Three causes,
+  three fixes (none needs new hardware):
+  * The IMU's tilt is 1-2 deg off while the robot trots, so the floor ahead was mapped a little
+    high, a few mm a step. A frame that sees mostly one plane now uses that floor's own tilt
+    (`TerrainMap::floorTilt`, `FrameTilt`); frames that don't (a step, an obstacle) use the IMU's
+    plus the last offset. The dog's mapped floor stays at 0 mm over a 40 s walk
+    (`tests/test_terrain.py::test_terrain_map_stays_on_the_floor_on_a_long_walk`).
+  * Without foot switches the body is only planned to be at its height: where the feet land short
+    (a platform edge), it is lower, the next frame mapped the ground higher, the body followed it
+    up, and so on. Each frame is now lined up with the heights the map already has (median
+    over the overlapping cells, `TerrainMap::frameOffset`, 3 mm deadband).
+  * Walls and furniture: the ToF hits their faces low and high, and the feet took the low hits as
+    steps and climbed the wall. A cell hit at heights more than 3 x `jump` apart is now a vertical
+    face, never a foothold.
+
+What doesn't yet: the hexapod with the rough gait gets lost in the rooms (its room scans get
+rejected more, the map pose ends up 1-2 m off), terrain sensing or not; it reached 2 of 3
+goals on the plain floor and none with `floor=30`. That is the nav with the slower gait, not the
+terrain map (it stays upright). `drive.py --nav` keeps the hexapod's terrain sensing
+off for now.
 
 ## Plan
 

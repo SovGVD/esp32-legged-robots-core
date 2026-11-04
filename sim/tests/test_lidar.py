@@ -157,3 +157,42 @@ def test_tof_room_scan_with_terrain_sensing_on(model):
         fw.select_gait("default")
         fw.set_heading_sensors(None)
         fw.reset()
+
+
+@needs_cxx
+def test_dog_walks_to_a_goal_with_terrain_sensing_on():
+    """Room scans, the nav and the ToF terrain map together: the dog walks from the
+    lower room through the door (over the threshold, past the uneven tiles) to a
+    goal in the upper room without tipping over."""
+    fw = scenario.core("dog")
+    try:
+        fw.tune_tof_scan(reset=True)
+        fw.set_heading_sensors(gyro_bias_dps=1.0, magnetometer=False)
+        fw.set_leveling(True)
+        fw.set_terrain(**scenario.SENSING["tof"])
+        fw.select_gait("rough")
+        fw.set_tof_nav(True, subrays=2, latency=0.04)
+        robot = fw.place(scenario.make_robot("dog", terrain.rooms(floor=20)))
+        fw.drive(robot, duration=1.0)
+        goal = (1100, 2900)
+        fw.nav_goal(*goal)
+        t, worst = 0.0, 0.0
+        while t < 150:
+            fw.drive(robot)
+            t += fw.loop_dt
+            o = robot.body_orientation()
+            worst = max(worst, abs(o["pitch"]), abs(o["roll"]))
+            ns = fw.nav_state()
+            if ns["state"] != "active" and ns["phase"] == "idle":
+                break
+        p = robot.body_position_mm()
+        assert ns["state"] == "arrived"
+        assert math.hypot(p[0] - goal[0], p[1] - goal[1]) < 500
+        assert worst < math.radians(30)
+    finally:
+        fw.set_tof_nav(False)
+        fw.set_terrain()
+        fw.set_leveling(False)
+        fw.select_gait("default")
+        fw.set_heading_sensors(None)
+        fw.reset()

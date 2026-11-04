@@ -50,3 +50,15 @@ void TerrainTilt::update(float dt, const LR_angle &imu, const LR_angle &correcti
 		map->tick(dt);
 	}
 }
+
+LR_angle FrameTilt::place(const TofSensor &s, const float *mm, const LR_angle &tilt, float gain, float maxDiff)
+{
+	LR_angle floor;
+	LR_angle guess = { tilt.pitch + _offset.pitch, tilt.roll + _offset.roll, 0 };
+	if (TerrainMap::floorTilt(s, mm, guess, floor) && fabsf(floor.pitch - tilt.pitch) < maxDiff
+	    && fabsf(floor.roll - tilt.roll) < maxDiff) {
+		_offset.pitch += (floor.pitch - tilt.pitch - _offset.pitch) * gain;
+		_offset.roll  += (floor.roll  - tilt.roll  - _offset.roll)  * gain;
+	}
+	return { tilt.pitch + _offset.pitch, tilt.roll + _offset.roll, 0 };
+}
