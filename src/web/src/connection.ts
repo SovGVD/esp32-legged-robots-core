@@ -21,10 +21,13 @@ export class Connection {
 
   private readonly url: string;
   private readonly events: ConnectionEvents;
+  private readonly open: (url: string) => WebSocket;
 
-  constructor(url: string, events: ConnectionEvents) {
+  /** open: makes the socket (the demo build passes its in-page mock robot) */
+  constructor(url: string, events: ConnectionEvents, open = (u: string) => new WebSocket(u)) {
     this.url = url;
     this.events = events;
+    this.open = open;
   }
 
   get online(): boolean {
@@ -38,7 +41,7 @@ export class Connection {
 
     let ws: WebSocket;
     try {
-      ws = new WebSocket(this.url);
+      ws = this.open(this.url);
     } catch (e) {
       this.setState('offline', String(e));
       return;

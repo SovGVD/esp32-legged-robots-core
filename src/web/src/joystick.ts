@@ -4,9 +4,11 @@ export interface Stick {
 }
 
 /**
- * On-screen joystick driven by pointer events, so mouse, pen and several
- * fingers (one per stick) all work. The stick returns to the centre when
- * released or when the pointer is lost.
+ * Round on-screen joystick, like a game's thumb stick: the element is the
+ * ring, the knob follows the finger and the value is the knob's offset from
+ * the centre over the ring's radius, clamped to the circle. Pointer events,
+ * so mouse, pen and several fingers (one per stick) all work. The stick
+ * returns to the centre when released or when the pointer is lost.
  */
 export class Joystick {
   private pointerId: number | null = null;
@@ -16,7 +18,7 @@ export class Joystick {
   private readonly onChange: (v: Stick) => void;
   private readonly deadband: number;
 
-  constructor(el: HTMLElement, onChange: (v: Stick) => void, deadband = 0.05) {
+  constructor(el: HTMLElement, onChange: (v: Stick) => void, deadband = 0.08) {
     this.el = el;
     this.onChange = onChange;
     this.deadband = deadband;
@@ -26,6 +28,7 @@ export class Joystick {
 
     el.addEventListener('pointerdown', (e) => {
       if (this.pointerId !== null) return;
+      e.preventDefault();
       this.pointerId = e.pointerId;
       el.setPointerCapture(e.pointerId);
       el.classList.add('active');
@@ -51,19 +54,23 @@ export class Joystick {
 
   private move(e: PointerEvent): void {
     const r = this.el.getBoundingClientRect();
-    const x = this.axis(((e.clientX - r.left) / r.width) * 2 - 1);
-    const y = this.axis(((e.clientY - r.top) / r.height) * 2 - 1);
+    const radius = r.width / 2;
+    let x = (e.clientX - r.left - radius) / radius;
+    let y = (e.clientY - r.top - r.height / 2) / radius;
+    const len = Math.hypot(x, y);
+    if (len > 1) {
+      x /= len;
+      y /= len;
+    }
+    // the knob follows the finger, the value has a dead zone around the centre
     this.show(x, y);
-    this.onChange({ x, y: -y });
-  }
-
-  private axis(v: number): number {
-    const c = Math.min(1, Math.max(-1, v));
-    return Math.abs(c) <= this.deadband ? 0 : c;
+    const k = len <= this.deadband ? 0 : Math.min(1, (Math.min(1, len) - this.deadband) / (1 - this.deadband)) / Math.min(1, len);
+    this.onChange({ x: round(x * k), y: round(-y * k) });
   }
 
   private show(x: number, y: number): void {
-    this.knob.style.left = `${(x + 1) * 50}%`;
-    this.knob.style.top = `${(y + 1) * 50}%`;
+    this.knob.style.transform = `translate(${x * 75}%, ${y * 75}%)`;
   }
 }
+
+const round = (v: number) => Math.round(v * 1000) / 1000;
