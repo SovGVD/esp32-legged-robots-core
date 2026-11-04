@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 import { defineConfig, type Plugin, type PreviewServer, type ViteDevServer } from 'vite';
 import { attachMockRobot } from './mock/robot.ts';
+import { mockConfig } from './mock/sim.ts';
 
 /**
  * Inline the bundled JS and CSS into index.html: the firmware serves a single
@@ -42,10 +43,7 @@ function robotDevServer(): Plugin {
       const ws = robot ? `ws://${robot}/ws` : `ws://${req.headers.host}/ws`;
       res.setHeader('Content-Type', 'application/javascript');
       // TOF=<n> sets the number of ToF views (dog 1, hexapod 2)
-      const tof = Number(process.env.TOF ?? 2);
-      // mounting as in model_data.h TOF_SENSORS: dog nose, hexapod front left/right
-      const m = tof === 1 ? '[[0,88,0,0,0.7,0.785]]' : '[[-25,90,10,0.35,0.61,0.785],[25,90,10,-0.35,0.61,0.785]]';
-      res.end(`const c={v:'dev',w:'${ws}',c:0,g:1,l:1,t:${tof},r:450,n:1,m:${m}};`);
+      res.end(`const c=${JSON.stringify(mockConfig(Number(process.env.TOF ?? 2), ws))};`);
     });
   };
   return {
@@ -55,8 +53,19 @@ function robotDevServer(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [inlineIntoHtml(), robotDevServer()],
+/** Demo build: no /c.js, the page runs the mock robot itself (src/demo.ts). */
+function dropConfigScript(): Plugin {
+  return {
+    name: 'drop-config-script',
+    transformIndexHtml: (html) => html.replace(/\s*<!--[^>]*-->\s*<script src="\/c\.js"[^>]*><\/script>/, ''),
+  };
+}
+
+// `vite build --mode demo` (npm run build:demo): a page with the mock robot built in, to try the UI
+// without a robot or a dev server; dist-demo/index.html
+export default defineConfig(({ mode }) => ({
+  plugins: [inlineIntoHtml(), robotDevServer(), ...(mode === 'demo' ? [dropConfigScript()] : [])],
+  define: { __DEMO__: JSON.stringify(mode === 'demo') },
   server: { host: true },
   build: {
     target: 'es2020',
@@ -64,5 +73,6 @@ export default defineConfig({
     cssCodeSplit: false,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
     reportCompressedSize: false,
+    outDir: mode === 'demo' ? 'dist-demo' : 'dist',
   },
-});
+}));
