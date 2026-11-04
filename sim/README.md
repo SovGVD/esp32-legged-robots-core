@@ -19,6 +19,13 @@ firmware bridge (built automatically on first use): `g++` on Linux
 (`xcode-select --install`), MinGW-w64 `g++` on Windows (untested; WSL works
 like Linux). Set `CXX` to pick another compiler.
 
+On Linux the live examples open their windows on X11 (XWayland on a Wayland
+desktop). If the X server refuses the connection ("Authorization required, but
+no authorization protocol specified": stale `XAUTHORITY` in tmux/ssh/sudo), they
+fall back to Wayland with libdecor off, so GTK isn't loaded (a GTK/GNOME schema
+mismatch there aborts Python with a `GLib-GIO-ERROR`), or print how to fix the
+display. Details in `legsim/display.py`.
+
 ```
 git clone -b development https://github.com/SovGVD/esp32-legged-robots-core.git
 cd esp32-legged-robots-core/sim

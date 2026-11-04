@@ -31,7 +31,9 @@ Xbox 360 gamepad controls are listed in that window and in legsim/control.py.
 Needs a display, a C++ compiler (the firmware is built on first run) and
 `pip install pygame-ce`. On macOS the MuJoCo viewer needs `mjpython`, which runs
 the script off the main thread; pygame windows need the main thread there, so
-this example is for Linux and Windows.
+this example is for Linux and Windows. On Linux it picks X11 (or Wayland if
+X refuses the connection) and says what to fix if neither opens: see
+legsim/display.py.
 """
 
 import argparse
@@ -42,10 +44,14 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import mujoco
-import mujoco.viewer
-from legsim import SimDog, FirmwareCore
-from legsim.control import ManualControl
+from legsim import display
+
+display.prepare()   # X11 or Wayland, before the viewer and pygame load (see legsim/display.py)
+
+import mujoco  # noqa: E402
+import mujoco.viewer  # noqa: E402
+from legsim import SimDog, FirmwareCore  # noqa: E402
+from legsim.control import ManualControl  # noqa: E402
 
 from legsim import scenario, terrain as terrains  # noqa: E402
 
