@@ -34,6 +34,8 @@ def control(t):
 
 
 if args.view:
+    from legsim import display
+    display.prepare()
     import mujoco.viewer
     with mujoco.viewer.launch_passive(dog.model, dog.data) as v:
         import time

@@ -59,6 +59,8 @@ if args.video:
 
 if args.view:
     import time
+    from legsim import display
+    display.prepare()
     import mujoco.viewer
     viewer = mujoco.viewer.launch_passive(robot.model, robot.data)
     viewer.cam.distance, viewer.cam.elevation, viewer.cam.azimuth = 0.6, -30, 235
