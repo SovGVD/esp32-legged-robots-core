@@ -108,7 +108,7 @@ float GaitEngine::plannedGround(uint8_t legId, const LR_point &at) const
 {
 	float own = _state[legId].ground;
 	float z;
-	if (_map && _map->heightAt(at.x, at.y, z)) {
+	if (_map && !_map->isFace(at.x, at.y) && _map->heightAt(at.x, at.y, z)) {
 		z += _terrain->footRadius;
 		// within `tolerance` it is the same ground (map noise): following it
 		// from step to step would let the feet wander

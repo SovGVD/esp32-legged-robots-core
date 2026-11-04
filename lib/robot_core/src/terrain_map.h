@@ -93,14 +93,15 @@ class TerrainMap
 		/** Add a point (gait world frame, mm). */
 		void addPoint(const LR_point &p);
 
-		/**
-		 * Ground height at (x, y); false if the cell is unknown or too old.
-		 * A vertical face (a wall, furniture: one frame's zones hit the cell at
-		 * heights more than 3 x `jump` apart) reads WALL_HEIGHT above the highest
-		 * point seen on it: its top is out of the sensor's view, and the lower
-		 * points on it are not a foothold (the body would climb the wall).
-		 */
+		/** Ground height at (x, y); false if the cell is unknown or too old. */
 		bool heightAt(float x, float y, float &z) const;
+		/**
+		 * (x, y) is on a vertical face: a wall, furniture, a step's or a gap's
+		 * edge (the cell was hit at heights more than 3 x `jump` apart). Not a
+		 * foothold: its lower points are the face, and feet planned onto them
+		 * climbed walls.
+		 */
+		bool isFace(float x, float y) const;
 		/**
 		 * Highest known point within `radius` mm of the segment a-b (XY).
 		 * false if no cell there is known.
@@ -116,8 +117,6 @@ class TerrainMap
 
 		uint16_t knownCells() const;
 		const TerrainMapParams &params() const { return _params; }
-
-		static constexpr float WALL_HEIGHT = 1000.0f;
 
 	private:
 		typedef struct {

@@ -125,13 +125,13 @@ void TerrainMap::addPoint(const LR_point &p)
 		c.z  = p.z;
 		c.lo = INT16_MAX;
 		c.wall = false;
-	} else if (fmaxf(c.z, p.z) - fminf(c.lo, p.z) > 3 * _params.jump) {
-		c.wall = true;                                // far apart heights: a vertical face
-		c.z  = fmaxf(c.z, p.z);
 	} else if (p.z > c.z + _params.jump) {
 		c.z = p.z;                                    // something stands here: take its top
 	} else {
 		c.z += (p.z - c.z) * _params.smoothing;       // same surface, average the noise
+	}
+	if (fmaxf(c.z, p.z) - fminf((float)c.lo, p.z) > 3 * _params.jump) {
+		c.wall = true;                                // far apart heights: a vertical face
 	}
 	if (p.z < c.lo) {
 		c.lo = (int16_t)fmaxf(p.z, (float)INT16_MIN);
@@ -145,8 +145,14 @@ bool TerrainMap::heightAt(float x, float y, float &z) const
 	if (!c) {
 		return false;
 	}
-	z = c->wall ? c->z + WALL_HEIGHT : c->z;
+	z = c->z;
 	return true;
+}
+
+bool TerrainMap::isFace(float x, float y) const
+{
+	const cell *c = find(index(x), index(y));
+	return c && c->wall;
 }
 
 bool TerrainMap::maxHeightAlong(const LR_point &a, const LR_point &b, float radius, float &z) const
@@ -168,8 +174,8 @@ bool TerrainMap::maxHeightAlong(const LR_point &a, const LR_point &b, float radi
 		for (int oy = -r; oy <= r; oy++) {
 			for (int ox = -r; ox <= r; ox++) {
 				const cell *c = find(cx + ox, cy + oy);
-				if (c && (!found || c->z + (c->wall ? WALL_HEIGHT : 0) > z)) {
-					z = c->z + (c->wall ? WALL_HEIGHT : 0);
+				if (c && (!found || c->z > z)) {
+					z = c->z;
 					found = true;
 				}
 			}

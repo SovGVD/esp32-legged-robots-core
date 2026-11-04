@@ -68,16 +68,18 @@ void test_map_marks_vertical_faces()
 	// a wall's face: one cell hit low and high (more than 3 x jump apart)
 	LR_point low = { 3, 4, -80 }, high = { 3, 4, -40 };
 	map.addPoint(low);
+	TEST_ASSERT_FALSE(map.isFace(3, 4));
 	map.addPoint(high);
+	TEST_ASSERT_TRUE(map.isFace(3, 4));               // not a foothold
 	TEST_ASSERT_TRUE(map.heightAt(3, 4, z));
-	TEST_ASSERT_TRUE(z > 500);                        // not a foothold: far above any step
+	TEST_ASSERT_FLOAT_WITHIN(1e-4f, -40, z);          // its top, for the swing and the edges
 	// lower hits on it later don't make it ground again
 	map.addPoint(low);
-	map.heightAt(3, 4, z);
-	TEST_ASSERT_TRUE(z > 500);
+	TEST_ASSERT_TRUE(map.isFace(3, 4));
 	// a plain cell next to it is ground
 	LR_point floor = { 13, 4, -80 };
 	map.addPoint(floor);
+	TEST_ASSERT_FALSE(map.isFace(13, 4));
 	map.heightAt(13, 4, z);
 	TEST_ASSERT_FLOAT_WITHIN(1e-4f, -80, z);
 }

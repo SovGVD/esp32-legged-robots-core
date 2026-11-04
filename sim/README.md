@@ -573,7 +573,8 @@ goal on the robot; `--nav tof --sensing tof` in `drive.py`). What works:
     over the overlapping cells, `TerrainMap::frameOffset`, 2 mm deadband).
   * Walls and furniture: the ToF hits their faces low and high, and the feet took the low hits as
     steps and climbed the wall. A cell hit at heights more than 3 x `jump` apart is now a vertical
-    face, never a foothold.
+    face (`TerrainMap::isFace`), never a foothold; its height still updates as before (a gap's
+    bottom must stay low for the gap checks).
 
 What doesn't yet: the hexapod with the rough gait gets lost in the rooms (its room scans get
 rejected more, the map pose ends up 1-2 m off), terrain sensing or not; it reached 2 of 3
