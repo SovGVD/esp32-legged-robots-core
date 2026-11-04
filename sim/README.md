@@ -549,6 +549,27 @@ gaps (324 vs 700 mm in the test), hence the mixed mount, which crosses them and 
 step (695 vs 674 mm, a few footholds out of reach).
 Tests: `tests/test_lidar.py` (ToF room scans), `tests/test_terrain.py`, `test/test_tof_scan` (native).
 
+
+### What-if: a new body with MG90S direct drive
+
+`examples/hexapod_body_check.py` puts MG90S servos straight on the joints (no
+printed gears) on the current legs and reports the servo load standing and
+walking, body sag, speed and servo current (total and per leg, from the torque):
+
+    python examples/hexapod_body_check.py --mass 850 1000
+    python examples/hexapod_body_check.py --femur-ratio 1.5 --volts 6
+
+Drive it live: `python examples/drive.py --hexapod --servos mg90s-direct --mass 900`
+(`mg90s-direct-6v` for a 6 V supply).
+
+`tools/hexapod_leg_sizing.py` is a quick static check for a new leg shape
+(coxa / femur / tibia lengths, foot reach and height, mass): femur and tibia
+load as a share of MG90S stall in tripod stance, and how far the centre of
+mass is inside the tripod. It is a slippery-floor worst case, roughly twice
+what the sim reads on a grippy floor.
+
+    python tools/hexapod_leg_sizing.py --mass 800 --shape 60 40 90 18 75
+
 ### Nav with terrain sensing
 
 The same ToF sensors can feed the terrain map and the room scans at once (`terrain on` plus a

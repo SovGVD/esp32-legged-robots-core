@@ -8,6 +8,7 @@ Drive the simulated dog by hand with the real firmware motion code.
   python examples/drive.py --terrain gaps --sensing none     # open loop, like the real robots today
   python examples/drive.py --nav tof                         # two rooms: ToF room scans, click the map to walk there
   python examples/drive.py --hexapod --nav lidar             # the same with the LD06 lidar
+  python examples/drive.py --hexapod --servos mg90s-direct   # what-if: MG90S without the printed gears
 
 --terrain: flat, bumps, rocks, rubble, bars, step, drop, gaps, bridge, course
 (legsim/terrain.py, sized for the robot). With a terrain the gait is the slower
@@ -68,6 +69,9 @@ ap.add_argument("--goal", nargs=2, type=float, metavar=("X", "Y"), help="with --
 ap.add_argument("--mount", type=float, metavar="DEG", help="with --nav tof: ToF sensors DEG down (TOF_SENSORS)")
 ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --nav tof: nose up while scanning")
 ap.add_argument("--gyro-bias", type=float, default=1.0, help="with --nav: gyro drift, deg/s (default 1)")
+ap.add_argument("--servos", default="geared", choices=("geared", "mg90s-direct", "mg90s-direct-6v"),
+                help="hexapod: MG90S + printed gears (now), or MG90S driving the joints directly at 5 / 6 V")
+ap.add_argument("--mass", type=float, metavar="G", help="hexapod: total robot mass, g (default ~892, min ~840)")
 ap.add_argument("--floor", type=float, metavar="MM",
                 help="with --nav: rug, threshold, platform and tiles up to MM high (default 20 dog / 30 hexapod, 0 = none)")
 args = ap.parse_args()
@@ -121,12 +125,21 @@ if args.nav:
 else:
     ground = scenario.scene(model, args.terrain, args.height)
 if model == "hexapod":
-    from legsim.hexapod import SimHexapod
-    dog = fw.place(SimHexapod(terrain=ground))
+    import dataclasses
+    from legsim.hexapod import SimHexapod, HexapodParams
+    from legsim.hexapod.params import mg90s, with_mass, HexHalParams, LINEAR_500_2500
+    hp = HexapodParams()
+    if args.servos != "geared":
+        hp = dataclasses.replace(hp, servo=mg90s(6.0 if args.servos.endswith("6v") else 5.0),
+                                 hal=HexHalParams(ratio=(1.0, 1.0, 1.0)), profile=LINEAR_500_2500)
+    if args.mass:
+        hp = with_mass(hp, args.mass)
+    dog = fw.place(SimHexapod(params=hp, terrain=ground))
     view_distance = 1.1
 else:
     dog = fw.place(SimDog(terrain=ground))
     view_distance = 0.7
+IDEAL = model == "hexapod" and args.servos != "geared"   # firmware HAL still has the geared ratios
 ui = ManualControl(panel=PANEL if nav else None)
 NAV_HELP = ["Map: click = walk there, N scan the room, X stop"] if nav else []
 
@@ -174,7 +187,7 @@ with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
         if not paused:
             # keep the sim in step with the wall clock, one firmware tick at a time
             while dog.data.time - sim_start < time.perf_counter() - wall_start:
-                fw.drive(dog, cmd.as_tuple())
+                fw.drive(dog, cmd.as_tuple(), ideal_servos=IDEAL)
                 if nav:
                     nav["ticks"] += 1
                     if nav["ticks"] % 10 == 0:

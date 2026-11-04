@@ -12,6 +12,7 @@ converts to SI. Every number says where it comes from:
   [est]   engineering guess, tune against the real robot
 """
 
+import dataclasses
 from dataclasses import dataclass, field
 import math
 
@@ -195,3 +196,28 @@ def direct_drive(params: HexapodParams = None, servo: HexServoParams = None) -> 
     p = params or HexapodParams()
     return dataclasses.replace(p, servo=servo or ptk_7465mg(), hal=HexHalParams(ratio=(1.0, 1.0, 1.0)),
                                profile=LINEAR_500_2500)
+
+
+# MG90S (the datasheet the current robot's clone follows): 1.8 kg*cm, 0.10 s/60 deg
+# at 4.8 V; 2.2 kg*cm, 0.08 s/60 deg at 6 V [ds]. Linear in between.
+MG90S = {4.8: (1.8, 0.10), 6.0: (2.2, 0.08)}
+
+
+def mg90s(volts=5.0) -> HexServoParams:
+    """MG90S at `volts` (4.8-6.0). Same loop gains as the default servo,
+    scaled with the torque [est]."""
+    volts = min(max(volts, 4.8), 6.0)
+    f = (volts - 4.8) / 1.2
+    stall_kgcm, s60 = (a + f * (b - a) for a, b in zip(MG90S[4.8], MG90S[6.0]))
+    base = HexServoParams()
+    k = stall_kgcm * _KGCM / base.stall_torque
+    return dataclasses.replace(base, stall_torque=stall_kgcm * _KGCM, no_load_speed=math.radians(60) / s60,
+                               kp=base.kp * k, kd=base.kd * k, friction=base.friction * k)
+
+
+def with_mass(params: HexapodParams, total_g: float) -> HexapodParams:
+    """Change the body mass (the torso lump: screws, wires, bearings, the
+    printed halves) so the robot weighs `total_g`; legs, servos, battery and
+    electronics stay as they are."""
+    m = params.masses
+    return dataclasses.replace(params, masses=dataclasses.replace(m, torso=m.torso + total_g - m.total()))
