@@ -230,13 +230,16 @@ const float SIT_HEIGHT = -30;
  * the terrain code (sim/examples/terrain_walk.py).
  *
  * Two VL53L5CX (8x8 zones, 45 deg field of view) on the front of the body,
- * turned 20 deg left and right and 35 deg down: together they see the ground
- * from just ahead of the front feet to ~400 mm ahead, ~300 mm wide.
+ * turned 20 deg left and right: together they see the ground from just ahead
+ * of the front feet, ~300 mm wide. The left one looks 35 deg down (terrain),
+ * the right one 22 deg down: its top zone rows look nearly level, which the
+ * room scan (TOF_SCAN_PARAMS) needs (at 35 deg the servo ranges can't tilt the
+ * nose up far enough). Both at 22 deg the terrain code missed 70 mm gaps (sim).
  */
 const TofSensor TOF_SENSORS[] = {
 	// position (mm, body frame), yaw (+ = left), tilt down (rad), field of view (rad), zones per side, max range (mm)
 	{ { -25, 90, 10 },  0.35, 0.61, 0.785, 8, 450 },
-	{ {  25, 90, 10 }, -0.35, 0.61, 0.785, 8, 450 },
+	{ {  25, 90, 10 }, -0.35, 0.384, 0.785, 8, 450 },
 };
 #define TOF_SENSOR_COUNT 2
 
@@ -306,16 +309,15 @@ const NavParams NAV_PARAMS = {
 /**
  * Room scans with the ToF sensors instead of a lidar (tof_scan.h, used when
  * LIDAR_TYPE is not set in config.h): the robot stops, tilts its nose up so
- * both front sensors (TOF_SENSORS) look level, turns once around and
+ * the flatter right sensor's (TOF_SENSORS) top rows look level, turns once around and
  * puts what they saw into the same map. Walking to a goal it scans every
  * scanEvery mm. Simulator only so far (sim/examples/lidar_nav.py --tof).
  */
 #define TOF_SCAN_SUPPORTED 1
 const TofScanParams TOF_SCAN_PARAMS = {
-	0.17,   // nose up 10 deg while scanning, about the most the servo ranges allow.
-	        // The top zone row looks 19.7 +- 2.8 deg above the sensor's axis: best is nose up = mount
-	        // angle - 17 deg, so its lower edge is level. With the 35 deg mount the rows still look
-	        // down and walls further than ~1 m are lost: a 22 deg mount and 6 deg work well (sim)
+	0.105,  // nose up 6 deg while scanning. The top zone row looks 19.7 +- 2.8 deg above the
+	        // sensor's axis: nose up = mount angle (22, right sensor) - 17 deg puts its lower edge level. The
+	        // servo ranges allow ~10 deg at most, so the mount can't be much steeper than 27 deg
 	0.3,    // tilt rate, rad/s
 	0.45,   // turning while scanning, rad/s (slow: the sensor's frames lag a little)
 	6.7,    // turn a full circle plus 23 deg of overlap

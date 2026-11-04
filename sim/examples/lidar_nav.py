@@ -12,8 +12,8 @@ writes the move command. The robot starts in the lower of two rooms
   python examples/lidar_nav.py --model hexapod
   python examples/lidar_nav.py --goal -600 3600 --goal 0 0 --png out/map.png
   MUJOCO_GL=egl python examples/lidar_nav.py --video out/dog-lidar.mp4
-  python examples/lidar_nav.py --tof --mount 25 --scan-tilt 8   # no lidar: ToF room scans (flatter sensor mount)
-  MUJOCO_GL=egl python examples/lidar_nav.py --tof --mount 25 --scan-tilt 8 --video out/dog-tof.mp4 --speedup 6
+  python examples/lidar_nav.py --tof                             # no lidar: ToF room scans
+  MUJOCO_GL=egl python examples/lidar_nav.py --tof --video out/dog-tof.mp4 --speedup 6
 
 Map frame = the robot's start pose = the sim's world frame (the robots start
 at the origin facing +Y), so the map pose can be compared with the truth.

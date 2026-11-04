@@ -375,8 +375,9 @@ so the real robots keep walking open loop until sensors are fitted:
 
 `TERRAIN_PARAMS` and `TERRAIN_MAP_PARAMS` in each `model_data.h` hold the
 numbers. Sensor mounts (simulated, nothing is fitted yet): dog, one 8x8 ToF on
-the nose looking 40 deg down; hexapod, two on the front turned 20 deg left and
-right, 35 deg down.
+the nose looking 25 deg down; hexapod, two on the front turned 20 deg left and
+right, the left 35 deg down, the right 22 deg (flatter for the room scans, see
+"ToF room scans"; until PR #25 the dog's was 40 deg and both hexapod ones 35).
 
 In the sim (`legsim/terrain.py`, `legsim/tof.py`): obstacles are static boxes
 (bumps, rocks, rubble, bars, step, drop = walk off a platform); a foot switch is
@@ -501,33 +502,41 @@ Walking to a goal it scans first, then every metre. The simulated VL53L5CX repor
 target of 2 x 2 rays per zone, out to 3 m, ~40 ms late. `set_tof_mount(i, deg)` and
 `tune_tof_scan(...)` try other mounts and scan settings.
 
-    python examples/lidar_nav.py --tof --mount 25 --scan-tilt 8                 # dog, sensor 25 deg down
-    python examples/lidar_nav.py --tof --model hexapod --mount 22 --scan-tilt 6
-    MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --tof --mount 25 --scan-tilt 8 --video out/dog-tof.mp4 --speedup 6
+    python examples/lidar_nav.py --tof                                          # dog
+    python examples/lidar_nav.py --tof --model hexapod
+    python examples/lidar_nav.py --tof --mount 40 --scan-tilt 15                # the old, steeper mount
+    MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --tof --video out/dog-tof.mp4 --speedup 6
 
 The legs can tilt the dog's nose up ~15 deg (with the crouch; 20 deg runs the legs out of reach)
 and the hexapod's ~10 deg (servo ranges). The sensors' top zone row looks 19.7 +- 2.8 deg above
 their axis, and a zone reports the floor under its lower edge before a wall further away, so the
-lower edge has to look level: nose up = mount angle - 17 deg. With today's mounts (dog 40 deg,
+lower edge has to look level: nose up = mount angle - 17 deg. With the old mounts (dog 40 deg,
 hexapod 35 deg down) that is out of reach, walls beyond ~1 m are lost and the robots got lost
-(dog 1 of 3 goals, ~1 m off; hexapod none). With flatter mounts:
+(dog 1 of 3 goals, ~1 m off; hexapod none); dog 30 / hexapod 27 deg (nose up 13 / 10, the legs'
+limit) got lost too. So `TOF_SENSORS` now has the dog's sensor 25 deg down and the hexapod's
+right one 22 deg (the left stays 35 for terrain):
 
 | robot (mount)    | goal              | reached | map pose error   | odometry only    |
 |------------------|-------------------|---------|------------------|------------------|
 | dog (25 deg)     | (-0.7, 3.0) m     | 230 s   | 125 mm, 4.5 deg  | 1325 mm, 39 deg  |
 | dog              | (1.1, 2.9) m      | 48 s    | 127 mm, 3.1 deg  | 1773 mm, 45 deg  |
 | dog              | back to (0.3, 0)  | 74 s    | 90 mm, 2.9 deg   | 1527 mm, 58 deg  |
-| hexapod (22 deg) | (-0.9, 3.9) m     | 172 s   | 326 mm, 0.5 deg  | 284 mm, 6 deg    |
-| hexapod          | (1.3, 3.7) m      | 51 s    | 303 mm, 1.6 deg  | 347 mm, 8 deg    |
-| hexapod          | back to (0.5, 0)  | 98 s    | 290 mm, 0.6 deg  | 389 mm, 10 deg   |
+| hexapod (35+22)  | (-0.9, 3.9) m     | 179 s   | 350 mm, 6 deg    | 292 mm, 10 deg   |
+| hexapod          | (1.3, 3.7) m      | 51 s    | 357 mm, 7 deg    | 370 mm, 12 deg   |
+| hexapod          | back to (0.5, 0)  | 94 s    | 259 mm, 11 deg   | 640 mm, 16 deg   |
 
 Every goal is reached, slowly (each scan is ~16 s standing and turning; the first goal is behind
 a wall the robot hasn't seen, it walks into the corner first). The dog's odometry suffers from the
 scan turns (a few degrees off per turn), which the scans then correct. The hexapod's map pose is
 ~30 cm off, about what its odometry alone is: the sparse scans hardly improve on it at 10 cm
-cells (with 5 cm cells it was 1-10 cm). A flatter mount costs some terrain sensing: the dog crossed
-50 mm gaps worse (345 vs 617 mm walked in 8 s), the hexapod's runs were about the same.
-Tests: `tests/test_lidar.py` (ToF test with the flatter mounts), `test/test_tof_scan` (native).
+cells (with 5 cm cells it was 1-10 cm). With only its right sensor scanning, half its scans are
+rejected and the heading is 6-11 deg off (with both at 22 deg: under 2 deg). What the flatter mounts cost on rough ground (`terrain_walk.py`, ToF sensing, 25 vs 40 deg):
+the dog still climbs the step, bars and rubble and walks as far or further (step 317 vs 268 mm,
+rubble 706 vs 641), but its body brushes the obstacles more often (step 31 vs 0 ticks, bars 40
+vs 0). The dog's gap runs are poor at either angle. Both hexapod sensors at 22 deg walked into 70 mm
+gaps (324 vs 700 mm in the test), hence the mixed mount, which crosses them and climbs the 30 mm
+step (695 vs 674 mm, a few footholds out of reach).
+Tests: `tests/test_lidar.py` (ToF room scans), `tests/test_terrain.py`, `test/test_tof_scan` (native).
 
 ## Plan
 

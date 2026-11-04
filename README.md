@@ -150,11 +150,12 @@ toggles keeping the map as it is (localize only). Parameters: `NAV_PARAMS` and t
   level, turns it once around (~15 s) and puts what they saw near level into the map; walking to a goal it
   scans again every metre (`TOF_SCAN_PARAMS.scanEvery`) and walks on odometry in between, stopping for
   anything higher than 4 cm right ahead (and marking it in the map). `lidar scan` (or the Map view's **Scan**)
-  scans once. The gyro's bias is learned whenever the robot stands. The sensors must be mounted flatter than
-  for terrain alone: the legs only tilt the dog's nose ~15° and the hexapod's ~10°, and the scan wants the
-  top row's lower edge level (nose up = mount angle - 17°). In the sim a dog sensor 25° down (nose up 8°) and
-  hexapod sensors 22° down (6°) reached every goal 3-30 cm off; at today's 40° / 35° walls further than ~1 m
-  are lost and the robots got lost. The VL53L5CX reaches ~2.5 m indoors: rooms are mapped from the middle
+  scans once. The gyro's bias is learned whenever the robot stands. The sensors are mounted flatter than for
+  terrain alone (`TOF_SENSORS`): the legs only tilt the dog's nose ~15° and the hexapod's ~10°, and the scan
+  wants the top row's lower edge level (nose up = mount angle - 17°). **Dog: the nose sensor 25° down** (nose
+  up 8° to scan). **Hexapod: the right sensor 22° down** (6°), the left one stays 35° down for terrain (both
+  at 22° missed 70 mm gaps). In the sim both reached every goal (dog's map pose ~10 cm off, hexapod's ~30 cm and 6-11° with one sensor scanning); at 40° / 35° walls further than
+  ~1 m are lost and the robots got lost, and a middle ground (dog 30°, hexapod 27°) got lost too. The VL53L5CX reaches ~2.5 m indoors: rooms are mapped from the middle
   out, wide halls poorly. Parameters: `TOF_SCAN_PARAMS`, `TOF_MAP_PARAMS`.
 - *Lidar* (LD06 / LD19, `#define LIDAR_TYPE LD06` in `config.h`, or `pio run -e robot-dog-lidar`): scans 10
   times a second while walking, cm accurate. On top of the body, above every part of the robot (the scan

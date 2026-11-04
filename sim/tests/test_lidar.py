@@ -75,19 +75,12 @@ def test_stick_cancels_the_goal():
         fw.reset()
 
 
-# flatter ToF mounts than the terrain-only TOF_SENSORS (see README): sensor down, scan nose up (deg)
-TOF_MOUNT = {"dog": (25, 8), "hexapod": (22, 6)}
-
-
 @needs_cxx
 @pytest.mark.parametrize("model", ["dog", "hexapod"])
 def test_tof_room_scans_map_and_walk_to_a_point(model):
     fw = scenario.core(model)
     try:
-        mount, tilt = TOF_MOUNT[model]
-        for i in range(len(fw.tof_sensors())):
-            fw.set_tof_mount(i, mount)
-        fw.tune_tof_scan(reset=True, tilt=math.radians(tilt))
+        fw.tune_tof_scan(reset=True)   # the model's TOF_SENSORS mounts and TOF_SCAN_PARAMS
         fw.set_heading_sensors(gyro_bias_dps=1.0, magnetometer=False)
         fw.set_tof_nav(True, subrays=2, latency=0.04)
         s = 1.0 if model == "dog" else 1.3
@@ -120,7 +113,5 @@ def test_tof_room_scans_map_and_walk_to_a_point(model):
     finally:
         fw.set_tof_nav(False)
         fw.tune_tof_scan(reset=True)
-        for i in range(len(fw.tof_sensors())):
-            fw.set_tof_mount(i, None)
         fw.set_heading_sensors(None)
         fw.reset()

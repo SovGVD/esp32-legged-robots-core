@@ -3,7 +3,7 @@
  * lidar map, localization and walking to a point without a lidar.
  *
  * The ToF sensors look down at the ground ahead (TOF_SENSORS: the dog's
- * nose sensor 40 deg down, the hexapod's two 35 deg down). To see the walls
+ * nose sensor 25 deg down, the hexapod's right one 22 deg down). To see the walls
  * the robot stops, tilts its nose up (tilt) until the top zone row looks
  * level, and turns in place once around. Every frame, the zones whose ray is
  * within `band` of level and that hit something above the floor become

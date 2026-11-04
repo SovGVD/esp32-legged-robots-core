@@ -217,12 +217,13 @@ const float SIT_HEIGHT = -30;
  * the terrain code (sim/examples/terrain_walk.py).
  *
  * One VL53L5CX (8x8 zones, 45 deg field of view) on the front of the body,
- * looking 40 deg down: from the dog's height it sees the ground ~40 to ~250 mm
- * ahead of the nose.
+ * looking 25 deg down: it sees the ground from just ahead of the nose and, with
+ * the top zone rows, nearly level (the room scan, TOF_SCAN_PARAMS, needs that:
+ * at 40 deg down the legs can't tilt the nose up far enough).
  */
 const TofSensor TOF_SENSORS[] = {
 	// position (mm, body frame), yaw, tilt down (rad), field of view (rad), zones per side, max range (mm)
-	{ { 0, 88, 0 }, 0.0, 0.70, 0.785, 8, 400 },
+	{ { 0, 88, 0 }, 0.0, 0.436, 0.785, 8, 400 },
 };
 #define TOF_SENSOR_COUNT 1
 
@@ -300,10 +301,9 @@ const NavParams NAV_PARAMS = {
  */
 #define TOF_SCAN_SUPPORTED 1
 const TofScanParams TOF_SCAN_PARAMS = {
-	0.26,   // nose up 15 deg while scanning, about the most the legs reach (with the crouch below).
-	        // The top zone row looks 19.7 +- 2.8 deg above the sensor's axis: best is nose up = mount
-	        // angle - 17 deg, so its lower edge is level. With the 40 deg mount the rows still look
-	        // down a little and walls further than ~1 m are lost: a 25 deg mount and 8 deg work well (sim)
+	0.14,   // nose up 8 deg while scanning. The top zone row looks 19.7 +- 2.8 deg above the
+	        // sensor's axis: nose up = mount angle (25) - 17 deg puts its lower edge level. The legs
+	        // reach ~15 deg at most (with the crouch), so the mount can't be much steeper than 30 deg
 	0.3,    // tilt rate, rad/s
 	0.45,   // turning while scanning, rad/s (slow: the sensor's frames lag a little)
 	6.7,    // turn a full circle plus 23 deg of overlap
