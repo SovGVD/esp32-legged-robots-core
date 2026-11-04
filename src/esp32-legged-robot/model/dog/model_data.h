@@ -251,4 +251,44 @@ const TerrainParams TERRAIN_PARAMS = {
 	20     // gap margin, mm: keep 20 mm from a gap (foot ball radius + a map cell, rounded up)
 };
 
+/**
+ * 2D lidar (LD06 / LD19) for indoor mapping and walking to a point (lidar.cpp,
+ * `lidar`, `goto`). On top of the body, in the middle: the scan plane is
+ * ~40 mm above the body origin, ~120 mm above the floor, over the legs and
+ * the head. Simulator only so far.
+ */
+#define LIDAR_SUPPORTED 1
+const LidarParams LIDAR_PARAMS = {
+	{ 0, 0, 40 },  // position, mm, body frame
+	0.0,           // yaw of the sensor's 0 deg, rad (check with `lidar print`)
+	true,          // LD06 / LD19 count clockwise
+	100,           // min range, mm (closer is the robot itself)
+	8000,          // max range, mm
+	10             // min intensity
+};
+
+const LidarMapParams LIDAR_MAP_PARAMS = {
+	50,     // cell size, mm (200 x 200 cells: 10 x 10 m, 40 KB)
+	6000,   // readings up to 6 m go into the map
+	20, 5,  // log-odds: + 20 where a beam ends, - 5 where it passes
+	100,    // cells stay within +-100
+	50,     // map update after 50 mm...
+	0.1,    // ...or 6 deg
+	0.25,   // matches with a mean occupancy under the points below 0.25 are thrown away
+	150,    // ...or that move the odometry guess more than 150 mm
+	0.25    // ...or 14 deg in one scan (0.1 s)
+};
+
+const NavParams NAV_PARAMS = {
+	130,   // robot radius, mm: half the body length plus a little
+	100,   // + 100 mm that still costs more (doorways: walk in the middle)
+	350,   // lookahead, mm
+	120,   // arrived within 120 mm
+	0.8,   // forward command 0.8 of GAIT_PARAMS max speed
+	1.5,   // turn gain, 1/s
+	0.6,   // turn in place for heading errors over 35 deg
+	180,   // stop walking forward with something closer than 180 mm ahead
+	1.0    // replan every second
+};
+
 #endif

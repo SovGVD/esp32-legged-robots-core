@@ -21,6 +21,7 @@ Scenes (each leaves the start area flat):
   gaps()      a raised floor with trenches across the path, narrow to too wide
   bridge()    a ramp up onto a raised deck with gaps in it, and a ramp down
   course()    bars, then bumps, then a step: everything in one run
+  rooms()     two rooms joined by a doorway, with furniture: indoor lidar mapping
 """
 
 import math
@@ -210,6 +211,37 @@ def course(scale=1.0, y0=250.0):
     return t
 
 
+def rooms(scale=1.0, wall=250.0, thick=60.0, door=800.0):
+    """Two rooms of a flat (lidar mapping and walking to a point): the robot starts
+    in the lower room facing +Y; a wall with a doorway (`door` mm wide, at x ~ 1 m)
+    leads to the upper room. Furniture: a sofa, a cabinet, a table on four legs
+    (the lidar sees the legs only) and a box. Walls `wall` mm high, over the lidar's
+    scan plane. scale > 1 makes the rooms bigger (the hexapod is wider)."""
+    s = scale
+    t = Terrain(f"rooms{scale:g}")
+    x0, x1 = -1600 * s, 1800 * s      # side walls
+    y0, ym, y1 = -900 * s, 2200 * s, 4800 * s   # back wall, middle wall, front wall
+    w = lambda cx, cy, sx, sy: t.add_box(cx, cy, wall, sx, sy)
+    w((x0 + x1) / 2, y0, x1 - x0 + thick, thick)
+    w((x0 + x1) / 2, y1, x1 - x0 + thick, thick)
+    w(x0, (y0 + y1) / 2, thick, y1 - y0)
+    w(x1, (y0 + y1) / 2, thick, y1 - y0)
+    # middle wall with a doorway centred at x = 1000 s
+    dc = 1000 * s
+    w((x0 + dc - door / 2) / 2, ym, dc - door / 2 - x0, thick)
+    w((dc + door / 2 + x1) / 2, ym, x1 - dc - door / 2, thick)
+    # lower room: sofa on the left, a box on the right
+    t.add_box(-1150 * s, 700 * s, 220, 600, 1400 * s)
+    t.add_box(1200 * s, -300 * s, 300, 400, 400)
+    # upper room: cabinet against the front wall, table legs, a box
+    t.add_box(800 * s, y1 - 250, 400, 1000, 400)
+    for lx in (-700 * s, -100 * s):
+        for ly in (3300 * s, 3900 * s):
+            t.add_box(lx, ly, 400, 40, 40)
+    t.add_box(1300 * s, 3300 * s, 300, 400, 500, yaw=0.4)
+    return t
+
+
 SCENES = {
     "flat": flat,
     "bumps": bumps,
@@ -221,4 +253,5 @@ SCENES = {
     "gaps": gaps,
     "bridge": bridge,
     "course": course,
+    "rooms": rooms,
 }

@@ -11,6 +11,7 @@ interface FirmwareConfig {
   l?: number; // 1 = IMU leveling available
   t?: number; // number of ToF sensors, 0 = none
   r?: number; // ToF range, mm (colour scale)
+  n?: number; // 1 = lidar map and navigation
   m?: number[][]; // ToF mounting per sensor: [x, y, z (mm, body frame), yaw, tilt, fov (rad)]
 }
 
@@ -35,6 +36,7 @@ export interface Config {
   tofSensors: number;
   tofRange: number;
   tofMounts: TofMount[];
+  lidar: boolean;
 }
 
 export function loadConfig(): Config {
@@ -49,6 +51,7 @@ export function loadConfig(): Config {
     levelToggle: fw.l === 1,
     tofSensors: fw.t ?? 0,
     tofRange: fw.r || 400,
+    lidar: fw.n === 1,
     tofMounts: (fw.m ?? []).map(([x, y, z, yaw, tilt, fov]) => ({ x, y, z, yaw, tilt, fov })),
   };
 }

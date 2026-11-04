@@ -15,6 +15,8 @@ const ModelTerrain MODEL_TERRAIN = {
 	TOF_SENSORS, TOF_SENSOR_COUNT, &TERRAIN_MAP_PARAMS, &TERRAIN_PARAMS, &GAIT_PARAMS_ROUGH, TERRAIN_TILT_MODE
 };
 
+const ModelLidar MODEL_LIDAR = { &LIDAR_PARAMS, &LIDAR_MAP_PARAMS, &NAV_PARAMS };
+
 const GaitParams *const MODEL_WALK_GAIT = nullptr;   // one gait only
 
 const cliCommand *modelCliCommands     = nullptr;

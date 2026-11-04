@@ -450,6 +450,41 @@ Findings (rough gait, full stick, 8 s dog / 6 s hexapod; `--compare`):
   stuck the robot falls behind its odometry and the map slides with it;
   cells are forgotten after `maxAge` (dog 10 s, hexapod 6 s).
 
+## Lidar: indoor map and walking to a point
+
+`FirmwareCore.set_lidar(True)` puts a simulated LD06 on the robot (`legsim/lidar.py`,
+mount from `LIDAR_PARAMS` in `model_data.h`): 10 rev/s, 4500 points/s, each point cast
+from where the lidar is at that moment (a walking, turning, rocking robot skews the scan
+like the real one), ~10 mm + 1 % noise, packed into real LD06 packets (CRC-8) and fed to the
+firmware's own driver as UART bytes. The firmware code (`lib/robot_core` `lidar`,
+`lidar_slam`, `navigator`) parses them, builds the map, corrects the odometry and plans;
+`nav_goal(x, y)` is the CLI's `goto` (mm), `nav_state()`, `nav_path()`, `lidar_pose()`
+(map and odometry pose), `lidar_map()` read it back. The scene `terrain.rooms()` is two rooms
+joined by an 80 cm doorway, with a sofa, a cabinet, table legs and boxes.
+
+    python examples/lidar_nav.py                      # dog: three goals, through the door and back
+    python examples/lidar_nav.py --model hexapod
+    MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --video out/dog-lidar.mp4 --png out/map.png
+
+Results (gyro drifting 1 deg/s, no magnetometer: indoors it is thrown off by steel and wiring):
+
+| robot   | goal              | reached | lidar pose error | odometry only   |
+|---------|-------------------|---------|------------------|-----------------|
+| dog     | (-0.7, 3.0) m     | 35 s    | 69 mm, 0.1 deg   | 1080 mm, 34 deg |
+| dog     | (1.1, 2.9) m      | 17 s    | 56 mm, 0.3 deg   | 968 mm, 47 deg  |
+| dog     | back to (0.3, 0)  | 26 s    | 36 mm, 0.0 deg   | 1986 mm, 75 deg |
+| hexapod | (-0.9, 3.9) m     | 37 s    | 63 mm, 0.7 deg   | 1278 mm, 40 deg |
+| hexapod | (1.3, 3.7) m      | 17 s    | 47 mm, 0.8 deg   | 1311 mm, 58 deg |
+| hexapod | back to (0.5, 0)  | 27 s    | 52 mm, 0.5 deg   | 3343 mm, 85 deg |
+
+The odometry alone is useless after a few metres (the dog's feet slip, the gyro drifts); with
+the lidar the pose stays within a few cm. The remaining error is mostly the 5 cm map cells:
+the matcher pulls points toward cell centres, up to half a cell. No rejected scans, no CRC
+errors. Limits: the map is 10 x 10 m around the start (larger flats need a bigger grid or a
+moving map), no loop closure (a long loop through several rooms can come back a little off),
+things below the scan plane are invisible to it, and moving people leave marks that fade as
+the lidar sees through them again. Tests: `tests/test_lidar.py`, `test/test_lidar` (native).
+
 ## Plan
 
 1. **Model (done).** Parametric MJCF, servo and IMU models, tests that

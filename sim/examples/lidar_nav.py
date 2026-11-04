@@ -1,0 +1,223 @@
+"""
+Indoor mapping and walking to a point with the LD06 lidar, in the sim.
+
+The firmware's own code does everything: the LD06 driver parses the
+simulated lidar's UART bytes, LidarSlam builds the map and corrects the
+odometry (gait velocity + a gyro with a constant drift, no magnetometer:
+indoors it is thrown off by steel and wiring), Navigator plans a path and
+writes the move command. The robot starts in the lower of two rooms
+(legsim.terrain.rooms) and walks to each goal in turn.
+
+  python examples/lidar_nav.py                       # dog, default goals, prints the result
+  python examples/lidar_nav.py --model hexapod
+  python examples/lidar_nav.py --goal -600 3600 --goal 0 0 --png out/map.png
+  MUJOCO_GL=egl python examples/lidar_nav.py --video out/dog-lidar.mp4
+
+Map frame = the robot's start pose = the sim's world frame (the robots start
+at the origin facing +Y), so the map pose can be compared with the truth.
+"""
+import argparse
+import math
+import os
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from legsim import scenario, terrain  # noqa: E402
+from legsim.firmware import FirmwareCore  # noqa: E402
+
+GOALS = {
+    "dog": [(-700, 3000), (1100, 2900), (300, 0)],
+    "hexapod": [(-900, 3900), (1300, 3700), (500, 0)],
+}
+SCALE = {"dog": 1.0, "hexapod": 1.3}
+
+try:
+    FONT = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+    SMALL = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 17)
+except OSError:
+    FONT = SMALL = ImageFont.load_default()
+
+
+def draw_map(grid, cell, size, view, true_path, map_path, odom_path, plan, goal, pose, points, title=None):
+    """The firmware map as the web UI would show it, plus the true / lidar / odometry tracks.
+    view: (xmin, xmax, ymin, ymax) mm."""
+    n = grid.shape[0]
+    xmin, xmax, ymin, ymax = view
+    W, H = size
+    scale = min(W / (xmax - xmin), H / (ymax - ymin))
+
+    def px(x, y):
+        return ((x - xmin) * scale, H - (y - ymin) * scale)
+
+    # cells -> image (map y up)
+    img = np.full((n, n, 3), 205, np.uint8)
+    img[grid < 0] = (250, 250, 250)
+    occ = np.clip(grid.astype(int), 0, 40) / 40.0
+    mask = grid > 0
+    img[mask] = (np.stack([1 - occ[mask]] * 3, axis=1) * 150).astype(np.uint8)
+    half = n / 2 * cell
+    im = Image.fromarray(img[::-1])
+    x0, y0 = px(-half, half)
+    x1, y1 = px(half, -half)
+    im = im.resize((max(1, int(round(x1 - x0))), max(1, int(round(y1 - y0)))), Image.NEAREST)
+    out = Image.new("RGB", size, (205, 205, 205))
+    out.paste(im, (int(round(x0)), int(round(y0))))
+    d = ImageDraw.Draw(out)
+
+    def line(path, color, width):
+        if len(path) > 1:
+            d.line([px(p[0], p[1]) for p in path], fill=color, width=width)
+
+    line(odom_path, (220, 60, 50), 2)
+    line(true_path, (40, 170, 60), 3)
+    line(map_path, (40, 90, 220), 2)
+    if plan is not None and len(plan) > 1:
+        line(plan, (250, 160, 0), 2)
+    if pose is not None:
+        s, c = math.sin(pose[2]), math.cos(pose[2])
+        for bx, by in points[::2]:
+            x, y = pose[0] + bx * c - by * s, pose[1] + bx * s + by * c
+            q = px(x, y)
+            d.ellipse([q[0] - 1.5, q[1] - 1.5, q[0] + 1.5, q[1] + 1.5], fill=(240, 30, 30))
+        q = px(pose[0], pose[1])
+        tip = px(pose[0] - 200 * s, pose[1] + 200 * c)
+        d.ellipse([q[0] - 6, q[1] - 6, q[0] + 6, q[1] + 6], outline=(20, 60, 200), width=3)
+        d.line([q, tip], fill=(20, 60, 200), width=3)
+    if goal is not None:
+        q = px(*goal)
+        d.line([q[0] - 8, q[1] - 8, q[0] + 8, q[1] + 8], fill=(200, 0, 160), width=3)
+        d.line([q[0] - 8, q[1] + 8, q[0] + 8, q[1] - 8], fill=(200, 0, 160), width=3)
+    y = 6
+    if title:
+        d.text((8, y), title, font=FONT, fill=(0, 0, 0))
+        y += 28
+    d.rectangle([4, y - 2, 190, y + 4 * 21 + 2], fill=(255, 255, 255))
+    for label, color in (("true path (sim)", (40, 170, 60)), ("lidar map pose", (40, 90, 220)),
+                         ("odometry only", (220, 60, 50)), ("planned path", (250, 160, 0))):
+        d.line([8, y + 9, 28, y + 9], fill=color, width=3)
+        d.text((34, y), label, font=SMALL, fill=(0, 0, 0))
+        y += 21
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--model", default="dog", choices=("dog", "hexapod"))
+    ap.add_argument("--goal", nargs=2, type=float, action="append", metavar=("X", "Y"),
+                    help="map point in mm (repeat for several); default: through the doorway and back")
+    ap.add_argument("--gyro-bias", type=float, default=1.0, help="gyro drift, deg/s (default 1)")
+    ap.add_argument("--timeout", type=float, default=90.0, help="s per goal")
+    ap.add_argument("--png", help="write the final map with the tracks")
+    ap.add_argument("--video", help="write a video (needs MUJOCO_GL=egl or xvfb-run)")
+    ap.add_argument("--seed", type=int, default=0)
+    args = ap.parse_args()
+
+    model = args.model
+    goals = [tuple(g) for g in args.goal] if args.goal else GOALS[model]
+    fw = FirmwareCore(model=model)
+    fw.set_heading_sensors(gyro_bias_dps=args.gyro_bias, magnetometer=False, seed=args.seed)
+    fw.set_lidar(True, seed=args.seed)
+    scene = terrain.rooms(scale=SCALE[model])
+    robot = fw.place(scenario.make_robot(model, scene))
+    dt = fw.loop_dt
+    view = (-2400 * SCALE[model], 2600 * SCALE[model], -1300 * SCALE[model], 5200 * SCALE[model])
+
+    rec = None
+    if args.video:
+        import mujoco
+        rec = {"r": mujoco.Renderer(robot.model, 540, 540), "cam": mujoco.MjvCamera(), "frames": [], "next": 0.0}
+        rec["cam"].distance = 2.6 if model == "dog" else 3.3
+        rec["cam"].elevation = -55
+        rec["cam"].azimuth = 90
+
+    true_path, map_path, odom_path = [], [], []
+    t = 0.0
+    results = []
+
+    def tick(goal):
+        nonlocal t
+        fw.drive(robot)
+        t += dt
+        p = robot.body_position_mm()
+        mp, op = fw.lidar_pose()
+        if int(t / dt) % 10 == 0:
+            true_path.append((p[0], p[1]))
+            map_path.append((mp[0], mp[1]))
+            odom_path.append((op[0], op[1]))
+        if rec is not None and t >= rec["next"]:
+            rec["next"] += 1 / 15
+            frame(goal)
+
+    def frame(goal):
+        import mujoco
+        r, cam = rec["r"], rec["cam"]
+        cam.lookat[:] = robot.data.xpos[robot._torso]
+        r.update_scene(robot.data, cam)
+        fw.lidar.draw(robot, r.scene)
+        left = Image.fromarray(r.render())
+        grid, cell = fw.lidar_map()
+        mp, _ = fw.lidar_pose()
+        ns = fw.nav_state()
+        right = draw_map(grid, cell, (420, 540), view, true_path, map_path, odom_path, fw.nav_path(), goal, mp,
+                         fw.lidar_points())
+        img = Image.new("RGB", (960, 540))
+        img.paste(left, (0, 0))
+        img.paste(right, (540, 0))
+        d = ImageDraw.Draw(img)
+        d.text((12, 10), f"{model}: LD06 lidar map + walk to point", font=FONT, fill=(255, 255, 255),
+               stroke_width=3, stroke_fill=(0, 0, 0))
+        d.text((12, 40), f"t {t:4.1f} s   nav: {ns['state']}{'  (blocked ahead)' if ns['blocked'] else ''}",
+               font=SMALL, fill=(255, 255, 255), stroke_width=3, stroke_fill=(0, 0, 0))
+        rec["frames"].append(np.asarray(img))
+
+    for _ in range(int(1.0 / dt)):   # stand: first scans
+        tick(None)
+    for goal in goals:
+        fw.nav_goal(*goal)
+        start = t
+        while t - start < args.timeout:
+            tick(goal)
+            if fw.nav_state()["state"] not in ("active",):
+                break
+        for _ in range(int(0.5 / dt)):
+            tick(goal)
+        ns = fw.nav_state()
+        p = robot.body_position_mm()
+        yaw = robot.body_orientation()["yaw"]
+        mp, op = fw.lidar_pose()
+        res = {
+            "goal": goal, "state": ns["state"], "time": t - start,
+            "to_goal": math.hypot(p[0] - goal[0], p[1] - goal[1]),
+            "map_err": math.hypot(mp[0] - p[0], mp[1] - p[1]),
+            "map_yaw_err": math.degrees(abs((mp[2] - yaw + math.pi) % (2 * math.pi) - math.pi)),
+            "odom_err": math.hypot(op[0] - p[0], op[1] - p[1]),
+            "odom_yaw_err": math.degrees(abs((op[2] - yaw + math.pi) % (2 * math.pi) - math.pi)),
+        }
+        results.append(res)
+        print(f"goal ({goal[0]:6.0f}, {goal[1]:6.0f}): {res['state']:8s} in {res['time']:5.1f} s, "
+              f"true distance to goal {res['to_goal']:4.0f} mm | lidar pose error {res['map_err']:4.0f} mm "
+              f"{res['map_yaw_err']:4.1f} deg | odometry only {res['odom_err']:5.0f} mm {res['odom_yaw_err']:5.1f} deg")
+    ls = fw.lidar_state()
+    print(f"scans {ls['scans']}, rejected {ls['rejected']}, packets {ls['packets']}, CRC errors {ls['crc_errors']}")
+
+    if args.png:
+        grid, cell = fw.lidar_map()
+        mp, _ = fw.lidar_pose()
+        img = draw_map(grid, cell, (700, 910), view, true_path, map_path, odom_path, None, None, mp,
+                       fw.lidar_points(), title=f"{model}: firmware map after {t:.0f} s")
+        os.makedirs(os.path.dirname(os.path.abspath(args.png)), exist_ok=True)
+        img.save(args.png)
+        print("wrote", args.png)
+    if rec is not None:
+        import mediapy
+        os.makedirs(os.path.dirname(os.path.abspath(args.video)), exist_ok=True)
+        mediapy.write_video(args.video, rec["frames"], fps=15)
+        print("wrote", args.video)
+    return results
+
+
+if __name__ == "__main__":
+    main()
