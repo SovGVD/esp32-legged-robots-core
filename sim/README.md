@@ -579,7 +579,7 @@ What doesn't yet: the hexapod with the rough gait gets lost in the rooms (its ro
 rejected more, the map pose ends up 1-2 m off), terrain sensing or not; it reached 2 of 3
 goals on the plain floor and none with `floor=30`. That is the nav with the slower gait, not the
 terrain map (it stays upright). `drive.py --nav` keeps the hexapod's terrain sensing
-off for now.
+off for now. Follow-up: issue #27.
 
 ## Plan
 
