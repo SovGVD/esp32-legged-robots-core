@@ -97,11 +97,11 @@ class HexGeometry:
 
 @dataclass
 class HexMasses:
-    """Grams, ~1137 g in all. Legs: coxa print 35.1 + its servo 13.4; femur print
+    """Grams, ~1122 g in all. Legs: coxa print 35.1 + its servo 13.4; femur print
     20.1 + 2 servos; tibia prints 15.1 + foot switch 2 [CAD, cad/hexapod, solid PLA:
-    real prints with infill come out somewhat lighter]. Body: plates, columns, ToF mount, battery cartridge and latches 142 [CAD], cells,
+    real prints with infill come out somewhat lighter]. Body: plates, columns, ToF mount, battery cartridge and latches 126 [CAD], cells,
     boards, screws, wires [design]."""
-    torso: float = 462.3
+    torso: float = 446.7
     battery: float = 100.0      # 2x 18650 (~47 g each) + holder [ds, est]
     electronics: float = 55.0   # ESP32, 2x PCA9685, 7x Mini360, GY-91, 2x VL53L5CX, fuse, switch [est]
     coxa: float = 48.5

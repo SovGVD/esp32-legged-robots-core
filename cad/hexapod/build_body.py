@@ -85,6 +85,37 @@ def rib(x0, y0, x1, y1, z0, z1):
     return b
 
 
+def footprint(solid, z0, z1, grow):
+    """A solid's outline from below, grown by `grow`, as a prism z0..z1: full thickness under it."""
+    faces = [f for f in solid.Faces if f.Surface.TypeId == "Part::GeomPlane" and f.normalAt(0, 0).z < -0.999]
+    if not faces:
+        return None
+    low = min(faces, key=lambda f: f.BoundBox.ZMin)
+    wire = low.OuterWire.makeOffset2D(grow, 0) if grow else low.OuterWire
+    face = Part.Face(wire)
+    face.translate(App.Vector(0, 0, z0 - face.BoundBox.ZMin))
+    return face.extrude(App.Vector(0, 0, z1 - z0))
+
+
+def pockets(z0, z1, keep_solids, extra, hang=False):
+    """Pockets z0..z1 inside the border rib's outline, around everything that keeps full thickness,
+    crossed by a diagonal rib grid."""
+    keep = [k for k in (footprint(sd, z0 - 1, z1 + 1, v("keep_margin")) for sd in keep_solids) if k is not None] + extra
+    pitch, gt = v("grid_pitch"), v("grid_rib_t")
+    for k in range(-8, 9):
+        for ang in (45, -45):
+            # the bottom plate's grid stands on its skin (z0); the top plate's hangs from its skin (z1)
+            gh = min(v("grid_rib_h"), z1 - z0)
+            gz = z1 - gh if hang else z0 - 1
+            b = Part.makeBox(300, gt, gh + 1, App.Vector(-150, -gt / 2, gz))
+            b.rotate(App.Vector(0, 0, 0), App.Vector(0, 0, 1), ang)
+            b.translate(App.Vector(k * pitch * math.sqrt(2), 0, 0))
+            keep.append(b)
+    out = prism(inner, "xy", z0, z1).cut(Part.makeCompound(keep))
+    print("  pockets: %d, widest %.1f mm across" % (len(out.Solids), max(min(p.BoundBox.XLength, p.BoundBox.YLength) for p in out.Solids)))
+    return out
+
+
 COLUMNS = [(sx * v("col_front_x"), sy * v("col_front_y")) for sx in (1, -1) for sy in (1, -1)] + \
           [(sx * v("col_side_x"), sy * v("col_side_y")) for sx in (1, -1) for sy in (1, -1)]
 
@@ -97,7 +128,7 @@ sx_, sy_ = v("col_side_x"), v("col_side_y")
 h_b = top_bot + v("rib_bot_h")
 # ribs on the bottom plate: where nothing stands, in front of the ESP32 and behind the holder
 bot_parts += [rib(-fx, fy, fx, fy, top_bot, h_b), rib(-fx, -fy, fx, -fy, top_bot, h_b)]
-skin = top_bot - v("body_skin_t")
+skin = top_bot - v("body_skin_t")          # the battery cartridge's floor
 for _, x, y, __, ___ in AXES:
     bot_parts.append(rod(v("bear_boss_d"), top_bot - z_bot, (x, y, z_bot), "z"))
 for x, y in COLUMNS:
@@ -140,7 +171,8 @@ bot_parts.append(prism(cart_outline(cfit + v("cart_band_w")), "xy", z_bot, top_b
 for lx, ly, _ in LATCHES.values():
     bot_parts.append(rod(7.0, top_bot - z_bot, (lx, ly, z_bot), "z"))
 bot_parts.append(rod(7.0, 3.0, (LATCHES["r"][0], LATCHES["r"][1], top_bot), "z"))   # thread for the rear latch's screw (the front one's goes into the ESP32's slot rail)
-bottom_solid = plate_prism(skin, top_bot).fuse(bot_parts).removeSplitter()
+bottom_solid = plate_prism(z_bot, top_bot).fuse(bot_parts).removeSplitter()
+bottom_solid = bottom_solid.cut(pockets(z_bot + v("bot_skin_t"), top_bot + 0.01, bot_parts[1:], [])).removeSplitter()
 
 bot_cuts = []
 for _, x, y, __, ___ in AXES:
@@ -197,8 +229,15 @@ for _, x, y, yaw, __ in AXES:
 for x, y in COLUMNS:
     top_cuts.append(rod(2.2, v("top_plate_t") + 2, (x, y, top0 - 1), "z"))
     top_cuts.append(rod(v("col_d") + v("col_fit"), v("rib_h") + 1, (x, y, r_low - 1), "z"))   # the column stands here, its top against the plate
+pf_ = v("pwr_frame") + v("pwr_fit")
+top_keep_extra = [block(-9.5, 9.5, -13, 13, top0 - 1, top1),                                   # under the GY-91
+                  block(v("pwr_x") - v("pwr_body_w") / 2 - pf_ - 1, v("pwr_x") + v("pwr_body_w") / 2 + pf_ + 1,
+                        v("pwr_y") - v("pwr_body_len") / 2 - pf_ - 1, v("pwr_y") + v("pwr_body_len") / 2 + pf_ + 1, top0 - 1, top1)] + \
+                 [rod(8.0, top1 - top0 + 2, (sx * v("tof_mount_screw_x"), v("tof_mount_screw_y"), top0 - 1), "z") for sx in (1, -1)] + \
+                 [rod(8.5, top1 - top0 + 2, (0, v("tof_wire_y"), top0 - 1), "z")]
+top_pockets = pockets(top0 - 0.01, top1 - v("top_skin_t"), top_parts[1:], top_keep_extra, hang=True)
 top_shape = plate_prism(top0, top1).fuse(top_parts).common(plate_prism(r_low - 1, top1 + 1).fuse(
-    [rod(v("top_boss_d"), boss_h, (x, y, hub_z), "z") for _, x, y, __, ___ in AXES])).cut(Part.makeCompound(top_cuts)).removeSplitter()
+    [rod(v("top_boss_d"), boss_h, (x, y, hub_z), "z") for _, x, y, __, ___ in AXES])).cut(top_pockets).cut(Part.makeCompound(top_cuts)).removeSplitter()
 print("raw", len(bottom_shape.Solids), len(top_shape.Solids), bottom_shape.isValid(), top_shape.isValid())
 
 # ------------------------------------------------------------ round the plates' outlines
@@ -208,7 +247,7 @@ edge_r = v("body_edge_r")
 def bottom_sharp(e):
     """Only the plate's own outer rim gets rounded; the seats, rails and rings stay."""
     bb = e.BoundBox
-    return not (bb.ZLength < 1e-4 and abs(bb.ZMin - skin) < 1e-4)
+    return not (bb.ZLength < 1e-4 and abs(bb.ZMin - z_bot) < 1e-4)
 
 
 def top_sharp(e):
@@ -278,6 +317,7 @@ top = common["as_part"](doc, part, "Body_Top", top_final, COL_TOP)
 tof_mount = common["as_part"](doc, part, "Body_ToF_Mount", mount, COL_TOP)
 col_len = top0 - top_bot
 col_raw = rod(v("col_d"), col_len, (0, 0, 0), "z").cut(Part.makeCompound([
+    rod(v("col_bore_d"), col_len - 2 * v("col_screw_depth"), (0, 0, v("col_screw_depth")), "z"),
     rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, -1), "z"),
     rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, col_len - v("col_screw_depth")), "z")]))
 col_edges = [e for e in col_raw.Edges if e.Curve.TypeId == "Part::GeomCircle" and abs(e.Curve.Radius - v("col_d") / 2) < 1e-4]
