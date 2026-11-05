@@ -30,12 +30,10 @@ def p(alias):
 class Dummy:
     def __init__(self, name, index):
         self.name = name
-        old = doc.getObject("Dummy_" + name)
-        if old:
-            for child in old.Group:
-                doc.removeObject(child.Name)
-            doc.removeObject(old.Name)
-        self.part = doc.addObject("App::Part", "Dummy_" + name)
+        # keep the part itself: links in the check assemblies point at it
+        self.part = doc.getObject("Dummy_" + name) or doc.addObject("App::Part", "Dummy_" + name)
+        for child in self.part.Group:
+            doc.removeObject(child.Name)
         self.part.setExpression("Placement.Base.x", "%d * %s" % (index, p("catalog_pitch")))
 
     def _add(self, kind, sub, x, y, z, color):
@@ -80,14 +78,18 @@ def mg90s(i):
           "0 mm", "0 mm", p("mg90_body_top"), BLUE)
     d.cyl("shaft", p("mg90_shaft_d"), "%s - %s" % (p("mg90_shaft_top"), p("mg90_turret_top")),
           "0 mm", "0 mm", p("mg90_turret_top"), SILVER)
+
+
+def horn(i):
+    # own part: each joint turns its horn to its own angle on the servo
+    d = Dummy("Horn", i)
     hub_z = "%s + %s" % (p("mg90_turret_top"), p("horn_gap"))
-    d.cyl("horn_hub", p("horn_hub_d"), p("horn_hub_h"), "0 mm", "0 mm", hub_z, WHITE)
+    d.cyl("hub", p("horn_hub_d"), p("horn_hub_h"), "0 mm", "0 mm", hub_z, WHITE)
     arm_z = "%s - %s" % (p("horn_top"), p("horn_arm_t"))
-    # cross horn: long arms along X, short arms along Y
     arm = "%s - %s" % (p("horn_span"), p("horn_tip_w"))
-    d.cbox("horn_arm", arm, p("horn_tip_w"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
-    d.cbox("horn_short_arm", p("horn_short_w"), p("horn_short_span"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
-    for sub, sign in (("horn_tip_a", ""), ("horn_tip_b", "-")):
+    d.cbox("arm", arm, p("horn_tip_w"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
+    d.cbox("short_arm", p("horn_short_w"), p("horn_short_span"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
+    for sub, sign in (("tip_a", ""), ("tip_b", "-")):
         d.cyl(sub, p("horn_tip_w"), p("horn_arm_t"), "%s(%s) / 2" % (sign, arm), "0 mm", arm_z, WHITE)
 
 
@@ -177,13 +179,18 @@ def microswitch(i):
 def bearing(i):
     d = Dummy("Bearing", i)
     d.cyl("ring", p("bearing_od"), p("bearing_t"), "0 mm", "0 mm", "0 mm", SILVER)
-    # dark plug standing for the bore, proud of the ring so it shows
-    d.cyl("bore", p("bearing_id"), "%s + 0.1 mm" % p("bearing_t"), "0 mm", "0 mm", "0 mm", BLACK)
+    bore = d.cyl("bore", p("bearing_id"), p("bearing_t"), "0 mm", "0 mm", "0 mm", BLACK)
+    ring = doc.getObject("Bearing_ring")
+    cut = doc.addObject("Part::Cut", "Bearing_body")
+    d.part.addObject(cut)
+    cut.Base, cut.Tool = ring, bore
+    ring.ViewObject.Visibility = bore.ViewObject.Visibility = False
+    cut.ViewObject.ShapeColor = SILVER
 
 
 BUILDERS = {"MG90S": mg90s, "18650_pair": cells, "PCA9685": pca9685, "Mini360": mini360,
             "ESP32_devkit": esp32, "GY91": gy91, "VL53L5CX": vl53l5cx, "Microswitch": microswitch,
-            "Bearing": bearing}
+            "Bearing": bearing, "Horn": horn}
 ORDER = list(BUILDERS)
 
 for name in globals().get("PARTS") or ORDER:
