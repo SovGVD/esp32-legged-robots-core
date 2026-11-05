@@ -80,9 +80,11 @@ def build(case, load, bonded):
         columns = []
         for o in src.getObject("Body_Check").Group:
             if o.Name.startswith("BodyCheck_column"):
-                c = src.getObject("Body_Column").Shape.copy()
-                c.Placement = o.Placement.multiply(c.Placement)
-                columns.append(c)
+                # a solid rod 0.2 mm into each plate: faces that only touch don't mesh
+                import Part
+                p0 = o.Placement.Base
+                columns.append(Part.makeCylinder(val("col_d") / 2, val("top_plate_z0") - val("body_plate_top") + 0.4,
+                                                 App.Vector(p0.x, p0.y, val("body_plate_top") - 0.2)))
         shape = src.getObject("Body_Bottom").Shape.multiFuse(columns + [src.getObject("Body_Top").Shape]).removeSplitter()
         if len(shape.Solids) != 1:
             raise ValueError("the plates did not join: %d solids" % len(shape.Solids))
@@ -199,8 +201,8 @@ def build(case, load, bonded):
     an.addObject(fixed)
     mesh = ObjectsFem.makeMeshGmsh(doc, "Mesh")
     mesh.Shape = obj
-    mesh.CharacteristicLengthMax = 3.0 if case == "body" else 1.6
-    mesh.CharacteristicLengthMin = 0.3
+    mesh.CharacteristicLengthMax = float(globals().get("MESH_MAX", 3.0 if case == "body" else 1.6))
+    mesh.CharacteristicLengthMin = float(globals().get("MESH_MIN", 0.3))
     mesh.ElementOrder = "2nd"
     mesh.SecondOrderLinear = True   # straight element edges: curved ones invert on small features
     an.addObject(mesh)
@@ -208,7 +210,8 @@ def build(case, load, bonded):
     from femmesh.gmshtools import GmshTools
     err = GmshTools(mesh).create_mesh()
     if err:
-        print("gmsh:", err[:200])
+        print("gmsh:", err[:300])
+    print("mesh nodes", mesh.FemMesh.NodeCount, "solids", len(obj.Shape.Solids), "valid", obj.Shape.isValid())
     solver = ObjectsFem.makeSolverCalculiXCcxTools(doc, "CalculiX")
     an.addObject(solver)
     doc.recompute()
@@ -233,7 +236,7 @@ def build(case, load, bonded):
             for face in faces:
                 nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))
         if not nodes:
-            raise ValueError("no mesh nodes on " + label)
+            raise ValueError("no mesh nodes on %s (mesh has %d nodes, %s)" % (label, mesh.FemMesh.NodeCount, faces))
         lines += ["%d,%d,%.8E" % (n, dof, newtons / len(nodes)) for n in sorted(nodes)]
         totals[dof] = totals.get(dof, 0.0) + newtons
         arrows.append((label, nodes, newtons, dof))
