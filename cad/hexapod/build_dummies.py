@@ -1,0 +1,172 @@
+"""Step 2: simple dummies of the bought parts, one App::Part each, built from
+primitives whose sizes and positions are expressions on Params.
+
+Every dummy lies in its own part coordinates (see the Params section headers);
+the assembly will place it with an App::Link. Here they only stand in a row
+along X (catalog_pitch).
+
+Run with init_globals={"PARTS": ["MG90S", ...]} to build some, or all by default.
+Re-running replaces those parts.
+"""
+import os
+import runpy
+
+import FreeCAD as App
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+common = runpy.run_path(os.path.join(HERE, "common.py"))
+
+doc = common["get_doc"]()
+
+BLUE, GOLD, GREY = (0.11, 0.2, 0.55), (0.75, 0.6, 0.2), (0.25, 0.25, 0.28)
+BLACK, WHITE, SILVER = (0.08, 0.08, 0.08), (0.92, 0.92, 0.9), (0.72, 0.73, 0.75)
+PCB_GREEN, PCB_PURPLE = (0.05, 0.35, 0.2), (0.4, 0.15, 0.5)
+
+
+def p(alias):
+    return "Params." + alias
+
+
+class Dummy:
+    def __init__(self, name, index):
+        self.name = name
+        old = doc.getObject("Dummy_" + name)
+        if old:
+            for child in old.Group:
+                doc.removeObject(child.Name)
+            doc.removeObject(old.Name)
+        self.part = doc.addObject("App::Part", "Dummy_" + name)
+        self.part.setExpression("Placement.Base.x", "%d * %s" % (index, p("catalog_pitch")))
+
+    def _add(self, kind, sub, x, y, z, color):
+        obj = doc.addObject(kind, self.name + "_" + sub)
+        self.part.addObject(obj)
+        for axis, expr in zip("xyz", (x, y, z)):
+            obj.setExpression("Placement.Base." + axis, expr)
+        obj.ViewObject.ShapeColor = color
+        return obj
+
+    def box(self, sub, lx, ly, lz, x, y, z, color):
+        """Box of sizes lx, ly, lz (expressions); x, y, z is its low corner."""
+        obj = self._add("Part::Box", sub, x, y, z, color)
+        obj.setExpression("Length", lx)
+        obj.setExpression("Width", ly)
+        obj.setExpression("Height", lz)
+        return obj
+
+    def cbox(self, sub, lx, ly, lz, cx, cy, z, color):
+        """Box centred on cx, cy in plan, from z upwards."""
+        return self.box(sub, lx, ly, lz, "(%s) - (%s) / 2" % (cx, lx), "(%s) - (%s) / 2" % (cy, ly), z, color)
+
+    def cyl(self, sub, d, h, x, y, z, color, along_y=False):
+        """Cylinder of diameter d and length h from x, y, z along +Z (or +Y)."""
+        obj = self._add("Part::Cylinder", sub, x, y, z, color)
+        obj.setExpression("Radius", "%s / 2" % d)
+        obj.setExpression("Height", h)
+        if along_y:
+            obj.Placement = App.Placement(obj.Placement.Base, App.Rotation(App.Vector(1, 0, 0), -90))
+        return obj
+
+
+def mg90s(i):
+    d = Dummy("MG90S", i)
+    w, ln = p("mg90_body_w"), p("mg90_body_len")
+    y0 = "%s - %s" % (p("mg90_shaft_end"), ln)       # body runs from the shaft end to -Y
+    z0 = "-" + p("mg90_below_tab")
+    d.box("body", w, ln, "%s + %s" % (p("mg90_below_tab"), p("mg90_body_top")), "-%s / 2" % w, y0, z0, BLUE)
+    tab_y = "%s + %s / 2 - %s / 2" % (y0, ln, p("mg90_tab_total"))
+    d.box("tabs", w, p("mg90_tab_total"), p("mg90_tab_t"), "-%s / 2" % w, tab_y, "0 mm", BLUE)
+    d.cyl("turret", p("mg90_turret_d"), "%s - %s" % (p("mg90_turret_top"), p("mg90_body_top")),
+          "0 mm", "0 mm", p("mg90_body_top"), BLUE)
+    d.cyl("shaft", p("mg90_shaft_d"), "%s - %s" % (p("mg90_shaft_top"), p("mg90_turret_top")),
+          "0 mm", "0 mm", p("mg90_turret_top"), SILVER)
+    hub_z = "%s + %s" % (p("mg90_turret_top"), p("horn_gap"))
+    d.cyl("horn_hub", p("horn_hub_d"), p("horn_hub_h"), "0 mm", "0 mm", hub_z, WHITE)
+    arm_z = "%s - %s" % (p("horn_top"), p("horn_arm_t"))
+    # horn arms along X, the widest clearance case for the body neighbours
+    arm = "%s - %s" % (p("horn_span"), p("horn_tip_w"))
+    d.cbox("horn_arm", arm, p("horn_tip_w"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
+    for sub, sign in (("horn_tip_a", ""), ("horn_tip_b", "-")):
+        d.cyl(sub, p("horn_tip_w"), p("horn_arm_t"), "%s(%s) / 2" % (sign, arm), "0 mm", arm_z, WHITE)
+
+
+def cells(i):
+    d = Dummy("18650_pair", i)
+    y0 = "-%s / 2" % p("cell_len")
+    z = "0 mm"
+    d.cyl("left", p("cell_d"), p("cell_len"), "-" + p("cell_x"), y0, z, (0.15, 0.55, 0.3), along_y=True)
+    d.cyl("right", p("cell_d"), p("cell_len"), p("cell_x"), y0, z, (0.15, 0.55, 0.3), along_y=True)
+
+
+def pca9685(i):
+    d = Dummy("PCA9685", i)
+    t = p("pca_t")
+    d.cbox("pcb", p("pca_len"), p("pca_w"), t, "0 mm", "0 mm", "-" + t, PCB_PURPLE)
+    hy = "%s / 2 - %s - %s / 2" % (p("pca_w"), p("pca_hdr_edge"), p("pca_hdr_w"))
+    d.cbox("servo_header", p("pca_hdr_len"), p("pca_hdr_w"), p("pca_hdr_h"), "0 mm", hy, "0 mm", GREY)
+    ty = "-(%s / 2 - %s / 2)" % (p("pca_w"), p("pca_term_w"))
+    d.cbox("power_terminal", p("pca_term_len"), p("pca_term_w"), p("pca_term_h"), "0 mm", ty, "0 mm", (0.1, 0.5, 0.7))
+
+
+def mini360(i):
+    d = Dummy("Mini360", i)
+    t = p("mini_t")
+    d.cbox("pcb", p("mini_len"), p("mini_w"), t, "0 mm", "0 mm", "-" + t, PCB_GREEN)
+    d.cbox("components", p("mini_comp_len"), p("mini_comp_w"), p("mini_comp_h"), "0 mm", "0 mm", "0 mm", GREY)
+
+
+def esp32(i):
+    d = Dummy("ESP32_devkit", i)
+    t = p("esp_t")
+    d.cbox("pcb", p("esp_len"), p("esp_w"), t, "0 mm", "0 mm", "-" + t, BLACK)
+    d.cbox("module", p("esp_mod_len"), p("esp_mod_w"), p("esp_mod_h"),
+           "%s / 2 - %s / 2" % (p("esp_len"), p("esp_mod_len")), "0 mm", "0 mm", SILVER)
+    d.cbox("usb", p("esp_usb_len"), p("esp_usb_w"), p("esp_usb_h"),
+           "-(%s / 2 - %s / 2)" % (p("esp_len"), p("esp_usb_len")), "0 mm", "0 mm", SILVER)
+    hz = "-(%s + %s)" % (t, p("esp_hdr_h"))
+    for sub, sign in (("header_a", ""), ("header_b", "-")):
+        d.cbox(sub, p("esp_hdr_len"), p("esp_hdr_w"), p("esp_hdr_h"),
+               "0 mm", "%s(%s / 2)" % (sign, p("esp_hdr_pitch")), hz, GOLD)
+
+
+def gy91(i):
+    d = Dummy("GY91", i)
+    t = p("gy91_t")
+    d.cbox("pcb", p("gy91_w"), p("gy91_len"), t, "0 mm", "0 mm", "-" + t, PCB_PURPLE)
+    d.cbox("imu", p("gy91_chip"), p("gy91_chip"), p("gy91_chip_h"), "0 mm", "0 mm", "0 mm", BLACK)
+    hx = "%s / 2 - %s / 2" % (p("gy91_w"), p("gy91_hdr_w"))
+    d.cbox("header", p("gy91_hdr_w"), p("gy91_hdr_len"), p("gy91_hdr_h"), hx, "0 mm",
+           "-(%s + %s)" % (t, p("gy91_hdr_h")), GOLD)
+
+
+def vl53l5cx(i):
+    d = Dummy("VL53L5CX", i)
+    t = p("tof_t")
+    d.cbox("pcb", p("tof_w"), p("tof_h"), t, "0 mm", "0 mm", "-" + t, PCB_PURPLE)
+    d.cbox("sensor", p("tof_chip_w"), p("tof_chip_h"), p("tof_chip_t"), "0 mm", "0 mm", "0 mm", BLACK)
+
+
+def microswitch(i):
+    d = Dummy("Microswitch", i)
+    y0 = "-%s / 2" % p("sw_h")
+    d.cbox("body", p("sw_len"), p("sw_h"), p("sw_t"), "0 mm", "0 mm", "-%s / 2" % p("sw_t"), BLACK)
+    # lever from the -X end of the body, sticking out past +X, in the switch's mid plane
+    d.box("lever", p("sw_lever_len"), p("sw_lever_t"), p("sw_lever_w"),
+          "-%s / 2" % p("sw_len"), "%s / 2 + %s" % (p("sw_h"), p("sw_lever_gap")),
+          "-%s / 2" % p("sw_lever_w"), SILVER)
+    for sub, x in (("term_a", "-" + p("sw_term_pitch")), ("term_b", "0 mm"), ("term_c", p("sw_term_pitch"))):
+        d.box(sub, p("sw_term_t"), p("sw_term_len"), p("sw_term_w"),
+              "%s - %s / 2" % (x, p("sw_term_t")), "%s - %s" % (y0, p("sw_term_len")),
+              "-%s / 2" % p("sw_term_w"), GOLD)
+
+
+BUILDERS = {"MG90S": mg90s, "18650_pair": cells, "PCA9685": pca9685, "Mini360": mini360,
+            "ESP32_devkit": esp32, "GY91": gy91, "VL53L5CX": vl53l5cx, "Microswitch": microswitch}
+ORDER = list(BUILDERS)
+
+for name in globals().get("PARTS") or ORDER:
+    BUILDERS[name](ORDER.index(name))
+common["save"](doc)
+for name in globals().get("PARTS") or ORDER:
+    bb = doc.getObject("Dummy_" + name).Shape.BoundBox if hasattr(doc.getObject("Dummy_" + name), "Shape") else None
+    print(name, "x %.1f y %.1f z %.1f" % (bb.XLength, bb.YLength, bb.ZLength) if bb else "built")
