@@ -1,6 +1,9 @@
 """FEA of one finished print, in its own unsaved document, with CalculiX.
 
-Run inside FreeCAD with init_globals={"CASE": "coxa"} or "femur". Solves and
+Run inside FreeCAD with init_globals={"CASE": "coxa"} or "femur", and optionally
+"TWIST": True and, for the coxa, "BOTH": True (lower + top joined at the bosses,
+held at the hip bearing and the horn: the realistic one) or "NO_TOP": True (the top
+plate helps nothing, the worst case). Solves and
 prints the result itself: FreeCAD's writer leaves the *CLOAD sections empty on
 these faces (0 MPa, which looks like a pass), so this script adds the node loads
 to the solver input, checks their sum, and reads the stresses from the .frd file.
@@ -11,6 +14,11 @@ Loads, on a standing robot of 815 g (params.py):
   servo stall  the next servo at stall (0.19 N*m at 5 V) as a couple on its 2
                tab screws, 27.86 mm apart: +-6.8 N
   coxa stall   coxa link only: 0.19 N*m over the 60 mm link = 3.2 N sideways
+
+  twist        a sideways foot force, friction 0.5 x 8 N = 4 N, at the next joint and
+               acting through the leg below it: about the link's long axis
+               0.4 N*m on the coxa (foot 100 mm below), 0.24 N*m on the femur (tibia
+               60 mm), taken as a couple between the bearing cap and the servo tabs
 
 PLA solid and isotropic: E 3500 MPa, nu 0.36. Real prints are weaker across the
 layers, so judge the result against about 20 MPa, not the 50-60 MPa of the datasheet.
@@ -26,9 +34,11 @@ import Part
 
 STALL_NM = 0.19
 FOOT_N = 8.0
+SIDE_N = 4.0
+TWIST_LEVER = {"coxa": 0.100, "femur": 0.060}   # m, foot below the joint
 
 
-def build(case):
+def build(case, twist=False, no_top=False, both=False):
     src = App.getDocument("hexapod")
     sheet = src.getObject("Params")
 
@@ -40,9 +50,16 @@ def build(case):
     if name in App.listDocuments():
         App.closeDocument(name)
     doc = App.newDocument(name)
-    source = "CoxaLink_Lower" if case == "coxa" else "Femur_Main"
     obj = doc.addObject("Part::Feature", "Print")
-    obj.Shape = src.getObject(source).Shape.copy()
+    if case == "femur":
+        obj.Shape = src.getObject("Femur_Main").Shape.copy()
+    elif both:
+        # lower + top joined at the bosses, as if the 2 screws were glue
+        obj.Shape = src.getObject("CoxaLink_Lower").Shape.fuse(src.getObject("CoxaLink_Top").Shape).removeSplitter()
+        if len(obj.Shape.Solids) != 1:
+            raise ValueError("the 2 prints did not join: %d solids" % len(obj.Shape.Solids))
+    else:
+        obj.Shape = src.getObject("CoxaLink_Lower").Shape.copy()
     zdir, ydir = 3, 2     # solver degrees of freedom
     doc.recompute()
 
@@ -97,7 +114,12 @@ def build(case):
         joint_x = val("coxa_len")
         fix("HipSeat", cyl_faces(seat_r, 0))
         pad_z = val("coxa_wall_top_z")
-        fix("TopPlateBosses", plane_faces("z", pad_z))
+        if both:
+            # the horn holds the top plate: its screws and the hub pocket
+            faces = cyl_faces(val("horn_screw_d") / 2, val("horn_screw_r")) + cyl_faces(val("horn_screw_d") / 2, -val("horn_screw_r"))
+            fix("Horn", faces + cyl_faces(val("horn_hub_d") / 2, 0))
+        elif not no_top:
+            fix("TopPlateBosses", plane_faces("z", pad_z))
     else:
         joint_x = val("femur_len")
         fix("Pin", cyl_faces(val("coxa_pin_d") / 2, 0))
@@ -111,6 +133,15 @@ def build(case):
     force("TabOuter", hole_b, FOOT_N / 4 - couple, zdir)
     if case == "coxa":
         force("CoxaStall", cap, STALL_NM / (joint_x / 1000), ydir)
+    if twist:
+        tabs_y = val("coxa_seat_y") - val("coxa_wall_t") / 2
+        cap_y = val("joint_cap_y0") + val("bearing_t") / 2
+        pair = SIDE_N * TWIST_LEVER[case] / ((tabs_y - cap_y) / 1000)
+        print("  twist %.2f N*m: +-%.1f N between cap and tabs, %.1f mm apart" % (SIDE_N * TWIST_LEVER[case], pair, tabs_y - cap_y))
+        force("SideFoot", cap, SIDE_N, ydir)
+        force("TwistCap", cap, -pair, zdir)
+        force("TwistTabIn", hole_a, pair / 2, zdir)
+        force("TwistTabOut", hole_b, pair / 2, zdir)
 
     mesh = ObjectsFem.makeMeshGmsh(doc, "Mesh")
     mesh.Shape = obj
@@ -196,4 +227,4 @@ def report(frd, obj, case, totals):
     return vm
 
 
-print("doc", build(globals().get("CASE", "coxa")))
+print("doc", build(globals().get("CASE", "coxa"), globals().get("TWIST", False), globals().get("NO_TOP", False), globals().get("BOTH", False)))
