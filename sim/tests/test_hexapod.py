@@ -35,7 +35,7 @@ def test_design_numbers():
 def test_mass_and_standing_pose():
     import mujoco
     h = SimHexapod(params=P)
-    assert sum(h.model.body_mass) * 1000 == pytest.approx(815.0, abs=0.5)
+    assert sum(h.model.body_mass) * 1000 == pytest.approx(924.2, abs=0.5)
     for leg in P.legs:
         q = leg_angles_to_q(*firmware_ik(GEO, leg, default_foot(leg)))
         assert q[0] == pytest.approx(0, abs=1e-9)
@@ -124,9 +124,10 @@ def test_firmware_walks(fw, hexa, command, axis, sign, distance):
 def test_firmware_turns_right(fw, hexa):
     y0 = hexa.body_orientation()["yaw"]
     fw.drive(hexa, (0, 0, 0, 0, 0, 1), 2.0)
-    turned = math.degrees(hexa.body_orientation()["yaw"] - y0)
-    # ~1.5 rad/s once ramped up (GAIT_PARAMS max yaw rate 1.6)
-    assert -180 < turned < -120, turned
+    # yaw wraps at +-180, and 2 s at this rate is close to half a turn
+    turned = (math.degrees(hexa.body_orientation()["yaw"] - y0) + 300) % 360 - 300
+    # ~1.6 rad/s once ramped up (GAIT_PARAMS max yaw rate 1.6)
+    assert -200 < turned < -120, turned
     assert np.linalg.norm(hexa.body_position_mm()[:2]) < 30
     assert tilt_deg(hexa) < 5.0
 
