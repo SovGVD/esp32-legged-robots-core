@@ -3,10 +3,12 @@ outline with a lobe around each coxa axis and scallops between the legs. Ribs st
 both plates against twisting: along the border between the legs, and across the inside.
 
   Body_Bottom  6 coxa bearing seats, holes for the battery holder, rails for the
-               standing boards, columns, ribs
+               standing boards, ribs
   Body_Top     a pocket for each coxa servo's horn (glued in), thick around it, ribs
+  Body_Column  8 of these, printed apart so the plates print fast; a stock MG90S screw
+               through each plate into each end
 
-The columns take the stock MG90S screws from above. Body_Check places everything; the end
+The plates are thin skins with ribs, full thickness only around bearings and screws. Body_Check places everything; the end
 of this script swings every coxa link over +-40 deg looking for collisions. Body frame:
 origin on the centre at femur axis height, X right, Y forward. Sizes come from Params
 when this script runs: re-run it after changing them.
@@ -95,9 +97,13 @@ sx_, sy_ = v("col_side_x"), v("col_side_y")
 h_b = top_bot + v("rib_bot_h")
 # ribs on the bottom plate: where nothing stands, in front of the ESP32 and behind the holder
 bot_parts += [rib(-fx, fy, fx, fy, top_bot, h_b), rib(-fx, -fy, fx, -fy, top_bot, h_b)]
+skin = top_bot - v("body_skin_t")
+for _, x, y, __, ___ in AXES:
+    bot_parts.append(rod(v("bear_boss_d"), top_bot - z_bot, (x, y, z_bot), "z"))
+for sign in (1, -1):
+    bot_parts.append(rod(v("holder_boss_d"), top_bot - z_bot, (0, v("holder_y") + sign * v("holder_hole_span") / 2, z_bot), "z"))
 for x, y in COLUMNS:
-    bot_parts.append(rod(v("col_d"), top0 - top_bot, (x, y, top_bot), "z"))
-    bot_parts.append(rod(v("col_foot_d"), v("col_foot_h"), (x, y, top_bot), "z"))
+    bot_parts.append(rod(v("col_ring_d"), top_bot + v("col_ring_h") - z_bot, (x, y, z_bot), "z"))
 # rails for the standing boards
 rail_t, rail_h, rail_len, rfit = v("rail_t"), v("rail_h"), v("rail_len"), v("rail_fit")
 pca_len, pca_x, pca_y, pca_t = v("pca_len"), v("pca_x"), v("pca_y"), v("pca_t")
@@ -112,7 +118,7 @@ esp_y, esp_len = v("esp_y"), v("esp_len")
 for xo in (-esp_len / 2 + 8, esp_len / 2 - 8 - rail_len, -rail_len / 2):
     bot_parts.append(block(xo, xo + rail_len, esp_y - v("esp_t") - rfit - rail_t, esp_y - v("esp_t") - rfit, top_bot, top_bot + rail_h))
     bot_parts.append(block(xo, xo + rail_len, esp_y + rfit, esp_y + rfit + rail_t, top_bot, top_bot + rail_h))
-bottom_solid = plate_prism(z_bot, top_bot).fuse(bot_parts).removeSplitter()
+bottom_solid = plate_prism(skin, top_bot).fuse(bot_parts).removeSplitter()
 
 bot_cuts = []
 for _, x, y, __, ___ in AXES:
@@ -121,7 +127,9 @@ for _, x, y, __, ___ in AXES:
 for sign in (1, -1):
     bot_cuts.append(rod(v("holder_screw_d"), v("body_plate_t") + 2, (0, v("holder_y") + sign * v("holder_hole_span") / 2, z_bot - 1), "z"))
 for x, y in COLUMNS:
-    bot_cuts.append(rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (x, y, top0 - v("col_screw_depth")), "z"))
+    bot_cuts.append(rod(v("col_d") + v("col_fit"), v("rib_bot_h") + 1, (x, y, top_bot), "z"))
+    bot_cuts.append(rod(2.2, top_bot - z_bot + 1, (x, y, z_bot - 0.5), "z"))
+    bot_cuts.append(rod(v("col_head_d"), v("col_head_h") + 1, (x, y, z_bot - 1), "z"))
 bottom_shape = bottom_solid.cut(Part.makeCompound(bot_cuts)).removeSplitter()
 
 # ------------------------------------------------------------ top print
@@ -136,6 +144,8 @@ for sign in (1, -1):
 top_parts += [rib(-9.5, 13, 9.5, 13, r_low, top0), rib(-9.5, -13, 9.5, -13, r_low, top0), rib(-9.5, -13, -9.5, 13, r_low, top0), rib(9.5, -13, 9.5, 13, r_low, top0)]
 boss_h = top1 - v("top_boss_z0")
 top_cuts = []
+for x, y in COLUMNS:
+    top_parts.append(rod(v("col_ring_d"), v("col_ring_h"), (x, y, top0 - v("col_ring_h")), "z"))
 tip_w = v("horn_tip_w")
 arm = v("horn_reach") - tip_w / 2
 pocket = v("horn_hub_h")
@@ -155,7 +165,7 @@ for _, x, y, yaw, __ in AXES:
     top_cuts.append(rod(5.0, boss_h + 1, (x, y, hub_z), "z"))
 for x, y in COLUMNS:
     top_cuts.append(rod(2.2, v("top_plate_t") + 2, (x, y, top0 - 1), "z"))
-    top_cuts.append(rod(v("col_d") + 0.3, v("rib_h") + 1, (x, y, r_low - 1), "z"))   # the column stands here, its top against the plate
+    top_cuts.append(rod(v("col_d") + v("col_fit"), v("rib_h") + 1, (x, y, r_low - 1), "z"))   # the column stands here, its top against the plate
 top_shape = plate_prism(top0, top1).fuse(top_parts).common(plate_prism(r_low - 1, top1 + 1).fuse(
     [rod(v("top_boss_d"), boss_h, (x, y, hub_z), "z") for _, x, y, __, ___ in AXES])).cut(Part.makeCompound(top_cuts)).removeSplitter()
 print("raw", len(bottom_shape.Solids), len(top_shape.Solids), bottom_shape.isValid(), top_shape.isValid())
@@ -165,9 +175,9 @@ edge_r = v("body_edge_r")
 
 
 def bottom_sharp(e):
-    """Only the plate's own outer rim gets rounded; the seats, rails and columns stay."""
+    """Only the plate's own outer rim gets rounded; the seats, rails and rings stay."""
     bb = e.BoundBox
-    return not (bb.ZLength < 1e-4 and abs(bb.ZMin - z_bot) < 1e-4)
+    return not (bb.ZLength < 1e-4 and abs(bb.ZMin - skin) < 1e-4)
 
 
 def top_sharp(e):
@@ -179,6 +189,12 @@ print("bottom")
 bottom = common["as_part"](doc, part, "Body_Bottom", common["smooth"](bottom_shape, edge_r, lambda e: bottom_sharp(e) or (e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 8)), COL_BOT)
 print("top")
 top = common["as_part"](doc, part, "Body_Top", common["smooth"](top_shape, edge_r, top_sharp), COL_TOP)
+col_len = top0 - top_bot
+col_raw = rod(v("col_d"), col_len, (0, 0, 0), "z").cut(Part.makeCompound([
+    rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, -1), "z"),
+    rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, col_len - v("col_screw_depth")), "z")]))
+col_edges = [e for e in col_raw.Edges if e.Curve.TypeId == "Part::GeomCircle" and abs(e.Curve.Radius - v("col_d") / 2) < 1e-4]
+column = common["as_part"](doc, part, "Body_Column", col_raw.makeChamfer(v("col_end_ch"), col_edges), COL_BOT)
 common["save"](doc)
 
 
@@ -195,6 +211,8 @@ seat = v("coxa_seat_z")
 bear_z = v("coxa_floor_z0") - v("fem_boss_h") - v("bearing_t")
 link("bottom", "Body_Bottom", (0, 0, 0))
 link("top", "Body_Top", (0, 0, 0))
+for n, (x, y) in enumerate(COLUMNS):
+    link("column_%d" % n, "Body_Column", (x, y, top_bot))
 SERVO_LEG = App.Rotation(App.Vector(0, 0, 1), 90)
 for tag, x, y, yaw, side in AXES:
     rot = App.Rotation(App.Vector(0, 0, 1), yaw)
@@ -215,9 +233,13 @@ solids_of, clash = common["solids_of"], common["clash"]
 SERVO = ["MG90S_body", "MG90S_tabs", "MG90S_turret", "MG90S_shaft"]
 HORN = ["Horn_hub", "Horn_arm", "Horn_tip"]
 d = v("pla_density")
-print("bottom %.1f g, top %.1f g solid; valid %s %s; solids %d %d" % (
-    bottom.Shape.Volume / 1000 * d, top.Shape.Volume / 1000 * d, bottom.Shape.isValid(), top.Shape.isValid(), len(bottom.Shape.Solids), len(top.Shape.Solids)))
+print("bottom %.1f g, top %.1f g, 8 columns %.1f g solid; valid %s %s; solids %d %d" % (
+    bottom.Shape.Volume / 1000 * d, top.Shape.Volume / 1000 * d, 8 * column.Shape.Volume / 1000 * d, bottom.Shape.isValid(), top.Shape.isValid(), len(bottom.Shape.Solids), len(top.Shape.Solids)))
 bot_s, top_s = solids_of(doc, ["Body_Bottom"]), solids_of(doc, ["Body_Top"])
+col_s = []
+for x, y in COLUMNS:
+    col_s += solids_of(doc, ["Body_Column"], App.Placement(App.Vector(x, y, top_bot), App.Rotation()))
+print("columns overlap the plates mm3: %.3f" % clash(col_s, bot_s + top_s))
 Pl = lambda base, rot=None: App.Placement(App.Vector(*base), rot or App.Rotation())
 names = lambda part_name: [c.Name for c in doc.getObject(part_name).Group if c.Name not in ("Bearing_ring", "Bearing_bore")]
 inside = {
@@ -249,6 +271,7 @@ for tag, x, y, yaw, side in AXES:
         targets = dict(inside)
         targets["bottom"] = bot_s
         targets["top"] = top_s
+        targets["columns"] = col_s
         for name, group in targets.items():
             x_ = clash(coxa + servo, group)
             if x_ > 0.001:

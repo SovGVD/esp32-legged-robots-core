@@ -73,9 +73,9 @@ def torso(p):
     t = _Parts("")
     # bottom plate and the (see-through) top cover
     t.raw(f'<geom name="body_bottom" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, BOTTOM_Z * MM)}" '
-          f'mass="{95.3 * G:.6g}" rgba="{PLA_LIGHT}"/>', 95.3)
+          f'mass="{48.3 * G:.6g}" rgba="{PLA_LIGHT}"/>', 48.3)
     t.raw(f'<geom name="body_top" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, TOP_Z * MM)}" '
-          f'mass="{70.5 * G:.6g}" rgba="0.85 0.82 0.77 0.35"/>', 70.5)
+          f'mass="{58.7 * G:.6g}" rgba="0.85 0.82 0.77 0.35"/>', 58.7)
     # 2x 18650 at the bottom centre, along the body
     for x in (-9.9, 9.9):
         t.raw(f'<geom name="cell_{"l" if x < 0 else "r"}" type="cylinder" class="part" size="{_f(9 * MM, 32.5 * MM)}" '

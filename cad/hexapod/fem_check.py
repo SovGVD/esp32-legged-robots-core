@@ -76,8 +76,14 @@ def build(case, load, bonded):
         import Part
         shape = Part.makeBox(100, 10, 5)
     elif case == "body":
-        # the 2 plates joined at the columns, as if the screws were glue
-        shape = src.getObject("Body_Bottom").Shape.fuse(src.getObject("Body_Top").Shape).removeSplitter()
+        # the plates and columns joined, as if the screws were glue
+        columns = []
+        for o in src.getObject("Body_Check").Group:
+            if o.Name.startswith("BodyCheck_column"):
+                c = src.getObject("Body_Column").Shape.copy()
+                c.Placement = o.Placement.multiply(c.Placement)
+                columns.append(c)
+        shape = src.getObject("Body_Bottom").Shape.multiFuse(columns + [src.getObject("Body_Top").Shape]).removeSplitter()
         if len(shape.Solids) != 1:
             raise ValueError("the plates did not join: %d solids" % len(shape.Solids))
     else:
@@ -143,8 +149,9 @@ def build(case, load, bonded):
         for tag, x, y, yaw in pairs:
             push = each * foot_lever / couple_arm
             c, s_ = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
-            seat = cyl_faces(val("bearing_seat_d") / 2, x, axis_y=y)
-            horn = cyl_faces(val("horn_hub_d") / 2, x, axis_y=y)
+            top = val("body_plate_top")
+            seat = ("ring", x, y, val("bearing_seat_d") / 2, top - val("bearing_t"), top)
+            horn = ("ring", x, y, val("horn_hub_d") / 2, val("top_boss_z0"), val("coxa_horn_z"))
             loads.append(("%s up" % tag, seat, each, Z))
             loads.append(("%s low x" % tag, seat, -push * c, X))
             loads.append(("%s low y" % tag, seat, -push * s_, Y))
@@ -218,6 +225,10 @@ def build(case, load, bonded):
         if faces[0] == "near":
             _, zv, xlim, ylim = faces
             nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.6 and abs(v.x) <= xlim and abs(v.y) <= ylim}
+        elif faces[0] == "ring":
+            # small faces, so by position: nodes on a cylinder around Z
+            _, cx, cy, rad, z0, z1 = faces
+            nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(((v.x - cx) ** 2 + (v.y - cy) ** 2) ** 0.5 - rad) < 0.4 and z0 - 0.1 <= v.z <= z1 + 0.1}
         else:
             for face in faces:
                 nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))
