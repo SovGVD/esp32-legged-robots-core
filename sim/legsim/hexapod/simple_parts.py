@@ -79,7 +79,7 @@ def torso(p):
     # 2x 18650 at the bottom centre, along the body
     for x in (-9.9, 9.9):
         t.raw(f'<geom name="cell_{"l" if x < 0 else "r"}" type="cylinder" class="part" size="{_f(9 * MM, 32.5 * MM)}" '
-              f'pos="{_f(x * MM, -3.5 * MM, -14.8 * MM)}" euler="1.5708 0 0" mass="{m.battery / 2 * G:.6g}" rgba="{CELL}"/>',
+              f'pos="{_f(x * MM, -8 * MM, -14.8 * MM)}" euler="1.5708 0 0" mass="{m.battery / 2 * G:.6g}" rgba="{CELL}"/>',
               m.battery / 2)
     e0 = t.used
     # a PCA9685 + 3 Mini360 board standing along each side

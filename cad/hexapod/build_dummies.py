@@ -187,6 +187,12 @@ def rocker(i):
         d.cbox(sub, p("pwr_pin_t"), p("pwr_pin_w"), p("pwr_pin_len"), "0 mm", y, "-(%s + %s)" % (p("pwr_body_h"), p("pwr_pin_len")), SILVER)
 
 
+def xt30(i):
+    d = Dummy("XT30", i)
+    d.cbox("male", p("xt30_w"), p("xt30_t"), p("xt30_male_h"), "0 mm", "0 mm", "0 mm", (0.9, 0.75, 0.1))
+    d.cbox("female", p("xt30_w"), p("xt30_t"), "%s - %s" % (p("xt30_mated_h"), p("xt30_male_h")), "0 mm", "0 mm", p("xt30_male_h"), (0.75, 0.55, 0.05))
+
+
 def bearing(i):
     d = Dummy("Bearing", i)
     d.cyl("ring", p("bearing_od"), p("bearing_t"), "0 mm", "0 mm", "0 mm", SILVER)
@@ -201,7 +207,7 @@ def bearing(i):
 
 BUILDERS = {"MG90S": mg90s, "18650_pair": cells, "PCA9685": pca9685, "Mini360": mini360,
             "ESP32_devkit": esp32, "GY91": gy91, "VL53L5CX": vl53l5cx, "Microswitch": microswitch,
-            "Bearing": bearing, "Horn": horn, "Rocker": rocker}
+            "Bearing": bearing, "Horn": horn, "Rocker": rocker, "XT30": xt30}
 ORDER = list(BUILDERS)
 
 for name in globals().get("PARTS") or ORDER:

@@ -212,16 +212,18 @@ def build(case, load, bonded):
             if not out:
                 raise ValueError("no femur joint faces on " + tag)
             return out
-        weight = 1.118 * 9.81
-        under_cells = ("box", -18, 18, -40, 33, top_bot)
-        if load == "fall":
-            held = joint_faces("RF")
-            loads = [("body down", under_cells, -30.0, Z), ("body sideways", under_cells, -15.0, X)]
-        else:
-            held = joint_faces("RF") + joint_faces("LM") + joint_faces("RR")
-            loads = [("body down", under_cells, -3 * weight, Z)]
-            if load == "twist":
-                loads.append(("body sideways", under_cells, -weight, X))
+        # the robot's weight hangs on the battery cartridge's 2 turn latches, under the bottom plate
+        weight = 1.132 * 9.81
+        zb = val("body_bottom_z")
+        cart = src.getObject("BodyCheck_latch_f").Placement.Base, src.getObject("BodyCheck_latch_r").Placement.Base
+        pads = [("box", p.x - 3.4, p.x + 3.4, p.y - 3.4, p.y + 3.4, zb) for p in cart]
+        down, sideways = (30.0, 15.0) if load == "fall" else (3 * weight, weight if load == "twist" else 0.0)
+        held = joint_faces("RF") if load == "fall" else joint_faces("RF") + joint_faces("LM") + joint_faces("RR")
+        loads = []
+        for pad_name, pad in zip(("front latch", "rear latch"), pads):
+            loads.append((pad_name + " down", pad, -down / 2, Z))
+            if sideways:
+                loads.append((pad_name + " sideways", pad, -sideways / 2, X))
         probe = None
     elif case == "femur":
         fl = val("femur_len")
