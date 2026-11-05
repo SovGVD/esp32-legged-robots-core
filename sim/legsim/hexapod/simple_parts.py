@@ -73,9 +73,9 @@ def torso(p):
     t = _Parts("")
     # bottom plate and the (see-through) top cover
     t.raw(f'<geom name="body_bottom" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, BOTTOM_Z * MM)}" '
-          f'mass="{92.7 * G:.6g}" rgba="{PLA_LIGHT}"/>', 92.7)
+          f'mass="{95.3 * G:.6g}" rgba="{PLA_LIGHT}"/>', 95.3)
     t.raw(f'<geom name="body_top" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, TOP_Z * MM)}" '
-          f'mass="{54.8 * G:.6g}" rgba="0.85 0.82 0.77 0.35"/>', 54.8)
+          f'mass="{70.5 * G:.6g}" rgba="0.85 0.82 0.77 0.35"/>', 70.5)
     # 2x 18650 at the bottom centre, along the body
     for x in (-9.9, 9.9):
         t.raw(f'<geom name="cell_{"l" if x < 0 else "r"}" type="cylinder" class="part" size="{_f(9 * MM, 32.5 * MM)}" '
@@ -108,7 +108,7 @@ def leg(p, leg):
     off = SERVO_LEN / 2 - SHAFT_FROM_END
 
     cx = _Parts(n + "_")
-    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 24.7, PLA)
+    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 33.8, PLA)
     cx.box("coxa_servo", (off, 0, -8), (SERVO_LEN / 2, SERVO_WID / 2, SERVO_HGT / 2), SERVO_MASS, SERVO)
     cx.lump(m.coxa, (geo.coxa / 2, 0, -5), "coxa_misc")
 
@@ -120,7 +120,7 @@ def leg(p, leg):
 
     ti = _Parts(n + "_")
     L = geo.tibia
-    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 13.8, PLA)
+    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 15.9, PLA)
     ti.box("foot_switch", (5, 0, -L + 12), (3, 3, 6), 2.0, "0.76 0.23 0.23 1")   # switch in the tibia tip
     ti.lump(m.tibia, (0, 0, -L / 2), "tibia_misc")
     return str(cx), str(fe), str(ti)
