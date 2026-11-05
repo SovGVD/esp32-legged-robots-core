@@ -59,7 +59,8 @@ class OccupancyGrid {
 		void cellCentre(int ix, int iy, float &x, float &y) const;
 		int8_t at(int ix, int iy) const { return _cells[iy * LR_LIDAR_GRID + ix]; }
 		const int8_t *cells() const { return _cells; }
-		/** Beam from (x0, y0) to (x1, y1), mm: cells along it free, the end cell occupied if hit. */
+		/** Beam from (x0, y0) to (x1, y1), mm: cells along it free, the end cell occupied if hit.
+		 *  A free space beam (hit false: nothing seen) stops at the first occupied cell. */
 		void addBeam(float x0, float y0, float x1, float y1, bool hit, int8_t hitStep, int8_t missStep, int8_t limit);
 		/**
 		 * Occupancy 0..1 at (x, y), bilinear between cell centres, and its

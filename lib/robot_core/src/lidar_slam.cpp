@@ -59,6 +59,9 @@ void OccupancyGrid::addBeam(float x0, float y0, float x1, float y1, bool hit, in
 			return;   // left the map
 		}
 		int8_t &c = _cells[y * LR_LIDAR_GRID + x];
+		if (!hit && c > 0) {
+			return;   // free space beam (nothing seen): stops at a known wall, it may have looked over it
+		}
 		int v = c - missStep;
 		c = (int8_t)(v < -limit ? -limit : v);
 		int e2 = 2 * err;

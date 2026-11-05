@@ -335,6 +335,18 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 		_obstacle = _gap;
 	}
 	_blockedTime = blocked ? _blockedTime + dt : 0;
+	if (_blockedTime > 1.0f && !gap && _walked > 300) {
+		// stopped by something solid after walking on odometry: most likely the
+		// pose drifted (a door frame where the map has the doorway). Look first:
+		// the scan corrects the pose and the planner goes on from there. Marked
+		// only if it is still in the way right after a scan.
+		_blockedTime = 0;
+		_walked = 0;
+		_wantFull = true;
+		startScan();
+		LR_moveVector zero = { { 0, 0, 0 }, { 0, 0, 0 } };
+		return zero;
+	}
 	if (_blockedTime > 1.0f) {
 		// stopped by something the map doesn't have (too low for the scan, or
 		// that scan was thrown away): put it in, the planner goes around

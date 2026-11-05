@@ -214,10 +214,11 @@ const GaitParams GAIT_PARAMS_ROUGH = {
 };
 
 // IMU leveling (HORIZON_LEVEL or CLI `level on`), not tuned for this model yet:
-// the dog's values (tuned in the simulator) as a starting point
+// ki 1.0 (the dog went to 0.5 after the 2026-11-05 tilt fix; on the hexapod 0.5
+// let the terrain map floor creep up 11 mm on a 40 s walk)
 const LevelerParams LEVEL_PARAMS = {
 	0.0,   // kp
-	0.5,   // ki, 1/s
+	1.0,   // ki, 1/s
 	0.0,   // kd, s
 	0.25,  // limit, rad
 	0.5,   // rate, rad/s
@@ -246,14 +247,18 @@ const float SIT_HEIGHT = -30;
  * Two VL53L5CX (8x8 zones, 45 deg field of view) on the front of the body,
  * turned 20 deg left and right, so they see the ground where the front feet
  * step (the front legs open 20 deg wider to keep out of the view: ~2 % of the
- * zones hit a leg in the design concept). Both look 35 deg down (terrain);
- * the room scan (TOF_SCAN_PARAMS) tilts the nose 18 deg up so their top zone
- * rows look level, like the dog does.
+ * zones hit a leg in the design concept). The left one looks 35 deg down
+ * (terrain), the right one 22 deg down: its top zone rows look nearly level,
+ * which the room scan (TOF_SCAN_PARAMS) needs. Both at 35 deg with the nose
+ * 18 deg up for the scan was tried in the simulator (2026-11-05): the legs
+ * reach the tilt, but turning that far tilted throws the IMU tilt estimate a
+ * few degrees off, floor readings ~1 m out pass as walls (median point error
+ * 40-60 mm against 0 at 22 deg) and long routes got lost.
  */
 const TofSensor TOF_SENSORS[] = {
 	// position (mm, body frame), yaw (+ = left), tilt down (rad), field of view (rad), zones per side, max range (mm)
 	{ { -14, 74, 2 },  0.35, 0.61, 0.785, 8, 450 },
-	{ {  14, 74, 2 }, -0.35, 0.61, 0.785, 8, 450 },
+	{ {  14, 74, 2 }, -0.35, 0.384, 0.785, 8, 450 },
 };
 #define TOF_SENSOR_COUNT 2
 
@@ -329,9 +334,8 @@ const NavParams NAV_PARAMS = {
  */
 #define TOF_SCAN_SUPPORTED 1
 const TofScanParams TOF_SCAN_PARAMS = {
-	0.314,  // nose up 18 deg while scanning. The top zone row looks 19.7 +- 2.8 deg above the
-	        // sensor's axis: nose up = mount angle (35, both sensors) - 17 deg puts its lower edge level.
-	        // The legs reach ~20 deg (sim, with the crouch)
+	0.105,  // nose up 6 deg while scanning. The top zone row looks 19.7 +- 2.8 deg above the
+	        // sensor's axis: nose up = mount angle (22, right sensor) - 17 deg puts its lower edge level
 	0.3,    // tilt rate, rad/s
 	0.45,   // turning while scanning, rad/s (slow: the sensor's frames lag a little)
 	6.7,    // turn a full circle plus 23 deg of overlap
