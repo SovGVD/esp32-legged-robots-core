@@ -127,7 +127,7 @@ TABLE = [
     ("mini_comp_h", "3 mm", LOOSE, "tallest part above the PCB"),
 
     "ESP32 devkit, 38 pins, USB-C (part origin: PCB centre, lying flat; long side along X; +Z = module side; USB at -X)",
-    ("esp_len", "51.57 mm", CAL, "PCB; if the jaw sat on the USB socket, the PCB is ~1 shorter"),
+    ("esp_len", "51.57 mm", CAL, "PCB, the USB-C socket ends flush with it"),
     ("esp_w", "25.75 mm", CAL, "PCB"),
     ("esp_t", "1.6 mm", TODO, "PCB"),
     ("esp_mod_len", "25.5 mm", TODO, "WROOM module"),
@@ -136,11 +136,11 @@ TABLE = [
     ("esp_usb_len", "9 mm", TODO, "USB-C socket, scaled from the caliper photo"),
     ("esp_usb_w", "9 mm", TODO, "USB-C socket, scaled from the caliper photo"),
     ("esp_usb_h", "3.2 mm", TODO, "USB-C socket above the PCB"),
-    ("esp_usb_over", "1 mm", TODO, "socket past the PCB end, scaled from the caliper photo"),
+    ("esp_usb_over", "0 mm", CAL, "socket past the PCB end: flush"),
     ("esp_hdr_len", "48.23 mm", CAL, "19 pins per side"),
     ("esp_hdr_w", "2.54 mm", STD, "pin header"),
     ("esp_hdr_margin", "0.6 mm", TODO, "pin row from the antenna end of the PCB, scaled from the caliper photo"),
-    ("esp_hdr_h", "11 mm", TODO, "pins below the PCB"),
+    ("esp_hdr_h", "7.9 mm", CAL, "pins below the PCB, black plastic included"),
     ("esp_hdr_pitch", "22.86 mm", PHOTO, "between the two pin rows: ~23.2 in the caliper photo, nearest 2.54 multiple"),
 
     "GY-91, no pins, lies flat (part origin: PCB centre, lying flat; long side along Y; +Z = chip side)",
