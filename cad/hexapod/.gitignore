@@ -4,3 +4,4 @@
 __pycache__/
 # FEA pictures, made by fem_check.py
 fea/
+views/

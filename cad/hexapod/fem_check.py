@@ -7,6 +7,10 @@ the print alone: the real part is between the two.
   twist  walk + 4 N sideways at the foot
   fall   30 N up + 15 N sideways at the foot, landing hard on one leg (an estimate)
 
+CASE "body" stands the joined plates on a tripod and takes each leg's lever arm as a
+twist through its horn and bearing. CASE "beam" is a check of the method: a cantilever
+with a known textbook answer.
+
 Each run draws a picture in fea/: stress in colour, held faces in blue, loads as red
 arrows.
 
@@ -14,8 +18,8 @@ Solves and prints the result itself: FreeCAD's writer leaves the *CLOAD sections
 empty on these faces (0 MPa, which looks like a pass), so this script adds the node
 loads to the solver input, checks their sum, and reads the .frd file.
 
-PLA solid and isotropic: E 3500 MPa, nu 0.36. Prints are weaker across layers: judge
-against about 20 MPa. Peaks at sharp points overstate; the 99.9% figure is the fairer
+PLA, solid and isotropic: E from Params (Bambu PLA Basic across the layers), nu 0.36. Real
+prints with infill are softer than this. Judge against pla_limit. Peaks at sharp points overstate; the 99.9% figure is the fairer
 one. Foot movement counts the part only, with no servo, bearing or horn play.
 """
 import os
@@ -68,6 +72,14 @@ def build(case, load, bonded):
                                         App.Placement(App.Vector(val("femur_len"), seat_y, 0), ROT_IN_LEG)))
     elif case == "tibia":
         shape = src.getObject("Tibia_Horn").Shape.fuse(src.getObject("Tibia_Bearing").Shape).removeSplitter()
+    elif case == "beam":
+        import Part
+        shape = Part.makeBox(100, 10, 5)
+    elif case == "body":
+        # the 2 plates joined at the columns, as if the screws were glue
+        shape = src.getObject("Body_Bottom").Shape.fuse(src.getObject("Body_Top").Shape).removeSplitter()
+        if len(shape.Solids) != 1:
+            raise ValueError("the plates did not join: %d solids" % len(shape.Solids))
     else:
         shape = src.getObject("Coxa_Main").Shape.copy()
         if bonded:
@@ -76,15 +88,18 @@ def build(case, load, bonded):
     doc.recompute()
     an = ObjectsFem.makeAnalysis(doc, "Analysis")
     mat = ObjectsFem.makeMaterialSolid(doc, "PLA")
-    mat.Material = {"Name": "PLA", "YoungsModulus": "3500 MPa", "PoissonRatio": "0.36", "Density": "1240 kg/m^3"}
+    mat.Material = {"Name": "PLA", "YoungsModulus": "%g MPa" % val("pla_E"), "PoissonRatio": "0.36", "Density": "1240 kg/m^3"}
     mat.References = [(obj, ("Solid1",))]
     an.addObject(mat)
 
     def cyl_faces(radius, x, axis_y=None, z=None):
+        # axis_y: cylinders along Z only, this Y
         out = []
         for i, f in enumerate(obj.Shape.Faces):
             s = f.Surface
             if s.TypeId != "Part::GeomCylinder" or abs(s.Radius - radius) > 0.01 or abs(s.Center.x - x) > 0.01:
+                continue
+            if axis_y is not None and abs(s.Center.y - axis_y) > 0.01:
                 continue
             if z is not None and abs(s.Center.z - z) > 0.01 and abs(f.BoundBox.ZMin + radius - z) > 0.01:
                 continue
@@ -109,7 +124,34 @@ def build(case, load, bonded):
     pilot = val("mg90_screw_pilot_d") / 2
     servo_shaft = val("mg90_shaft_d") / 2
     near, far = val("mg90_hole_near"), val("mg90_hole_far")
-    if case == "femur":
+    if case == "beam":
+        # a check of the whole method against the textbook: cantilever, 1 N at its end
+        held = plane_faces("x", 0)
+        loads = [("tip", plane_faces("x", 100), 1.0, Z)]
+        probe = None
+    elif case == "body":
+        # standing on a tripod. Each leg pushes up on its bearing, and its foot's lever arm
+        # twists the body through the couple between the horn pocket and the bearing
+        import math
+        foot_lever = val("coxa_len") + 9.0
+        couple_arm = val("coxa_horn_z") - (val("body_plate_top") - val("bearing_t") / 2)
+        held = cyl_faces(pilot, 0)
+        pairs = (("RM", val("coxa_mid_x"), 0.0, 0.0), ("LF", -val("coxa_front_x"), val("coxa_front_y"), 180 - sheet.get("front_leg_yaw").getValueAs("deg").Value),
+                 ("LR", -val("coxa_front_x"), -val("coxa_front_y"), 180 - sheet.get("rear_leg_yaw").getValueAs("deg").Value))
+        loads = []
+        each = up + side
+        for tag, x, y, yaw in pairs:
+            push = each * foot_lever / couple_arm
+            c, s_ = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+            seat = cyl_faces(val("bearing_seat_d") / 2, x, axis_y=y)
+            horn = cyl_faces(val("horn_hub_d") / 2, x, axis_y=y)
+            loads.append(("%s up" % tag, seat, each, Z))
+            loads.append(("%s low x" % tag, seat, -push * c, X))
+            loads.append(("%s low y" % tag, seat, -push * s_, Y))
+            loads.append(("%s top x" % tag, horn, push * c, X))
+            loads.append(("%s top y" % tag, horn, push * s_, Y))
+        probe = None
+    elif case == "femur":
         fl = val("femur_len")
         held = cyl_faces(val("fem_shaft_d") / 2, 0) + (cyl_faces(servo_shaft, 0) if bonded else cyl_faces(pilot, -near) + cyl_faces(pilot, far))
         shaft = cyl_faces(val("fem_shaft_d") / 2, fl)
@@ -124,7 +166,7 @@ def build(case, load, bonded):
             loads.append(("side", shaft, side, Y))
         probe = (fl, 0.0, lever)
     elif case == "tibia":
-        held = cyl_faces(val("bearing_seat_d") / 2, 0) + cyl_faces(val("horn_screw_d") / 2, 0)
+        held = cyl_faces(val("bearing_seat_d") / 2, 0) + cyl_faces(val("horn_hub_d") / 2, 0)
         # the presser pushes on the ledge at the top of its cavity: small faces, so by position
         top = ("near", val("tip_cavity_z1"), val("tip_cavity_x") / 2 + 0.1, val("tip_hole_w") / 2 + 0.1)
         loads = [("foot up", top, up, Z)]
@@ -135,7 +177,7 @@ def build(case, load, bonded):
         hub = val("coxa_len")
         held = cyl_faces(val("coxa_shaft_d") / 2, 0) + (cyl_faces(servo_shaft, 0) if bonded else cyl_faces(pilot, -near) + cyl_faces(pilot, far))
         seat = cyl_faces(val("bearing_seat_d") / 2, hub)
-        horn = cyl_faces(val("horn_screw_d") / 2, hub - val("horn_screw_r1")) + cyl_faces(val("horn_screw_d") / 2, hub - val("horn_screw_r2"))
+        horn = cyl_faces(val("horn_hub_d") / 2, hub)
         lever = 0.100
         arm = val("coxa_arm_a_y1") - val("coxa_arm_b_y0") - 4.0
         twist = side * lever / (arm / 1000)
@@ -150,7 +192,7 @@ def build(case, load, bonded):
     an.addObject(fixed)
     mesh = ObjectsFem.makeMeshGmsh(doc, "Mesh")
     mesh.Shape = obj
-    mesh.CharacteristicLengthMax = 1.6
+    mesh.CharacteristicLengthMax = 3.0 if case == "body" else 1.6
     mesh.CharacteristicLengthMin = 0.3
     mesh.ElementOrder = "2nd"
     mesh.SecondOrderLinear = True   # straight element edges: curved ones invert on small features
@@ -212,7 +254,7 @@ def picture(path, title, coords, vm, held, arrows):
     for k, (elev, azim, name) in enumerate(((28, 120, "view 1"), (28, -60, "view 2"))):
         ax = fig.add_subplot(1, 2, k + 1, projection="3d", computed_zorder=False)
         order = np.argsort(val)
-        art = ax.scatter(xyz[order, 0], xyz[order, 1], xyz[order, 2], c=val[order], cmap="turbo", vmin=0, vmax=20, s=2.0, depthshade=False, zorder=1)
+        art = ax.scatter(xyz[order, 0], xyz[order, 1], xyz[order, 2], c=val[order], cmap="turbo", vmin=0, vmax=17.5, s=2.0, depthshade=False, zorder=1)
         h = np.array([coords[n] for n in held])
         ax.scatter(h[:, 0], h[:, 1], h[:, 2], c="#1f4fff", s=14, depthshade=False, zorder=5)
         ax.text2D(0.02, 0.95, "blue = held", color="#1f4fff", transform=ax.transAxes, fontsize=10)
@@ -231,7 +273,7 @@ def picture(path, title, coords, vm, held, arrows):
         ax.set_zlabel("Z")
         ax.set_box_aspect((np.ptp(xyz[:, 0]) + 30, np.ptp(xyz[:, 1]) + 30, np.ptp(xyz[:, 2]) + 30))
     bar = fig.colorbar(art, ax=fig.axes, shrink=0.7, pad=0.02)
-    bar.set_label("von Mises, MPa (scale stops at the 20 MPa limit)")
+    bar.set_label("von Mises, MPa (scale stops at the 17.5 MPa limit)")
     fig.suptitle(title, fontsize=12)
     fig.savefig(path, dpi=110)
     plt.close(fig)
@@ -265,9 +307,10 @@ def report(frd, case, load, bonded, totals, held, arrows, probe, volume):
         tip = (mean(hi, 2) - mean(lo, 2)) / dy
         foot = abs(mean(ring, 1) + tip * lever * 1000)
     else:
-        foot = max(abs(disp[n][1]) for n in disp)
+        foot = max(sum(u * u for u in disp[n]) ** 0.5 for n in disp)
     label = "%s, %s, %s" % (case, load, "servos bonded in" if bonded else ("print alone" if case != "tibia" else "halves joined"))
-    summary = "%s: peak %.1f MPa, 99.9%% under %.1f MPa, foot moves sideways %.2f mm" % (label, vm[ranked[0]], vm[ranked[len(ranked) // 1000]], foot)
+    moved = "foot moves sideways" if probe else "moves at most"
+    summary = "%s: peak %.1f MPa, 99.9%% under %.1f MPa, %s %.2f mm" % (label, vm[ranked[0]], vm[ranked[len(ranked) // 1000]], moved, foot)
     print(summary + " (peak at %s; forces %s)" % ([round(c, 1) for c in coords[ranked[0]]], {k: round(v, 1) for k, v in totals.items()}))
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fea")
     os.makedirs(out, exist_ok=True)

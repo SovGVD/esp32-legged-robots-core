@@ -168,3 +168,109 @@ def chamfer_edges(shape, size, skip, min_length=1.5):
                 kept.append(i)
     print("  chamfers: %d of %d straight edges" % (len(kept), len(wanted)))
     return [(i + 1, size, size) for i in kept]
+
+
+def rounded_face(points, plane):
+    """A flat outline with rounded corners. points = (u, v, radius) in order; plane is
+    "xy", "xz" or "yz". Radii that don't fit are reduced."""
+    import math
+    import Part
+    n = len(points)
+    to3d = {"xy": lambda u, v: App.Vector(u, v, 0), "xz": lambda u, v: App.Vector(u, 0, v), "yz": lambda u, v: App.Vector(0, u, v)}[plane]
+    corners = []
+    for i in range(n):
+        px, py, r = points[i]
+        ax, ay = points[i - 1][:2]
+        bx, by = points[(i + 1) % n][:2]
+        ux, uy = ax - px, ay - py
+        vx, vy = bx - px, by - py
+        lu, lv = math.hypot(ux, uy), math.hypot(vx, vy)
+        ux, uy, vx, vy = ux / lu, uy / lu, vx / lv, vy / lv
+        half = math.acos(max(-1.0, min(1.0, ux * vx + uy * vy))) / 2
+        cut = r / math.tan(half) if r > 0 else 0.0
+        limit = 0.48 * min(lu, lv)
+        if cut > limit:
+            cut = limit
+            r = cut * math.tan(half)
+        corners.append((px, py, ux, uy, vx, vy, cut, r, half))
+    edges = []
+    for i in range(n):
+        px, py, ux, uy, vx, vy, cut, r, half = corners[i]
+        start = (px + ux * cut, py + uy * cut)
+        end = (px + vx * cut, py + vy * cut)
+        if r > 1e-6:
+            bx, by = ux + vx, uy + vy
+            lb = math.hypot(bx, by)
+            bx, by = bx / lb, by / lb
+            dist = r / math.sin(half)
+            mid = (px + bx * (dist - r), py + by * (dist - r))
+            edges.append(Part.Arc(to3d(*start), to3d(*mid), to3d(*end)).toShape())
+        nx, ny, _, __, nvx, nvy, ncut, ___, ____ = corners[(i + 1) % n]
+        n_start = (nx + _ * ncut, ny + __ * ncut)
+        edges.append(Part.LineSegment(to3d(*end), to3d(*n_start)).toShape())
+    return Part.Face(Part.Wire(edges))
+
+
+def prism(points, plane, lo, hi):
+    """rounded_face pushed along the plane's normal, from lo to hi."""
+    normal = {"xy": App.Vector(0, 0, 1), "xz": App.Vector(0, 1, 0), "yz": App.Vector(1, 0, 0)}[plane]
+    face = rounded_face(points, plane)
+    face.translate(normal * lo)
+    return face.extrude(normal * (hi - lo))
+
+
+def block(x0, x1, y0, y1, z0, z1):
+    import Part
+    return Part.makeBox(x1 - x0, y1 - y0, z1 - z0, App.Vector(x0, y0, z0))
+
+
+def rod(d, length, base, direction):
+    """Cylinder from base along direction: "x", "y" or "z"."""
+    import Part
+    axis = {"x": App.Vector(1, 0, 0), "y": App.Vector(0, 1, 0), "z": App.Vector(0, 0, 1)}[direction]
+    return Part.makeCylinder(d / 2.0, length, App.Vector(*base), axis)
+
+
+def smooth(shape, size, skip):
+    """Round the edges, except those skip(edge) says must stay sharp. Whatever the kernel
+    refuses to round gets a chamfer if it can; the rest stay sharp, and are counted."""
+    wanted = [i for i, e in enumerate(shape.Edges) if e.Length > size * 1.5 and not skip(e)]
+    wanted.sort(key=lambda i: -shape.Edges[i].Length)
+
+    def attempt(items, make):
+        try:
+            result = make(size, [shape.Edges[i] for i in items])
+            return result if result.isValid() and len(result.Solids) == 1 else None
+        except Exception:
+            return None
+
+    result = attempt(wanted, shape.makeFillet)
+    kept = wanted
+    if result is None:
+        kept = []
+        for i in wanted:
+            trial = attempt(kept + [i], shape.makeFillet)
+            if trial is not None:
+                kept.append(i)
+                result = trial
+    print("  rounded %d of %d edges" % (len(kept), len(wanted)))
+    return result if result is not None else shape
+
+
+def as_part(doc, part, name, shape, color, visible=True):
+    obj = doc.addObject("Part::Feature", name)
+    part.addObject(obj)
+    obj.Shape = shape
+    obj.ViewObject.ShapeColor = color
+    obj.ViewObject.Visibility = visible
+    return obj
+
+
+def add_mirror(doc, part, obj, color):
+    mirror = doc.addObject("Part::Mirroring", obj.Name + "_L")
+    part.addObject(mirror)
+    mirror.Source = obj
+    mirror.Normal = App.Vector(0, 1, 0)
+    mirror.ViewObject.Visibility = False
+    mirror.ViewObject.ShapeColor = color
+    return mirror
