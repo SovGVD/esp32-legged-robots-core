@@ -190,7 +190,7 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 			tofNav.gapAhead(navParams.stopDistance);   // lidar.cpp: terrain mode stopped at a gap
 		}
 		tofCmd = tofNav.update(dt, slam, odom.pose(), motion.gait().params().maxYawRate, motion.gait().isActive());
-		scanTilt = tofNav.tilt();
+		scanTilt = tofNav.bodyTilt();   // 0 with a sensor servo: the sensors tilt, the body stays level
 		motion.setHeightOffset(-tofNav.crouch(), 200.0f);
 		if (tofNav.active()) {
 			cmd = tofCmd;
@@ -517,6 +517,14 @@ static const TofSensor &tofSensor(int i)
 	return tofSensors[i];
 }
 
+/** Sensor i as it looks now: a sensor servo (TofScanParams::sensorServo) tilts it up for a room scan. */
+static TofSensor tofSensorNow(int i)
+{
+	TofSensor t = tofSensor(i);
+	if (tofNavOn) t.tilt -= tofNav.sensorTilt();
+	return t;
+}
+
 /** Sensor i looks tilt rad down (< 0: back to TOF_SENSORS). */
 RC_API void rc_tof_mount(int i, float tilt)
 {
@@ -542,7 +550,7 @@ RC_API int rc_tof_sensor(int i, float *out)
 RC_API void rc_tof_rays(int i, float *out)
 {
 	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
-	const TofSensor &t = tofSensor(i);
+	const TofSensor t = tofSensorNow(i);
 	for (uint8_t z = 0; z < t.zones * t.zones; z++) {
 		LR_point d = TerrainMap::zoneDirection(t, z);
 		out[z * 3 + 0] = d.x; out[z * 3 + 1] = d.y; out[z * 3 + 2] = d.z;
@@ -557,7 +565,7 @@ RC_API void rc_tof_rays(int i, float *out)
 RC_API void rc_tof_frame(int i, const float *distances)
 {
 	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
-	const TofSensor &t = tofSensor(i);
+	const TofSensor t = tofSensorNow(i);
 	LR_figure pose = motion.body();
 	// the floor's own tilt in this frame where there is a floor (motion.cpp updateTerrain)
 	LR_angle tilt = floorTiltOn ? frameTilt.place(t, distances, terrainTilt.tilt(), frameGain)
@@ -763,6 +771,7 @@ RC_API void rc_nav_state(float *out)
 	out[5] = c.move.y; out[6] = c.rotate.yaw;
 	out[7] = tofNavOn ? tofNav.phase() : 0; out[8] = tofNav.tilt(); out[9] = tofNav.lastPoints();
 	out[10] = tofNavOn && tofNav.partialScan();
+	out[11] = tofNavOn ? tofNav.sensorTilt() : 0;
 }
 
 /** ToF room scans on (1) / off (0) instead of the lidar; kept across rc_init() (which clears the map). */
@@ -786,6 +795,7 @@ RC_API void rc_tofnav_params(float *out)
 	out[0] = p.tilt; out[1] = p.tiltRate; out[2] = p.turnRate; out[3] = p.turnAngle; out[4] = p.band;
 	out[5] = p.minRange; out[6] = p.maxRange; out[7] = p.minHeight; out[8] = p.scanEvery; out[9] = p.settleTime;
 	out[10] = p.obstacleHeight; out[11] = p.crouch; out[12] = p.rescanAngle;
+	out[13] = p.sensorServo;
 }
 
 /** Override TOF_SCAN_PARAMS fields (same order as rc_tofnav_params, < 0 = keep; reset = 1 back to the model's) */
@@ -795,8 +805,8 @@ RC_API void rc_tofnav_tune(const float *v, int reset)
 	float *f[] = { &tofParams.tilt, &tofParams.tiltRate, &tofParams.turnRate, &tofParams.turnAngle, &tofParams.band,
 	               &tofParams.minRange, &tofParams.maxRange, &tofParams.minHeight, &tofParams.scanEvery,
 	               &tofParams.settleTime, &tofParams.obstacleHeight, &tofParams.crouch,
-	               &tofParams.rescanAngle };
-	for (int i = 0; i < 13; i++) if (v[i] >= 0) *f[i] = v[i];
+	               &tofParams.rescanAngle, &tofParams.sensorServo };
+	for (int i = 0; i < 14; i++) if (v[i] >= 0) *f[i] = v[i];
 	if (tofNavOn) tofNav.begin(tofParams, navParams);
 }
 

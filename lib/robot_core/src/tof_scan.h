@@ -22,6 +22,9 @@
  * way round on the spot; scan() and a rejected full scan ask for a full turn again. While walking the sensors look down at the ground as
  * usual and stop the robot in front of anything higher than obstacleHeight.
  *
+ * With a sensor servo (sensorServo) the sensors tilt up instead of the body:
+ * the caller passes frames with the sensor's tilt as the servo has it now.
+ *
  * Frames: map frame and LR_pose2 as in lidar.h. Body tilt in the firmware
  * convention (LR_angle: pitch = lean about the forward axis, left side up
  * > 0; roll = nose up > 0), as the IMU measures it.
@@ -48,6 +51,8 @@ typedef struct {
 	float crouch;         // mm the body goes down while scanning (the legs reach a steeper tilt)
 	float rescanAngle;    // rad, later scans sweep only this much around the heading (turn right half,
 	                      // then left all of it), matched against the map; 0 = a full turn every time
+	float sensorServo;    // 1: a servo tilts the sensors up by `tilt` for a scan and the body stays level
+	                      // (no nose up); 0: the body tilts (bodyTilt / sensorTilt)
 } TofScanParams;
 
 /** One room scan: collects points from ToF frames while the robot turns. */
@@ -134,8 +139,12 @@ class TofNavigator {
 		const Navigator &nav() const { return _nav; }
 		/** Something close ahead (live ToF) or a gap (gapAhead), walking stopped. */
 		bool blocked() const { return _blocked || _sinceGap < 0.1f; }
-		/** Nose up to command now, rad (0 while not scanning). */
+		/** How far the scan has tilted up now, rad (0 while not scanning): the body or the sensor servo. */
 		float tilt() const { return _tilt; }
+		/** Nose up to command now, rad (0 with a sensor servo). */
+		float bodyTilt() const { return _params.sensorServo > 0 ? 0 : _tilt; }
+		/** Sensor servo: the sensors look this much less down than TOF_SENSORS now, rad (0 without one). */
+		float sensorTilt() const { return _params.sensorServo > 0 ? _tilt : 0; }
 		/** Body lowered by this now, mm (with the tilt). */
 		float crouch() const { return _params.tilt > 0 ? _params.crouch * _tilt / _params.tilt : 0; }
 		/** Points the last finished scan had. */

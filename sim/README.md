@@ -475,6 +475,16 @@ target of 2 x 2 rays per zone, out to 3 m, ~40 ms late. `set_tof_mount(i, deg)` 
     python examples/lidar_nav.py --tof --model hexapod
     python examples/lidar_nav.py --tof --mount 40 --scan-tilt 15                # the old, steeper mount
     MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --tof --video out/dog-tof.mp4 --speedup 6
+    python examples/drive.py --hexapod --nav tof --mount 35 --sensor-servo 18   # live, ToFs on a tilt servo
+    python examples/lidar_nav.py --tof --model hexapod --mount 35 --sensor-servo 18 --log
+
+**Sensor tilt servo** (`TofScanParams.sensorServo`, sim only so far, the firmware doesn't drive
+a servo yet): one small servo tilts both ToF sensors up `tilt` for a room scan instead of the
+body, which stays level (with the crouch: the hexapod turns faster lower). Both sensors can
+then look 35 deg down for footholds and 17 deg for walls. Hexapod, three seeds, three goals:
+all arrived, 0 rejected scans, heading error at the scans ~1.2 deg (2.8 with the 18 deg body
+tilt it would otherwise need, which the IMU's tilt estimate doesn't follow well while turning).
+Terrain tests about the same as the 35 / 22 mount (the 40 mm gap is still not crossed).
 
 The legs can tilt the dog's nose up ~15 deg (with the crouch; 20 deg runs the legs out of reach)
 and the hexapod's ~10 deg (servo ranges). The sensors' top zone row looks 19.7 +- 2.8 deg above

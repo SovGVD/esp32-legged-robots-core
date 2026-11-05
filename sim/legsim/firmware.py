@@ -187,6 +187,7 @@ class FirmwareCore:
         self.last_imu = (0.0, 0.0, 0.0)
         self.contacts = None      # foot switch threshold (N) while contact sensing is on
         self.tof = None           # legsim.tof.ToFArray while the terrain map is fed
+        self._sensor_tilt = 0.0   # sensor servo angle the ToF rays were last set for
         self.heading_sim = None   # set_heading_sensors()
         self.lidar = None         # legsim.lidar.LidarLD06 while the lidar is on (set_lidar)
         self.tof_nav = False      # ToF room scans feed the map (set_tof_nav)
@@ -284,9 +285,9 @@ class FirmwareCore:
 
     def tof_scan_params(self):
         """The model's TOF_SCAN_PARAMS (tof_scan.h): tilt (rad), rates, turn angle, ranges (mm), ..."""
-        v = self._floats(self.lib.rc_tofnav_params, 13)
+        v = self._floats(self.lib.rc_tofnav_params, 14)
         keys = ("tilt", "tilt_rate", "turn_rate", "turn_angle", "band", "min_range", "max_range", "min_height",
-                "scan_every", "settle_time", "obstacle_height", "crouch", "rescan_angle")
+                "scan_every", "settle_time", "obstacle_height", "crouch", "rescan_angle", "sensor_servo")
         return dict(zip(keys, map(float, v)))
 
     def set_tof_nav(self, on=True, sensor_range=None, **tof_args):
@@ -310,16 +311,17 @@ class FirmwareCore:
         # one set of sensors for both: the terrain map ignores readings beyond its TOF_SENSORS range
         self._nav_tof = (sensors, tof_args)
         self.tof = ToFArray(sensors, **tof_args)
+        self._sensor_tilt = 0.0
         self.reset()
 
     def tune_tof_scan(self, reset=False, **fields):
         """Override TOF_SCAN_PARAMS fields (names as tof_scan_params()) for experiments."""
         keys = ("tilt", "tilt_rate", "turn_rate", "turn_angle", "band", "min_range", "max_range", "min_height",
-                "scan_every", "settle_time", "obstacle_height", "crouch", "rescan_angle")
+                "scan_every", "settle_time", "obstacle_height", "crouch", "rescan_angle", "sensor_servo")
         v = [float(fields.pop(k, -1)) for k in keys]
         if fields:
             raise TypeError(f"unknown fields {list(fields)}")
-        self.lib.rc_tofnav_tune((ctypes.c_float * 13)(*v), 1 if reset else 0)
+        self.lib.rc_tofnav_tune((ctypes.c_float * 14)(*v), 1 if reset else 0)
 
     def set_tof_mount(self, i, tilt_deg=None):
         """Experiment: ToF sensor i looks tilt_deg down instead of its TOF_SENSORS tilt
@@ -374,10 +376,10 @@ class FirmwareCore:
         self.lib.rc_nav_stop()
 
     def nav_state(self):
-        v = self._floats(self.lib.rc_nav_state, 11)
+        v = self._floats(self.lib.rc_nav_state, 12)
         return {"state": self.NAV_STATES[int(v[0])], "blocked": bool(v[1]), "distance": float(v[2]),
                 "phase": self.TOF_PHASES[int(v[7])], "tilt": float(v[8]), "scan_points": int(v[9]),
-                "partial": bool(v[10]),
+                "partial": bool(v[10]), "sensor_tilt": float(v[11]),
                 "goal": v[3:5], "forward": float(v[5]), "yaw": float(v[6])}
 
     def nav_path(self):
@@ -413,6 +415,7 @@ class FirmwareCore:
         if self.tof_nav:
             # the room scans' sensors (longer reach) feed the terrain map too
             self.tof = ToFArray(self._nav_tof[0], **self._nav_tof[1])
+            self._sensor_tilt = 0.0
         else:
             self.tof = ToFArray(self.tof_sensors(), **tof_args) if tof else None
         self.lib.rc_set_contact_sensing(1 if contacts else 0)
@@ -465,6 +468,13 @@ class FirmwareCore:
         if self.lidar is not None:
             self.lidar_bytes(self.lidar.poll(robot, self.loop_dt if dt is None else dt))
         if self.tof is not None:
+            if self.tof_nav:
+                # a sensor servo (TOF_SCAN_PARAMS sensorServo) tilts the sensors up for a room scan
+                up = self.nav_state()["sensor_tilt"]
+                if up != self._sensor_tilt:
+                    self._sensor_tilt = up
+                    for s, now in zip(self.tof.sensors, self.tof_sensors()):
+                        s["rays"] = now["rays"]
             frames = self.tof.poll(robot, self.loop_dt if dt is None else dt)
             if frames is not None:
                 for i, f in enumerate(frames):

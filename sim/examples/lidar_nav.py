@@ -121,6 +121,9 @@ def main():
     ap.add_argument("--mount", type=float, metavar="DEG",
                     help="with --tof: the ToF sensors look DEG down instead of their TOF_SENSORS angle")
     ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --tof: nose up while scanning (TOF_SCAN_PARAMS tilt)")
+    ap.add_argument("--sensor-servo", type=float, metavar="DEG",
+                    help="with --tof: a servo tilts the sensors DEG up for a scan, the body stays level "
+                         "(TOF_SCAN_PARAMS sensorServo; with --mount for the walking angle)")
     ap.add_argument("--rescan", type=float, metavar="DEG",
                     help="with --tof: later scans sweep DEG around the heading (TOF_SCAN_PARAMS rescanAngle; 0 = full turns)")
     ap.add_argument("--log", action="store_true", help="with --tof: print every scan (match, pose error)")
@@ -140,6 +143,8 @@ def main():
                 fw.set_tof_mount(i, args.mount)
         if args.scan_tilt is not None:
             fw.tune_tof_scan(tilt=math.radians(args.scan_tilt))
+        if args.sensor_servo is not None:
+            fw.tune_tof_scan(sensor_servo=1, tilt=math.radians(args.sensor_servo), tilt_rate=1.0)
         if args.rescan is not None:
             fw.tune_tof_scan(rescan_angle=math.radians(args.rescan))
         # VL53L5CX: 8x8 at 15 Hz, closest target in each zone (2x2 rays), frames reach the firmware ~40 ms late
@@ -166,6 +171,7 @@ def main():
     results = []
 
     last_phase = ["idle", False]
+    phase_time = {}   # s in each scan phase, this scan (--log)
 
     def tick(goal):
         nonlocal t
@@ -175,6 +181,11 @@ def main():
         mp, op = fw.lidar_pose()
         if args.log and args.tof:
             ns = fw.nav_state()
+            if ns["phase"] != "idle":
+                phase_time[ns["phase"]] = phase_time.get(ns["phase"], 0.0) + dt
+            if ns["phase"] == "idle" and last_phase[0] != "idle" and phase_time:
+                print("           phases: " + ", ".join(f"{k} {v:.1f} s" for k, v in phase_time.items()))
+                phase_time.clear()
             if ns["phase"] == "turn" and last_phase[0] != "turn":
                 last_phase[1] = ns["partial"]
             if ns["phase"] != "turn" and last_phase[0] == "turn":

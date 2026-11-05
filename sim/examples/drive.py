@@ -67,6 +67,8 @@ ap.add_argument("--nav", choices=("tof", "lidar"),
 ap.add_argument("--goal", nargs=2, type=float, metavar=("X", "Y"), help="with --nav: walk here first, mm")
 ap.add_argument("--mount", type=float, metavar="DEG", help="with --nav tof: ToF sensors DEG down (TOF_SENSORS)")
 ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --nav tof: nose up while scanning")
+ap.add_argument("--sensor-servo", type=float, metavar="DEG",
+                help="with --nav tof: a servo tilts the ToF sensors DEG up for a scan, the body stays level")
 ap.add_argument("--gyro-bias", type=float, default=1.0, help="with --nav: gyro drift, deg/s (default 1)")
 ap.add_argument("--mass", type=float, metavar="G", help="hexapod: total robot mass, g (default 815)")
 ap.add_argument("--floor", type=float, metavar="MM",
@@ -102,6 +104,8 @@ if args.nav:
                 fw.set_tof_mount(i, args.mount)
         if args.scan_tilt is not None:
             fw.tune_tof_scan(tilt=math.radians(args.scan_tilt))
+        if args.sensor_servo is not None:
+            fw.tune_tof_scan(sensor_servo=1, tilt=math.radians(args.sensor_servo), tilt_rate=1.0)
         fw.set_tof_nav(True, subrays=2, latency=0.04)
     else:
         fw.set_lidar(True)
