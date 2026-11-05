@@ -119,7 +119,12 @@ class TofNavigator {
 		void scan();
 		/** The scan running now is a partial sweep (rescanAngle), not a full turn. */
 		bool partialScan() const { return _sweep > 0; }
-		/** Scan, then walk to (x, y), mm in the map frame. false: no memory for the planner. */
+		/**
+		 * Walk to (x, y), mm in the map frame. Scans first, unless the last scan
+		 * fit the map and the robot walked under scanEvery / 2 since (a new goal
+		 * right after arriving at the last one starts walking at once).
+		 * false: no memory for the planner.
+		 */
 		bool setGoal(float x, float y);
 		/** Stop walking and scanning (the nose comes back down). */
 		void stop();

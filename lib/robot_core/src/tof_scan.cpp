@@ -189,9 +189,14 @@ bool TofNavigator::setGoal(float x, float y)
 	if (!_nav.setGoal(x, y)) {
 		return false;
 	}
-	_walked = 0;
 	if (_phase == TOF_SCAN_IDLE || _phase == TOF_SCAN_LEVEL) {
-		startScan();   // where am I: a fresh scan before walking
+		// where am I: a fresh scan before walking, unless the last one fit the map
+		// and the robot walked less than half the scan distance since
+		bool fresh = _haveFull && !_wantFull && _walked < 0.5f * _params.scanEvery;
+		if (!fresh) {
+			_walked = 0;
+			startScan();
+		}
 	}
 	return true;
 }

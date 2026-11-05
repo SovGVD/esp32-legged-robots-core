@@ -134,7 +134,9 @@ void Navigator::buildCost(const OccupancyGrid &grid)
 			}
 			int cost = 10;
 			if (m > 0 && c < r + m) {
-				cost += 30 * (r + m - c) / m;
+				// steep enough that a doorway's middle beats its edge by more than
+				// the few extra cells of going round
+				cost += 80 * (r + m - c) / m;
 			}
 			bool unknown = true;
 			for (int fy = 0; fy < LR_NAV_FACTOR && unknown; fy++) {
@@ -364,11 +366,28 @@ LR_moveVector Navigator::update(float dt, const LidarSlam &slam, const LR_pose2 
 		return cmd;
 	}
 
-	// the point `lookahead` mm down the path
+	// the point `lookahead` mm down the path, but not past a bend: the straight
+	// line to it must stay within 50 mm of the path, or the robot cuts the corner
+	// (a door frame) the path goes round
 	float tx = _pathX[_pathLen - 1], ty = _pathY[_pathLen - 1];
 	float walked = 0;
 	for (uint8_t i = 1; i < _pathLen; i++) {
 		walked += hypotf(_pathX[i] - _pathX[i - 1], _pathY[i] - _pathY[i - 1]);
+		bool bend = false;
+		float cx = _pathX[i] - pose.x, cy = _pathY[i] - pose.y;
+		float len = hypotf(cx, cy);
+		for (uint8_t j = 1; j < i && len > 1; j++) {
+			float qx = _pathX[j] - pose.x, qy = _pathY[j] - pose.y;
+			if (fabsf(qx * cy - qy * cx) / len > 50) {
+				bend = true;
+				break;
+			}
+		}
+		if (bend) {
+			tx = _pathX[i - 1];
+			ty = _pathY[i - 1];
+			break;
+		}
 		if (walked >= _params.lookahead) {
 			tx = _pathX[i];
 			ty = _pathY[i];

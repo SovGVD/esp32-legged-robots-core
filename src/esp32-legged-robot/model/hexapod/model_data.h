@@ -310,7 +310,7 @@ const LidarMapParams LIDAR_MAP_PARAMS = {
 
 const NavParams NAV_PARAMS = {
 	200,   // robot radius, mm: the feet stand ~190 mm from the centre
-	100,   // + 100 mm that still costs more (doorways: walk in the middle)
+	200,   // + 200 mm that still costs more (doorways: walk in the middle)
 	450,   // lookahead, mm
 	150,   // arrived within 150 mm
 	0.4,   // forward command 0.4 of GAIT_PARAMS max speed (120 mm/s)
