@@ -135,8 +135,8 @@ TABLE = [
     ("mini_tape_t", "1 mm", TODO, "foam tape under the Mini360"),
 
     "Mini360 buck (part origin: PCB centre, lying flat; +Z = component side)",
-    ("mini_len", "17.2 mm", TODO, "sim 17; old pocket 18.5"),
-    ("mini_w", "11.2 mm", TODO, "sim 11; old pocket 12; photo fits the 12 pitch"),
+    ("mini_len", "17.4 mm", CAL, "PCB, about"),
+    ("mini_w", "11 mm", CAL, "PCB, about"),
     ("mini_t", "1 mm", LOOSE, "PCB"),
     ("mini_comp_len", "13 mm", LOOSE, "component envelope"),
     ("mini_comp_w", "9 mm", LOOSE, "component envelope"),
