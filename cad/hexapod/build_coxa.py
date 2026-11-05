@@ -58,8 +58,9 @@ floor_in = floor_z0 + v("coxa_floor_t")
 seat = v("coxa_seat_z")
 
 # the horseshoe from above
-above = prism([(-rear, rear, rear), (waist_x, a_y1, waist_r), (end_x, a_y1, 0), (end_x, a_y0, 0), (fork_x, a_y0, fork_r),
-               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (waist_x, b_y0, waist_r), (-rear, -rear, rear)],
+straight = v("coxa_straight_x")
+above = prism([(-rear, rear, rear), (straight, rear, 25), (waist_x, a_y1, 25), (end_x, a_y1, 0), (end_x, a_y0, 0), (fork_x, a_y0, fork_r),
+               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (waist_x, b_y0, 25), (straight, -rear, 25), (-rear, -rear, rear)],
               "xy", floor_z0 - 1, arm_r + 1)
 # the arch from the side, with a round end around the femur axis
 side = prism([(-rear, z1, 3), (v("coxa_top_x"), z1, 20), (fork_x, arm_r, 20), (end_x, arm_r, arm_r), (end_x, -arm_r, arm_r),
