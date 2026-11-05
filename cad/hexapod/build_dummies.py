@@ -103,10 +103,21 @@ def pca9685(i):
     d = Dummy("PCA9685", i)
     t = p("pca_t")
     d.cbox("pcb", p("pca_len"), p("pca_w"), t, "0 mm", "0 mm", "-" + t, PCB_PURPLE)
-    hy = "%s / 2 - %s - %s / 2" % (p("pca_w"), p("pca_hdr_edge"), p("pca_hdr_w"))
-    d.cbox("servo_header", p("pca_hdr_len"), p("pca_hdr_w"), p("pca_hdr_h"), "0 mm", hy, "0 mm", GREY)
-    ty = "-(%s / 2 - %s / 2)" % (p("pca_w"), p("pca_term_w"))
-    d.cbox("power_terminal", p("pca_term_len"), p("pca_term_w"), p("pca_term_h"), "0 mm", ty, "0 mm", (0.1, 0.5, 0.7))
+    # bent pins, one block per group: bend at the -Y edge, tips toward +Y
+    gy = "-%s / 2 + %s + %s / 2" % (p("pca_w"), p("pca_grp_edge"), p("pca_grp_depth"))
+    for n in "123":
+        d.cbox("pins_" + n, p("pca_grp_w"), p("pca_grp_depth"), p("pca_grp_h"), p("pca_grp_x" + n), gy, "0 mm", GOLD)
+    d.cbox("power_plug", p("pca_plug_len"), p("pca_plug_w"), p("pca_plug_h"), p("pca_plug_x"), p("pca_plug_y"), "0 mm", BLACK)
+    sx = "-(%s / 2 - %s)" % (p("pca_len"), p("pca_sock_edge"))
+    d.cbox("socket", p("pca_sock_w"), p("pca_sock_len"), p("pca_sock_h"), sx, "0 mm", "-(%s + %s)" % (t, p("pca_sock_h")), BLACK)
+    # 3 Mini360 on the back, long side across the board
+    tape_z = "-(%s + %s)" % (t, p("mini_tape_t"))
+    pcb_z = "%s - %s" % (tape_z, p("mini_t"))
+    comp_z = "%s - %s" % (pcb_z, p("mini_comp_h"))
+    for n, x in (("a", "-" + p("mini_pitch")), ("b", "0 mm"), ("c", p("mini_pitch"))):
+        d.cbox("tape_" + n, p("mini_w"), p("mini_len"), p("mini_tape_t"), x, p("mini_node_y"), tape_z, (0.55, 0.7, 0.9))
+        d.cbox("mini_" + n, p("mini_w"), p("mini_len"), p("mini_t"), x, p("mini_node_y"), pcb_z, PCB_GREEN)
+        d.cbox("comp_" + n, p("mini_comp_w"), p("mini_comp_len"), p("mini_comp_h"), x, p("mini_node_y"), comp_z, GREY)
 
 
 def mini360(i):
@@ -164,8 +175,16 @@ def microswitch(i):
               "%s - %s" % (p("sw_lead_z"), p("sw_lead_t")), SILVER)
 
 
+def bearing(i):
+    d = Dummy("Bearing", i)
+    d.cyl("ring", p("bearing_od"), p("bearing_t"), "0 mm", "0 mm", "0 mm", SILVER)
+    # dark plug standing for the bore, proud of the ring so it shows
+    d.cyl("bore", p("bearing_id"), "%s + 0.1 mm" % p("bearing_t"), "0 mm", "0 mm", "0 mm", BLACK)
+
+
 BUILDERS = {"MG90S": mg90s, "18650_pair": cells, "PCA9685": pca9685, "Mini360": mini360,
-            "ESP32_devkit": esp32, "GY91": gy91, "VL53L5CX": vl53l5cx, "Microswitch": microswitch}
+            "ESP32_devkit": esp32, "GY91": gy91, "VL53L5CX": vl53l5cx, "Microswitch": microswitch,
+            "Bearing": bearing}
 ORDER = list(BUILDERS)
 
 for name in globals().get("PARTS") or ORDER:
