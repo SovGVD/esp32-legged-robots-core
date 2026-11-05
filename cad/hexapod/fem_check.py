@@ -175,7 +175,7 @@ def build(case, load, bonded):
         nodes = set()
         if faces[0] == "near":
             _, zv, xlim, ylim = faces
-            nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.2 and abs(v.x) <= xlim and abs(v.y) <= ylim}
+            nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.6 and abs(v.x) <= xlim and abs(v.y) <= ylim}
         else:
             for face in faces:
                 nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))

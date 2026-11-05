@@ -98,6 +98,16 @@ def cells(i):
     z = "0 mm"
     d.cyl("left", p("cell_d"), p("cell_len"), "-" + p("cell_x"), y0, z, (0.15, 0.55, 0.3), along_y=True)
     d.cyl("right", p("cell_d"), p("cell_len"), p("cell_x"), y0, z, (0.15, 0.55, 0.3), along_y=True)
+    # the holder around them: end blocks and side walls
+    h = p("cell_d")
+    wall_z = "-%s / 2" % h
+    for tag, y in (("a", "-%s / 2" % p("holder_len")), ("b", "%s / 2" % p("cell_len"))):
+        d.box("end_" + tag, p("holder_w"), p("holder_end"), h, "-%s / 2" % p("holder_w"), y, wall_z, GREY)
+    for tag, x in (("l", "-%s / 2" % p("holder_w")), ("r", "%s / 2 - %s" % (p("holder_w"), p("holder_side")))):
+        d.box("side_" + tag, p("holder_side"), p("cell_len"), h, x, "-%s / 2" % p("cell_len"), wall_z, GREY)
+    for tag, x in (("l", "-%s - 1 mm" % p("cell_x")), ("r", "%s - 1 mm" % p("cell_x"))):
+        d.box("tab_a" + tag, "2 mm", p("holder_tab"), "6 mm", x, "%s / 2" % p("holder_len"), "-3 mm", GOLD)
+        d.box("tab_b" + tag, "2 mm", p("holder_tab"), "6 mm", x, "-%s / 2 - %s" % (p("holder_len"), p("holder_tab")), "-3 mm", GOLD)
 
 
 def pca9685(i):
@@ -133,11 +143,6 @@ def esp32(i):
            "%s / 2 - %s / 2" % (p("esp_len"), p("esp_mod_len")), "0 mm", "0 mm", SILVER)
     d.cbox("usb", p("esp_usb_len"), p("esp_usb_w"), p("esp_usb_h"),
            "-(%s / 2 + %s - %s / 2)" % (p("esp_len"), p("esp_usb_over"), p("esp_usb_len")), "0 mm", "0 mm", SILVER)
-    hz = "-(%s + %s)" % (t, p("esp_hdr_h"))
-    for sub, sign in (("header_a", ""), ("header_b", "-")):
-        d.cbox(sub, p("esp_hdr_len"), p("esp_hdr_w"), p("esp_hdr_h"),
-               "%s / 2 - %s - %s / 2" % (p("esp_len"), p("esp_hdr_margin"), p("esp_hdr_len")),
-               "%s(%s / 2)" % (sign, p("esp_hdr_pitch")), hz, GOLD)
 
 
 def gy91(i):

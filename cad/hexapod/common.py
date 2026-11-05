@@ -94,24 +94,6 @@ class Prims:
         obj.ViewObject.Visibility = False
         return obj
 
-    def lattice(self, name, run, run0, pitch, n, width_axis, w_low, w_size, normal, n0, t):
-        """Triangular truss holes through a plate: n cells along `run`, each cut
-        into 2 triangles leaving a diagonal rib. Returns the cutting prisms."""
-        s, rib = "Params.lattice_s", "Params.lattice_rib"
-        lu = "(%s) - %s - %s" % (pitch, s, rib)
-        lv = "(%s) - %s" % (w_size, s)
-        high = "(%s) + (%s)" % (w_low, w_size)
-        low_n, len_n = "(%s) - 1 mm" % n0, "(%s) + 2 mm" % t
-        out = []
-        for i in range(n):
-            start = "(%s) + %d * (%s) + %s / 2" % (run0, i, pitch, rib)
-            stop = "(%s) + %d * (%s) - %s / 2" % (run0, i + 1, pitch, rib)
-            for tag, r, w, sr, sw in (("a", start, w_low, 1, 1), ("b", stop, high, -1, -1)):
-                corner = {run: r, width_axis: w, normal: low_n}
-                out.append(self.gusset("%s_%d%s" % (name, i, tag), (corner["x"], corner["y"], corner["z"]),
-                                       (run, sr), (width_axis, sw), lu, lv, normal, len_n))
-        return out
-
     def fuse(self, name, items):
         obj = self.doc.addObject("Part::MultiFuse", self.prefix + "_" + name)
         self.part.addObject(obj)

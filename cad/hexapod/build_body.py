@@ -1,7 +1,7 @@
 """The body: 2 plates, with the legs' servos outside it.
 
-  Body_Bottom  hexagon plate, 6 coxa bearing seats, cell seats, rails for the standing
-               boards, 6 columns
+  Body_Bottom  hexagon plate, 6 coxa bearing seats, holes for the battery holder, rails
+               for the standing boards, columns
   Body_Top     hexagon plate, a pocket for each coxa servo's horn, thick around it
 
 The columns take the stock MG90S screws from above. Each coxa link's shaft runs in a
@@ -77,8 +77,9 @@ for tag, sx, sy, kind, _, __ in AXES:
     x, y = axis_exprs(sx, sy, kind)
     bot_cut.append(cyl("seat_" + tag, p("bearing_seat_d"), "%s + 1 mm" % p("bearing_t"), x, y, "%s - %s" % (plate_top, p("bearing_t"))))
     bot_cut.append(cyl("bore_" + tag, p("fem_boss_d"), "%s + 2 mm" % p("body_plate_t"), x, y, "%s - 1 mm" % p("body_bottom_z")))
-for tag, sign in (("l", -1), ("r", 1)):
-    bot_cut.append(cyl("cell_" + tag, p("cell_seat_d"), p("cell_len"), "%d * %s" % (sign, p("cell_x")), "-%s / 2" % p("cell_len"), p("cell_z"), along_y=True))
+for tag, sign in (("f", 1), ("r", -1)):
+    bot_cut.append(cyl("holder_" + tag, p("holder_screw_d"), "%s + 2 mm" % p("body_plate_t"), "0 mm",
+                       "%s + %d * %s / 2" % (p("holder_y"), sign, p("holder_hole_span")), "%s - 1 mm" % p("body_bottom_z")))
 COLUMNS = []
 for sx in (1, -1):
     for sy in (1, -1):
@@ -92,15 +93,16 @@ for tag, x, y in COLUMNS:
 # rails: 2 pairs per standing board, 1 pair for the ESP32
 rail_t, rail_h, rail_len, rfit = p("rail_t"), p("rail_h"), p("rail_len"), p("rail_fit")
 for side, sign in (("r", 1), ("l", -1)):
-    cx = "%d * %s" % (sign, p("pca_x"))
+    cx = "%d * (%s - %s / 2)" % (sign, p("pca_x"), p("pca_t"))   # the PCB's middle: pca_x is its pin side
     cy_b = "%d * %s" % (sign, p("pca_y"))
-    for n, off in (("a", "-%s / 2 + %s" % (p("pca_len"), "2 mm")), ("b", "%s / 2 - %s - 2 mm" % (p("pca_len"), rail_len))):
-        by = "(%s) + (%d) * (%s)" % (cy_b, sign, off) if sign > 0 else "(%s) - (%s) - %s" % (cy_b, off, rail_len)
+    # in the free spots between the pin groups: at both ends and in the wide gap
+    for n, off in (("a", "-%s / 2 + 0.3 mm" % p("pca_len")), ("b", "%s / 2 - 0.3 mm - %s" % (p("pca_len"), rail_len)), ("c", "5 mm")):
+        by = "(%s) + (%s)" % (cy_b, off) if sign > 0 else "(%s) - (%s) - %s" % (cy_b, off, rail_len)
         gap = "%s / 2 + %s" % (p("pca_t"), rfit)
         bot_solid.append(box("rail_%s%s_in" % (side, n), rail_t, rail_len, rail_h, "(%s) - (%s) - %s" % (cx, gap, rail_t), by, plate_top))
         bot_solid.append(box("rail_%s%s_out" % (side, n), rail_t, rail_len, rail_h, "(%s) + (%s)" % (cx, gap), by, plate_top))
-gap = "%s + %s" % (p("esp_t"), rfit)
-for n, xo in (("a", "-%s / 2 + 8 mm" % p("esp_len")), ("b", "%s / 2 - 8 mm - %s" % (p("esp_len"), rail_len))):
+gap = "(%s + %s)" % (p("esp_t"), rfit)
+for n, xo in (("a", "-%s / 2 + 8 mm" % p("esp_len")), ("b", "%s / 2 - 8 mm - %s" % (p("esp_len"), rail_len)), ("c", "-%s / 2" % rail_len)):
     bot_solid.append(box("rail_e%s_back" % n, rail_len, rail_t, rail_h, xo, "%s - %s - %s" % (p("esp_y"), gap, rail_t), plate_top))
     bot_solid.append(box("rail_e%s_front" % n, rail_len, rail_t, rail_h, xo, "%s + %s" % (p("esp_y"), rfit), plate_top))
 bottom_raw = P.cut("Body_Bottom_raw", bot_solid, bot_cut, COL_BOT, mirror=False)
@@ -149,10 +151,20 @@ def near_axis(e, limit):
     return any(math.hypot(c.x - ax, c.y - ay) < limit for ax, ay in axes_xy)
 
 
+rail_top = btop + val("rail_h") + 1e-3
+board_x = val("pca_x") - val("pca_t") / 2
+board_gap = val("pca_t") / 2 + val("rail_fit") + val("rail_t") + 0.1
+esp_lo = val("esp_y") - val("esp_t") - val("rail_fit") - val("rail_t") - 0.1
+esp_hi = val("esp_y") + val("rail_fit") + val("rail_t") + 0.1
+
+
 def bottom_skip(e):
+    """No chamfers on the rails: on their inside corners one would fill the board's slot."""
     bb = e.BoundBox
-    in_rail_gap = bb.ZMin >= btop - 1e-3 and bb.ZMax <= btop + val("rail_h") + 1e-3 and bb.XLength < 1e-4 and bb.YLength < 1e-4
-    return near_axis(e, 7) or in_rail_gap
+    low = bb.ZMin >= btop - 1e-3 and bb.ZMax <= rail_top
+    at_board = abs(abs(bb.Center.x) - board_x) < board_gap and abs(bb.Center.y) < 45
+    at_esp = esp_lo <= bb.Center.y <= esp_hi and abs(bb.Center.x) < 26
+    return near_axis(e, 7) or (low and (at_board or at_esp))
 
 
 def top_skip(e):
@@ -198,7 +210,7 @@ for tag, sx, sy, kind, yaw, side in AXES:
     link("horn_" + tag, "Dummy_Horn", (x, y, seat), rot.multiply(Z180))
     link("bearing_" + tag, "Dummy_Bearing", (x, y, bear_z))
 cz, px, py, pz = val("cell_z"), val("pca_x"), val("pca_y"), val("pca_z")
-link("cells", "Dummy_18650_pair", (0, 0, cz))
+link("cells", "Dummy_18650_pair", (0, val("holder_y"), cz))
 link("pca_r", "Dummy_PCA9685", (px, py, pz), PCA_RIGHT)
 link("pca_l", "Dummy_PCA9685", (-px, -py, pz), Z180.multiply(PCA_RIGHT))
 link("esp32", "Dummy_ESP32_devkit", (0, val("esp_y"), val("esp_z")), ESP_FRONT)
@@ -216,7 +228,7 @@ bot_s, top_s = solids_of(doc, ["Body_Bottom"]), solids_of(doc, ["Body_Top"])
 Pl = lambda base, rot=None: App.Placement(App.Vector(*base), rot or App.Rotation())
 names = lambda part_name: [c.Name for c in doc.getObject(part_name).Group if c.Name != "Bearing_ring" and c.Name != "Bearing_bore"]
 inside = {
-    "cells": solids_of(doc, names("Dummy_18650_pair"), Pl((0, 0, cz))),
+    "cells": solids_of(doc, names("Dummy_18650_pair"), Pl((0, val("holder_y"), cz))),
     "pca r": solids_of(doc, names("Dummy_PCA9685"), Pl((px, py, pz), PCA_RIGHT)),
     "pca l": solids_of(doc, names("Dummy_PCA9685"), Pl((-px, -py, pz), Z180.multiply(PCA_RIGHT))),
     "esp32": solids_of(doc, names("Dummy_ESP32_devkit"), Pl((0, val("esp_y"), val("esp_z")), ESP_FRONT)),
