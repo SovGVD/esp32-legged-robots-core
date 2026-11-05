@@ -162,3 +162,27 @@ def solids_of(doc, names, placement=None):
 
 def clash(group_a, group_b):
     return sum(a.common(b).Volume for a in group_a for b in group_b)
+
+
+def chamfer_edges(shape, size, skip, min_length=1.5):
+    """Straight edges to chamfer, for a Part::Chamfer: all of them, inside corners too,
+    except those `skip(edge)` says must stay sharp (servo fits). Longest first; edges
+    the kernel can't do together with the others are left out, and counted."""
+    wanted = [i for i, e in enumerate(shape.Edges)
+              if e.Curve.TypeId == "Part::GeomLine" and e.Length > min_length * size and not skip(e)]
+    wanted.sort(key=lambda i: -shape.Edges[i].Length)
+
+    def works(items):
+        try:
+            result = shape.makeChamfer(size, [shape.Edges[i] for i in items])
+            return result.isValid() and len(result.Solids) == 1
+        except Exception:
+            return False
+
+    kept = wanted if works(wanted) else []
+    if not kept:
+        for i in wanted:
+            if works(kept + [i]):
+                kept.append(i)
+    print("  chamfers: %d of %d straight edges" % (len(kept), len(wanted)))
+    return [(i + 1, size, size) for i in kept]
