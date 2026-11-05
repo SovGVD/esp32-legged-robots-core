@@ -97,11 +97,10 @@ cuts = [
 g_y0 = v("coxa_groove_y")
 g_y1 = g_y0 + v("cable_w") + 0.2
 g_x0 = v("coxa_groove_x0")
-# a rounded floor: square corners here were the link's highest stress
-g_mid, g_d = (g_y0 + g_y1) / 2, g_y1 - g_y0
+# one U-shaped outline, with a rounded floor: square corners here were the link's highest
+# stress. (A cylinder tangent to a box crashes FreeCAD's rounding step.)
 g_floor = z1 - v("coxa_groove_d")
-cuts.append(block(g_x0, fork_x + 1, g_y0, g_y1, g_floor + g_d / 2, arm_r + 2))
-cuts.append(rod(g_d, fork_x + 1 - g_x0, (g_x0, g_mid, g_floor + g_d / 2), "x"))
+cuts.append(prism([(g_y0, g_floor, 1.5), (g_y1, g_floor, 1.5), (g_y1, arm_r + 2, 0), (g_y0, arm_r + 2, 0)], "yz", g_x0, fork_x + 1))
 # hollow it from underneath, leaving walls all around and the top under the cable groove
 t = v("coxa_shell_t")
 hx0, hx1 = v("coxa_hollow_x0"), v("coxa_hollow_x1")
@@ -128,8 +127,7 @@ def keep_sharp(e):
     servo = abs(bb.YMin) <= hw + 0.2 and abs(bb.YMax) <= hw + 0.2 and bb.ZMin >= floor_in - 0.2 and bb.XMin >= -tab_near - 0.2 and bb.XMax <= tab_far + 0.2
     horn = bb.YMin >= a_y0 - 0.1 and bb.YMax <= a_y0 + pocket + 0.1 and bb.XMin >= fl - v("horn_reach") - 0.2
     bearing = bb.YMax < b_y1 + 0.1 and abs(bb.XMin - fl) <= 7 and abs(bb.XMax - fl) <= 7 and abs(bb.ZMin) <= 7 and abs(bb.ZMax) <= 7
-    # inside the groove stays sharp, but where it comes out through the fork wall is rounded
-    groove = bb.YMin >= g_y0 - 0.2 and bb.YMax <= g_y1 + 0.2 and bb.ZMin >= z1 - v("coxa_groove_d") - 0.2 and bb.XMax < fork_x - 0.5
+    groove = bb.YMin >= g_y0 - 0.2 and bb.YMax <= g_y1 + 0.2 and bb.ZMin >= z1 - v("coxa_groove_d") - 0.2
     small_round = e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 5
     shaft_area = bb.ZMax <= floor_z0 + 0.1 and abs(bb.XMin) < 6 and abs(bb.XMax) < 6
     return servo or horn or bearing or groove or small_round or shaft_area
