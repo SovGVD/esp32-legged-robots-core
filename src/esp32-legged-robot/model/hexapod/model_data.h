@@ -175,7 +175,8 @@ const GaitParams GAIT_PARAMS = {
 	300,      // max speed, mm/s. Simulator (MG90S datasheet at 5 V, 815 g): ~250 mm/s forward,
 	          // servos at their torque limit ~2 % of the time. 400 walks ~380 but the femur
 	          // servos saturate 38 % of the time and it drifts sideways
-	1.0,      // max yaw rate, rad/s (simulator: ~0.73 turning; 1.3 saturates the coxa servos)
+	1.6,      // max yaw rate, rad/s: simulator turns ~1.5 rad/s (86 deg/s), coxa servos at their
+	          // torque limit ~5 % of the time; 1.0 turned only ~0.73
 	600,      // max acceleration, mm/s^2
 	6,        // max yaw acceleration, rad/s^2
 	3,        // idle tolerance, mm

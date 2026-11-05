@@ -251,7 +251,7 @@ What the sim says (`tests/test_hexapod.py`):
 
 * Standing: femur servos at ~5 % of stall, tibia ~12 %.
 * Tripod, 0.3 s cycle: ~250 mm/s forward with the servos at their torque limit
-  ~2 % of the time; ~130 mm/s sideways; ~0.7 rad/s turning. 400 mm/s asked
+  ~2 % of the time; ~130 mm/s sideways; ~1.5 rad/s (86 deg/s) turning. 400 mm/s asked
   walks ~380 but the femur servos saturate 38 % of the time.
 * Room scans: the right ToF looks 22 deg down. With both at 35 deg the scan
   needs the nose ~18 deg up and the legs only give ~11.
