@@ -198,6 +198,27 @@ control" window (`pip install pygame-ce`; if plain `pygame` is also installed, `
 Keyboard and pad add up. Any pad SDL knows as a game controller works
 (Xbox 360/One, most others). Linux and Windows.
 
+### Dog stance width
+
+`FirmwareCore.set_stance(x)` (and `lidar_nav.py --stance-x`) tries other neutral foot widths
+(config.h `LEG_POINT_X`; the hip roll axes are 39.5 mm out). Sweep, 2026-11-05 (trot at full
+stick, ToF terrain walks, a 0.1 s sideways push while trotting in place):
+
+| feet out, mm | push that tips it | 20 mm step (1.0 / 0.8 speed) | trot roll p2p, deg |
+|---|---|---|---|
+| 39.5 (legs vertical) | 4 N | stuck / stuck | 4.4 |
+| 50 | 5 N | ok / ok | 2.9 |
+| 56 (old) | 6 N | ok / ok | 3.8 |
+| 60 | 8 N | ok / stuck | 4.0 |
+| 64 (new) | 10 N | ok / ok (447 mm) | 4.4 |
+| 68 | > 10 N | ok / ok | 2.0 |
+| 74-80 | > 10 N | stuck / stuck | 3 |
+
+Speeds (150 mm/s forward, 50 sideways, 33 deg/s turning) and servo loads barely change.
+Vertical legs fail the step (the front feet reach the edge and the body pitches); over ~70 mm
+the same. 64 mm is the middle of the range that climbs, with most of the push margin.
+Gaps (30 / 40 mm) vary run to run at every width.
+
 ## Hexapod
 
 | | |

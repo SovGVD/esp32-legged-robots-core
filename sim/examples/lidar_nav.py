@@ -132,6 +132,8 @@ def main():
                     help="rough ground sensing while walking (with the rough gait), like drive.py")
     ap.add_argument("--obstacle", type=float, metavar="MM",
                     help="with --tof: something this high ahead stops the walk (TOF_SCAN_PARAMS obstacleHeight)")
+    ap.add_argument("--stance-x", type=float, metavar="MM",
+                    help="feet MM out from the centre line (config.h LEG_POINT_X), an experiment")
     ap.add_argument("--doubtful", type=float, metavar="L",
                     help="map cells under L log-odds are doubtful walls: walk up and rescan (NAV_PARAMS doubtful)")
     ap.add_argument("--log", action="store_true", help="with --tof: print every scan (match, pose error)")
@@ -142,6 +144,8 @@ def main():
     model = args.model
     goals = [tuple(g) for g in args.goal] if args.goal else GOALS[model]
     fw = FirmwareCore(model=model)
+    if args.stance_x is not None:
+        fw.set_stance(args.stance_x)
     fw.set_heading_sensors(gyro_bias_dps=args.gyro_bias, magnetometer=False, seed=args.seed)
     if args.nav_speed is not None:
         fw.tune_nav(speed=args.nav_speed)

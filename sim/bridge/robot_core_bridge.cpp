@@ -109,6 +109,24 @@ RC_API int rc_leg_dof()   { return LEG_DOF; }
 RC_API float rc_loop_dt() { return BRIDGE_LOOP_DT; }
 
 /**
+ * Experiment: the neutral stance's feet |x| mm out from the centre and z mm
+ * down (< 0: keep), all legs (config.h LEG_POINT_X / LEG_POINT_Z). Call rc_init() after.
+ */
+RC_API void rc_set_stance(float x, float z)
+{
+	if (!initialSaved) {
+		memcpy((void *)initialLegs, (const void *)legs, sizeof(legs));
+		initialSaved = true;
+	}
+	leg *l = (leg *)(void *)initialLegs;
+	for (int i = 0; i < LEG_NUM; i++) {
+		LR_point *d = (LR_point *)(void *)&l[i].defaultFoot;   // const in the model: the saved copy is ours
+		if (x >= 0) d->x = l[i].foot.x = d->x < 0 ? -x : x;
+		if (z >= 0) d->z = l[i].foot.z = -z;
+	}
+}
+
+/**
  * (Re)start: legs back to the model's defaults, gait idle, joint angles
  * solved for the neutral stance.
  */

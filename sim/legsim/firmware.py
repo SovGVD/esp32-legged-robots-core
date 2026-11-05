@@ -86,6 +86,8 @@ class FirmwareCore:
         L.rc_leg_dof.restype = ctypes.c_int
         L.rc_loop_dt.restype = ctypes.c_float
         L.rc_init.restype = None
+        L.rc_set_stance.restype = None
+        L.rc_set_stance.argtypes = [ctypes.c_float, ctypes.c_float]
         L.rc_update.restype = ctypes.c_int
         L.rc_update.argtypes = [ctypes.c_float, f32p, f32p, ctypes.POINTER(ctypes.c_uint16)]
         for name in ("rc_leg_angles", "rc_feet", "rc_body"):
@@ -577,6 +579,12 @@ class FirmwareCore:
     def level_correction(self):
         """Leveler output: pitch, roll in rad, firmware convention."""
         return self._floats(self.lib.rc_level_correction, 2)
+
+    def set_stance(self, x=None, z=None):
+        """Experiment: neutral stance feet |x| mm out from the centre line, z mm down (config.h
+        LEG_POINT_X / LEG_POINT_Z; None keeps). Resets (kept across later reset() calls)."""
+        self.lib.rc_set_stance(-1.0 if x is None else float(x), -1.0 if z is None else float(z))
+        self.reset()
 
     def place(self, dog):
         """Put `dog` on the floor in the firmware's current pose (call after reset()
