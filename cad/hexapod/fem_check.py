@@ -125,7 +125,8 @@ def build(case, load, bonded):
         probe = (fl, 0.0, lever)
     elif case == "tibia":
         held = cyl_faces(val("bearing_seat_d") / 2, 0) + cyl_faces(val("horn_screw_d") / 2, 0)
-        top = plane_faces("z", val("tip_cavity_z1"))
+        # the presser pushes on the ledge at the top of its cavity: small faces, so by position
+        top = ("near", val("tip_cavity_z1"), val("tip_cavity_x") / 2 + 0.1, val("tip_hole_w") / 2 + 0.1)
         loads = [("foot up", top, up, Z)]
         if side:
             loads += [("side", top, side, Y), ("forward", top, side, X)]
@@ -172,8 +173,12 @@ def build(case, load, bonded):
     lines, totals, arrows = ["*CLOAD"], {}, []
     for label, faces, newtons, dof in loads:
         nodes = set()
-        for face in faces:
-            nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))
+        if faces[0] == "near":
+            _, zv, xlim, ylim = faces
+            nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.05 and abs(v.x) <= xlim and abs(v.y) <= ylim}
+        else:
+            for face in faces:
+                nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))
         if not nodes:
             raise ValueError("no mesh nodes on " + label)
         lines += ["%d,%d,%.8E" % (n, dof, newtons / len(nodes)) for n in sorted(nodes)]
@@ -269,4 +274,9 @@ def report(frd, case, load, bonded, totals, held, arrows, probe, volume):
     picture(os.path.join(out, "%s_%s_%s.png" % (case, load, "servos_bonded" if bonded else "alone")), summary, coords, vm, held, arrows)
 
 
-build(globals().get("CASE", "femur"), globals().get("LOAD", "twist"), globals().get("BONDED", False))
+try:
+    build(globals().get("CASE", "femur"), globals().get("LOAD", "twist"), globals().get("BONDED", False))
+finally:
+    if "hexapod_fem" in App.listDocuments():
+        App.closeDocument("hexapod_fem")
+    App.setActiveDocument("hexapod")

@@ -1,8 +1,9 @@
-"""The tibia: 2 flat halves split on the leg plane, screwed together, and a presser.
+"""The tibia: 2 flat halves split on the leg plane, joined with the stock MG90S screws,
+and a presser. From the front it is a triangle, from the knee circle to the tip circle.
 
   Tibia_Horn     +Y half, the tibia servo's horn sits in its pocket
   Tibia_Bearing  -Y half, the femur's knee shaft runs in the bearing in it
-  Tibia_Presser  the round foot, trapped between the halves by its flange
+  Tibia_Presser  the half-sphere foot, trapped between the halves by its flange
 
 The switch sits inside the tip, button down; when the foot takes load the presser
 rises 0.5 mm and pushes the button. Its 2 wires leave in a groove on the split plane.
@@ -101,14 +102,25 @@ wall_cut = lambda name: [
     box(name + "_wire_out", "%s / 2 - %s / 2 + 1 mm" % (sw, hole_w), p("wire_t"), p("wire_w"), "%s / 2" % hole_w,
         "-%s / 2" % p("wire_t"), "%s - %s" % (p("wire_exit_z"), p("wire_w"))),
 ]
-screws = (("s1", p("tib_screw_a_x"), p("tib_screw_a_z")), ("s2", "-" + p("tib_screw_a_x"), p("tib_screw_a_z")),
-          ("s3", p("tib_screw_b_x"), p("tib_screw_b_z")))
+screws = (("s1", p("tib_screw_a_x"), p("tib_screw_a_z")), ("s2", p("tib_screw_b_x"), p("tib_screw_b_z")),
+          ("s3", "-" + p("tib_screw_b_x"), p("tib_screw_b_z")))
+
+
+def triangle_cuts(name, y_low, y_len):
+    """The triangle seen from the front: both sides narrow from the knee circle to the
+    tip circle. Each cut is a long thin prism, with its right angle at the tip."""
+    tip_z, knee = p("tip_foot_z"), "-(%s)" % p("tip_foot_z")
+    grow = "%s" % p("tib_taper_x")
+    return [
+        P.gusset(name + "_tri_r", (p("tib_arm_w") + " / 2", y_low, tip_z), ("x", -1), ("z", 1), grow, knee, "y", y_len),
+        P.gusset(name + "_tri_l", ("-" + p("tib_arm_w") + " / 2", y_low, tip_z), ("x", 1), ("z", 1), grow, knee, "y", y_len),
+    ]
 
 # ------------------------------------------------------------ the horn pocket
 arm = "%s - %s / 2" % (p("horn_reach"), p("horn_tip_w"))
 pocket = p("horn_hub_h")
 through = "%s + 1 mm" % block_t
-horn_cut = wall_cut("ca") + [
+horn_cut = wall_cut("ca") + triangle_cuts("ca", "-1 mm", "%s + 2 mm" % top_y) + [
     box("pk_arm", p("horn_tip_w"), pocket, arm, "-%s / 2" % p("horn_tip_w"), low_y, "-(%s)" % arm),
     cyl("pk_tip", p("horn_tip_w"), pocket, "0 mm", low_y, "-(%s)" % arm, along_y=True),
     cyl("pk_hub", p("horn_hub_d"), pocket, "0 mm", low_y, "0 mm", along_y=True),
@@ -118,8 +130,10 @@ horn_cut = wall_cut("ca") + [
 ]
 for tag, x, z in screws:
     horn_cut.append(cyl("clear_" + tag, p("tib_screw_clear"), "%s + 2 mm" % half_t, x, "-1 mm", z, along_y=True))
+    horn_cut.append(cyl("head_" + tag, p("tib_screw_head_d"), "%s + 1 mm" % p("tib_screw_head_h"), x,
+                        "%s - %s" % (half_t, p("tib_screw_head_h")), z, along_y=True))
 
-bear_cut = wall_cut("cb") + [
+bear_cut = wall_cut("cb") + triangle_cuts("cb", "(%s) - 1 mm" % bear_y0, "-(%s) + 2 mm" % bear_y0) + [
     cyl("seat", p("bearing_seat_d"), "%s - (%s)" % (y1, seat_end), "0 mm", seat_end, "0 mm", along_y=True),
     cyl("bore", p("fem_boss_d"), "%s + 1 mm" % p("tib_bear_roof"), "0 mm", "%s - 1 mm" % bear_y0, "0 mm", along_y=True),
 ]
@@ -132,10 +146,17 @@ bear = P.cut("Tibia_Bearing_raw", bear_solid, bear_cut, COL_B, mirror=False)
 # ------------------------------------------------------------ the presser
 stem = p("tip_stem_w")
 foot_z = p("tip_foot_z")
+ball = P.sphere("ball", p("tip_foot_r"), "0 mm", "0 mm", foot_z)
+top_off = box("ball_top", "4 * %s" % p("tip_foot_r"), "4 * %s" % p("tip_foot_r"), "2 * %s" % p("tip_foot_r"),
+              "-2 * %s" % p("tip_foot_r"), "-2 * %s" % p("tip_foot_r"), foot_z)
+half_ball = doc.addObject("Part::Cut", "TibiaPrim_half_ball")
+part.addObject(half_ball)
+half_ball.Base, half_ball.Tool = ball, top_off
+half_ball.ViewObject.Visibility = False
 tip_solid = [
     box("stem", stem, stem, "%s - (%s)" % (p("tip_flange_top"), foot_z), "-%s / 2" % stem, "-%s / 2" % stem, foot_z),
     box("flange", p("tip_flange_x"), stem, p("tip_flange_h"), "-%s / 2" % p("tip_flange_x"), "-%s / 2" % stem, cz0),
-    P.sphere("foot", p("tip_foot_r"), "0 mm", "0 mm", foot_z),
+    half_ball,
 ]
 presser = doc.addObject("Part::MultiFuse", "Tibia_Presser")
 part.addObject(presser)
