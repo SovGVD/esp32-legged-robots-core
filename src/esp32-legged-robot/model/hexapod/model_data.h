@@ -217,7 +217,7 @@ const GaitParams GAIT_PARAMS_ROUGH = {
 // the dog's values (tuned in the simulator) as a starting point
 const LevelerParams LEVEL_PARAMS = {
 	0.0,   // kp
-	1.0,   // ki, 1/s
+	0.5,   // ki, 1/s
 	0.0,   // kd, s
 	0.25,  // limit, rad
 	0.5,   // rate, rad/s
@@ -343,7 +343,7 @@ const TofScanParams TOF_SCAN_PARAMS = {
 	0.5,    // stand still 0.5 s before tilting up
 	40,     // walking: anything over 40 mm high ahead stops the robot
 	15,     // body 15 mm lower while scanning: the legs reach a steeper tilt
-	2.6     // later scans sweep 150 deg around the heading (75 right, then left), matched to the map
+	0       // full turns every time: 150 deg partial rescans (2.6) got the hexapod lost in 1 of 2 sim runs
 };
 
 const LidarMapParams TOF_MAP_PARAMS = {

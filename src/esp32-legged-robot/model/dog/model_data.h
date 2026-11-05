@@ -190,7 +190,7 @@ const GaitParams GAIT_PARAMS_ROUGH = {
 // It holds its value during a trot (see BodyLeveler::update, hold).
 const LevelerParams LEVEL_PARAMS = {
 	0.0,   // kp
-	1.0,   // ki, 1/s
+	0.5,   // ki, 1/s
 	0.0,   // kd, s
 	0.25,  // limit, rad (~14 deg)
 	0.5,   // rate, rad/s
@@ -315,7 +315,8 @@ const TofScanParams TOF_SCAN_PARAMS = {
 	0.5,    // stand still 0.5 s before tilting up
 	40,     // walking: anything over 40 mm high ahead stops the robot
 	15,     // body 15 mm lower while scanning: the legs reach a steeper tilt
-	2.6     // later scans sweep 150 deg around the heading (75 right, then left), matched to the map
+	0       // full turns every time. 2.6 = rescans sweep 150 deg (75 right, then left): in the sim that
+	        // wasn't faster overall (doubtful sweeps turn on all the way) and got lost more often
 };
 
 const LidarMapParams TOF_MAP_PARAMS = {
