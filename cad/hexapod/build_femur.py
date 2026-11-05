@@ -114,30 +114,66 @@ def val(alias):
     return float(getattr(v, "Value", v))
 
 
-def pick_edges(shape):
-    top, low = val("fem_plate_y1"), val("fem_plate_y0")
-    h = val("fem_half_h")
+def straight_edges(shape):
+    """Every straight edge, inside corners too, except where a servo must fit: those
+    stay sharp. Edges the kernel can't chamfer with the others are left out, counted."""
+    ch = val("fem_edge_ch")
+    limit = val("mg90_body_w") / 2 + val("mg90_fit") + 1e-3
+    floor_in, top = val("fem_floor_y1"), val("fem_plate_y1")
+
+    def servo_fit(e):
+        """Inside the space the servos take up: window, tab pocket, strap interior."""
+        bb = e.BoundBox
+        return abs(bb.ZMin) <= limit and abs(bb.ZMax) <= limit and floor_in - 1e-3 <= bb.YMin and bb.YMax <= top + 1e-3
+
+    wanted = [i for i, e in enumerate(shape.Edges)
+              if e.Curve.TypeId == "Part::GeomLine" and e.Length > 1.5 * ch and not servo_fit(e)]
+    wanted.sort(key=lambda i: -shape.Edges[i].Length)   # keep the ones that show the most
+
+    def works(items):
+        try:
+            result = shape.makeChamfer(ch, [shape.Edges[i] for i in items])
+            return result.isValid() and len(result.Solids) == 1
+        except Exception:
+            return False
+
+    if works(wanted):
+        kept = wanted
+    else:
+        kept = []
+        for i in wanted:
+            if works(kept + [i]):
+                kept.append(i)
+    print("chamfers: %d of %d straight edges" % (len(kept), len(wanted)))
+    return [(i + 1, ch, ch) for i in kept]
+
+
+def shaft_edges(shape):
     tip = val("fem_floor_y0") - val("fem_boss_h") - val("fem_shaft_len")
     boss = val("fem_floor_y0") - val("fem_boss_h")
-    edges = []
+    out = []
     for i, e in enumerate(shape.Edges):
         bb = e.BoundBox
-        if e.Curve.TypeId == "Part::GeomCircle":
-            if abs(bb.YMin - tip) < 1e-4 and abs(bb.YMax - tip) < 1e-4:
-                edges.append((i + 1, val("fem_shaft_ch"), val("fem_shaft_ch")))
-            elif abs(bb.YMin - boss) < 1e-4 and abs(bb.YMax - boss) < 1e-4 and abs(e.Curve.Radius - val("fem_boss_d") / 2) < 1e-4:
-                edges.append((i + 1, val("fem_boss_ch"), val("fem_boss_ch")))
-        elif bb.XLength > 10 and bb.YLength < 1e-4 and bb.ZLength < 1e-4 and abs(abs(bb.ZMin) - h) < 1e-4:
-            if abs(bb.YMin - top) < 1e-4 or abs(bb.YMin - low) < 1e-4:
-                edges.append((i + 1, val("fem_edge_ch"), val("fem_edge_ch")))
-    return edges
+        if e.Curve.TypeId != "Part::GeomCircle" or bb.YLength > 1e-4:
+            continue
+        if abs(bb.YMin - tip) < 1e-4:
+            out.append((i + 1, val("fem_shaft_ch"), val("fem_shaft_ch")))
+        elif abs(bb.YMin - boss) < 1e-4 and abs(e.Curve.Radius - val("fem_boss_d") / 2) < 1e-4:
+            out.append((i + 1, val("fem_boss_ch"), val("fem_boss_ch")))
+    return out
 
 
+step = doc.addObject("Part::Chamfer", "Femur_Edges")
+part.addObject(step)
+step.Base = body
+step.Edges = straight_edges(body.Shape)
+body.ViewObject.Visibility = False
+doc.recompute()
 main = doc.addObject("Part::Chamfer", "Femur_Main")
 part.addObject(main)
-main.Base = body
-main.Edges = pick_edges(body.Shape)
-body.ViewObject.Visibility = False
+main.Base = step
+main.Edges = shaft_edges(step.Shape)
+step.ViewObject.Visibility = False
 main.ViewObject.ShapeColor = PLA
 mirror = doc.addObject("Part::Mirroring", "Femur_Main_L")
 part.addObject(mirror)
@@ -177,8 +213,8 @@ main_s = solids_of(doc, ["Femur_Main"])
 Pl = lambda x, y, rot: App.Placement(App.Vector(x, y, 0), rot)
 hip_s, knee_s = solids_of(doc, SERVO, Pl(0, s_y, HIP_SERVO)), solids_of(doc, SERVO, Pl(f_len, s_y, KNEE_SERVO))
 bb = main.Shape.BoundBox
-print("femur %.1f g solid; valid %s; solids %d; %d chamfered edges; %.1f x %.1f x %.1f, y %.1f to %.1f" % (
-    main.Shape.Volume / 1000 * val("pla_density"), main.Shape.isValid(), len(main.Shape.Solids), len(main.Edges),
+print("femur %.1f g solid; valid %s; solids %d; %d + %d chamfered edges; %.1f x %.1f x %.1f, y %.1f to %.1f" % (
+    main.Shape.Volume / 1000 * val("pla_density"), main.Shape.isValid(), len(main.Shape.Solids), len(step.Edges), len(main.Edges),
     bb.XLength, bb.YLength, bb.ZLength, bb.YMin, bb.YMax))
 print("overlap mm3: hip servo %.3f, knee servo %.3f, servos with each other %.3f, horns %.3f, bearings %.3f" % (
     clash(hip_s, main_s), clash(knee_s, main_s), clash(hip_s, knee_s),

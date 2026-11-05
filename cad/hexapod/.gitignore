@@ -2,3 +2,5 @@
 *.FCStd1
 *.FCBak
 __pycache__/
+# FEA pictures, made by fem_check.py
+fea/

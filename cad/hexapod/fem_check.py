@@ -142,12 +142,59 @@ def build(load, bonded=False):
                          capture_output=True, text=True, timeout=500, env=dict(os.environ, OMP_NUM_THREADS="4"))
     if "Job finished" not in run.stdout:
         raise RuntimeError("ccx failed: " + run.stdout[-600:])
-    report(fea.inp_file_name[:-4] + ".frd", load, totals, fl)
+    held_nodes = set()
+    for face in fixed.References[0][1]:
+        held_nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))
+    arrows = []
+    for label, faces, newtons, dof in loads:
+        nodes = set()
+        for face in faces:
+            nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))
+        arrows.append((label, nodes, newtons, dof))
+    report(fea.inp_file_name[:-4] + ".frd", load, totals, fl, held_nodes, arrows, bonded)
     App.closeDocument(name)
     App.setActiveDocument("hexapod")
 
 
-def report(frd, load, totals, fl):
+def picture(path, title, coords, vm, held, arrows):
+    """Stress on the mesh nodes, from 2 sides. Blue = held, red arrows = loads going in."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    ids = sorted(vm)
+    xyz = np.array([coords[n] for n in ids])
+    val = np.array([vm[n] for n in ids])
+    fig = plt.figure(figsize=(15, 7), facecolor="white")
+    for k, (elev, azim, name) in enumerate(((28, 120, "rim side"), (28, -60, "strap side"))):
+        ax = fig.add_subplot(1, 2, k + 1, projection="3d")
+        order = np.argsort(val)
+        art = ax.scatter(xyz[order, 0], xyz[order, 1], xyz[order, 2], c=val[order], cmap="turbo", vmin=0, vmax=20, s=2.0, depthshade=False)
+        h = np.array([coords[n] for n in held])
+        ax.scatter(h[:, 0], h[:, 1], h[:, 2], c="#1f4fff", s=10, depthshade=False, label="held")
+        for label, nodes, newtons, dof in arrows:
+            pts = np.array([coords[n] for n in nodes])
+            c = pts.mean(axis=0)
+            d = np.zeros(3)
+            d[dof - 1] = 1.0 if newtons > 0 else -1.0
+            size = 12 + 18 * min(abs(newtons) / 30.0, 1.0)
+            ax.quiver(c[0] - d[0] * size, c[1] - d[1] * size, c[2] - d[2] * size, d[0], d[1], d[2], length=size, color="red", linewidth=2)
+            ax.text(c[0] - d[0] * size, c[1] - d[1] * size, c[2] - d[2] * size, "%s %.1f N" % (label, abs(newtons)), color="red", fontsize=8)
+        ax.view_init(elev=elev, azim=azim)
+        ax.set_title(name)
+        ax.set_xlabel("X to the knee, mm")
+        ax.set_ylabel("Y, horn side +")
+        ax.set_zlabel("Z")
+        ax.set_box_aspect((np.ptp(xyz[:, 0]) + 30, np.ptp(xyz[:, 1]) + 30, np.ptp(xyz[:, 2]) + 30))
+    bar = fig.colorbar(art, ax=fig.axes, shrink=0.7, pad=0.02)
+    bar.set_label("von Mises, MPa (scale stops at the 20 MPa limit)")
+    fig.suptitle(title, fontsize=12)
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    print("       picture: " + path)
+
+
+def report(frd, load, totals, fl, held, arrows, bonded):
     coords, disp, stress, block = {}, {}, {}, None
     for line in open(frd):
         if line.startswith("    2C"):
@@ -175,6 +222,13 @@ def report(frd, load, totals, fl):
         load, vm[ranked[0]], [round(c, 1) for c in coords[ranked[0]]], vm[ranked[len(ranked) // 1000]], vm[ranked[len(ranked) // 100]]))
     print("       knee moves up %.3f, side %.3f mm; tips %.3f deg; foot moves sideways %.3f mm; forces %s" % (
         mean(ring, 2), mean(ring, 1), abs(tip) * 57.3, abs(foot_side), {k: round(v, 2) for k, v in totals.items()}))
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fea")
+    os.makedirs(out, exist_ok=True)
+    tag = "%s_%s" % (load, "servos_bonded" if bonded else "print_alone")
+    picture(os.path.join(out, "femur_%s.png" % tag),
+            "Femur, %s, %s: peak %.1f MPa, 99.9%% under %.1f MPa, foot moves sideways %.2f mm" % (
+                load, "servos bonded in" if bonded else "print alone, no servos", vm[ranked[0]], vm[ranked[len(ranked) // 1000]], abs(foot_side)),
+            coords, vm, held, arrows)
     for n in ranked[:300:60]:
         print("         %.2f MPa at %s" % (vm[n], [round(c, 1) for c in coords[n]]))
 
