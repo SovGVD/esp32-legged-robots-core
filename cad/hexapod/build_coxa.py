@@ -82,8 +82,8 @@ through = a_y1 - a_y0 + 1
 cuts = [
     block(-near, far, -hw, hw, floor_in, z1 + 1),                # the servo's body, down to the floor
     block(-tab_near, tab_far, -hw, hw, seat, z1 + 1),            # its tabs
-    rod(v("mg90_screw_pilot_d"), v("fem_plate_floor") + 1, (-v("mg90_hole_near"), 0, z0 - 1), "z"),
-    rod(v("mg90_screw_pilot_d"), v("fem_plate_floor") + 1, (v("mg90_hole_far"), 0, z0 - 1), "z"),
+    rod(v("mg90_screw_pilot_d"), v("coxa_plate_floor") + 1, (-v("mg90_hole_near"), 0, z0 - 1), "z"),
+    rod(v("mg90_screw_pilot_d"), v("coxa_plate_floor") + 1, (v("mg90_hole_far"), 0, z0 - 1), "z"),
     # the femur servo's horn, its arm toward the coxa axis
     block(fl - arm, fl, a_y0, a_y0 + pocket, -tip_w / 2, tip_w / 2),
     rod(tip_w, pocket, (fl - arm, a_y0, 0), "y"),

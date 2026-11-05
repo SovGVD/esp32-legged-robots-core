@@ -7,6 +7,13 @@ the print alone: the real part is between the two.
   twist  walk + 4 N sideways at the foot
   fall   30 N up + 15 N sideways at the foot, landing hard on one leg (an estimate)
 
+CASE "frame" is the whole assembled body: both plates, the 8 columns, and the 6 coxa
+links with their servos, horns and bearings, all joined as if glued. It stands on a
+tripod (RF, LM, RR held at their femur joints) and the robot's weight, times the load's
+factor, pushes down on the bottom plate under the cells: walk 3 x 11 N, twist adds a
+third of that sideways, fall is the robot landing on the RF leg alone (30 N + 15 N
+sideways).
+
 CASE "body" stands the joined plates on a tripod and takes each leg's lever arm as a
 twist through its horn and bearing. CASE "beam" is a check of the method: a cantilever
 with a known textbook answer.
@@ -75,6 +82,34 @@ def build(case, load, bonded):
     elif case == "beam":
         import Part
         shape = Part.makeBox(100, 10, 5)
+    elif case == "frame":
+        import Part
+        import math
+        top_bot, top0 = val("body_plate_top"), val("top_plate_z0")
+        pieces = [src.getObject("Body_Top").Shape.copy()]
+        for o in src.getObject("Body_Check").Group:
+            p0 = o.Placement.Base
+            if o.Name.startswith("BodyCheck_column"):
+                # the column fills its ring's clearance and reaches 0.2 into both plates: slivers don't mesh
+                pieces.append(Part.makeCylinder((val("col_d") + val("col_fit")) / 2 + 0.05, top0 - top_bot + 0.4, App.Vector(p0.x, p0.y, top_bot - 0.2)))
+        frame_legs = {}
+        for o in src.getObject("Body_Check").Group:
+            if not o.Name.startswith("BodyCheck_coxa_"):
+                continue
+            tag = o.Name.split("_")[-1]
+            coxa = o.LinkedObject.Shape.copy()
+            coxa.Placement = o.Placement.multiply(coxa.Placement)
+            pieces.append(coxa)
+            for prefix, names in (("servo_", SERVO), ("horn_", ("Horn_hub", "Horn_arm", "Horn_tip")), ("bearing_", ("Bearing_body",))):
+                link = src.getObject("BodyCheck_" + prefix + tag)
+                for n in names:
+                    piece = src.getObject(n).Shape.copy()
+                    piece.Placement = link.Placement.multiply(piece.Placement)
+                    pieces.append(piece)
+            frame_legs[tag] = o.Placement
+        shape = src.getObject("Body_Bottom").Shape.multiFuse(pieces).removeSplitter()
+        if len(shape.Solids) != 1:
+            raise ValueError("the frame did not join: %d solids" % len(shape.Solids))
     elif case == "body":
         # the plates and columns joined, as if the screws were glue
         columns = []
@@ -160,6 +195,34 @@ def build(case, load, bonded):
             loads.append(("%s top x" % tag, horn, push * c, X))
             loads.append(("%s top y" % tag, horn, push * s_, Y))
         probe = None
+    elif case == "frame":
+        def joint_faces(tag):
+            """The coxa's seat for the femur's bearing and horn: cylinders on the femur axis."""
+            pl = frame_legs[tag]
+            base = pl.multVec(App.Vector(val("coxa_len"), 0, 0))
+            axis = pl.Rotation.multVec(App.Vector(0, 1, 0))
+            out = []
+            for i, f in enumerate(obj.Shape.Faces):
+                su = f.Surface
+                if su.TypeId != "Part::GeomCylinder" or min(abs(su.Radius - val("bearing_seat_d") / 2), abs(su.Radius - val("horn_hub_d") / 2)) > 0.01:
+                    continue
+                if abs(abs(su.Axis.dot(axis)) - 1) > 1e-6 or (su.Center - base).cross(axis).Length > 0.01:
+                    continue
+                out.append("Face%d" % (i + 1))
+            if not out:
+                raise ValueError("no femur joint faces on " + tag)
+            return out
+        weight = 1.118 * 9.81
+        under_cells = ("box", -18, 18, -40, 33, top_bot)
+        if load == "fall":
+            held = joint_faces("RF")
+            loads = [("body down", under_cells, -30.0, Z), ("body sideways", under_cells, -15.0, X)]
+        else:
+            held = joint_faces("RF") + joint_faces("LM") + joint_faces("RR")
+            loads = [("body down", under_cells, -3 * weight, Z)]
+            if load == "twist":
+                loads.append(("body sideways", under_cells, -weight, X))
+        probe = None
     elif case == "femur":
         fl = val("femur_len")
         held = cyl_faces(val("fem_shaft_d") / 2, 0) + (cyl_faces(servo_shaft, 0) if bonded else cyl_faces(pilot, -near) + cyl_faces(pilot, far))
@@ -201,7 +264,7 @@ def build(case, load, bonded):
     an.addObject(fixed)
     mesh = ObjectsFem.makeMeshGmsh(doc, "Mesh")
     mesh.Shape = obj
-    mesh.CharacteristicLengthMax = float(globals().get("MESH_MAX", 3.0 if case == "body" else 1.6))
+    mesh.CharacteristicLengthMax = float(globals().get("MESH_MAX", 3.0 if case in ("body", "frame") else 1.6))
     mesh.CharacteristicLengthMin = float(globals().get("MESH_MIN", 0.3))
     mesh.ElementOrder = "2nd"
     mesh.SecondOrderLinear = True   # straight element edges: curved ones invert on small features
@@ -228,6 +291,10 @@ def build(case, load, bonded):
         if faces[0] == "near":
             _, zv, xlim, ylim = faces
             nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.6 and abs(v.x) <= xlim and abs(v.y) <= ylim}
+        elif faces[0] == "box":
+            # nodes on a horizontal face at z, inside an x-y box
+            _, x0, x1, y0, y1, zv = faces
+            nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.05 and x0 <= v.x <= x1 and y0 <= v.y <= y1}
         elif faces[0] == "ring":
             # small faces, so by position: nodes on a cylinder around Z
             _, cx, cy, rad, z0, z1 = faces
@@ -322,7 +389,7 @@ def report(frd, case, load, bonded, totals, held, arrows, probe, volume):
         foot = abs(mean(ring, 1) + tip * lever * 1000)
     else:
         foot = max(sum(u * u for u in disp[n]) ** 0.5 for n in disp)
-    label = "%s, %s, %s" % (case, load, "servos bonded in" if bonded else ("print alone" if case != "tibia" else "halves joined"))
+    label = "%s, %s, %s" % (case, load, "assembled, joints glued" if case == "frame" else "servos bonded in" if bonded else ("print alone" if case != "tibia" else "halves joined"))
     moved = "foot moves sideways" if probe else "moves at most"
     summary = "%s: peak %.1f MPa, 99.9%% under %.1f MPa, %s %.2f mm" % (label, vm[ranked[0]], vm[ranked[len(ranked) // 1000]], moved, foot)
     print(summary + " (peak at %s; forces %s)" % ([round(c, 1) for c in coords[ranked[0]]], {k: round(v, 1) for k, v in totals.items()}))
