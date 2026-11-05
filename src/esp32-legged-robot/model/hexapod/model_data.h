@@ -1,5 +1,5 @@
 /**
- * Hexapod description: legs, servo calibration and gait. Only types from
+ * New hexapod (MG90S direct drive) description: legs, servo calibration and gait. Only types from
  * lib/robot_core and macros from def.h + config.h, no Arduino, so the same
  * data can be compiled into the firmware (model.cpp), native tests and the
  * simulator bridge. Include it from exactly one .cpp file per program.
@@ -7,172 +7,185 @@
 #ifndef MODEL_HEXAPOD_MODEL_DATA_H
 #define MODEL_HEXAPOD_MODEL_DATA_H
 
+/**
+ * Leg order LF, LM, LR, RF, RM, RR. Left legs on the left PCA9685 (channels
+ * 0-10), right legs on the right one (16-26, second board), 3 channels per
+ * leg with a spare between legs, like the old hexapod.
+ *
+ * Direct drive: gear ratio 1, every joint has the servo's 180 deg. Servo
+ * middle (90 deg) = coxa along its neutral direction, femur level, tibia
+ * square to the femur. The neutral stance has the femur ~58 deg down and the
+ * knee ~132 deg open, 32 deg and 48 deg from the ends of the servo travel.
+ *
+ * Inverse flags (alpha, beta, gamma) assume the right legs are mirror images
+ * of the left ones: the femur and tibia servos of the right legs turn the
+ * other way. Not built yet: check each leg with the leg test before walking.
+ */
 leg legs[LEG_NUM] = {
   // left front leg
   {
-    { LEGLF, "LF" },                                              // ID: id, title
-    {   -LEG_BODY_X,     LEG_BODY_Y,     LEG_BODY_Z },            // default LEG POSITION ON BODY
-    {   -LEG_FOOT_X,     LEG_FOOT_Y,    -LEG_FOOT_Z },            // default LEG ON GROUND: x, y ,z
-    { LEG_SIZE_COXA, LEG_SIZE_FEMUR, LEG_SIZE_TIBIA },            // Leg part sizes
-    {             0,              0,              0 },            // MIN ANGLES FOR EACH JOINT (enforced by MotionController)
-    {          M_PI,           M_PI,           M_PI },            // MAX ANGLES FOR EACH JOINT (enforced by MotionController)
-    {        M_PI_2,         M_PI_2,         M_PI_2 },            // Calibration position
+    { LEGLF, "LF" },
+    { -LEG_FRONT_BODY_X, LEG_FRONT_BODY_Y, LEG_BODY_Z },                  // default LEG POSITION ON BODY
+    { -LEG_FRONT_FOOT_X, LEG_FRONT_FOOT_Y, -LEG_FOOT_Z },                 // default LEG ON GROUND: x, y, z
+    { LEG_SIZE_COXA, LEG_SIZE_FEMUR, LEG_SIZE_TIBIA },
+    { 0, 0, 0 },                                 // MIN ANGLES (enforced by MotionController)
+    { M_PI, M_PI, M_PI },                        // MAX ANGLES
+    { M_PI_2, M_PI_2, M_PI_2 },                  // calibration position
     {
-      { M_PI_2, M_PI_2, M_PI_2 },                                 // hardware middle (looks like never used, or not?)
-      {      0,      1,      2 },                                 // 3 servo channels on PCA board, if this is second board, then pin + 16
-      {      0,      0,      0 },                                 // servo middle trim (this will be override anyway with setup trim... why do I need it???)
-      {      2,      2,    1.5 }                                  // gear ratio, first and last one is 16 groves on servo and 24 groves on leg
+      { M_PI_2, M_PI_2, M_PI_2 },                // hardware middle
+      {  0,  1,  2 },                            // PCA9685 channels (16+ = second board)
+      { 0, 0, 0 },                               // servo middle trim
+      { 1, 1, 1 }                                // direct drive, no gears
     },
-    {  -LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },                    // initial LEG POSITION ON BODY, same as LEG POSITION ON BODY, not sure why I need it
-    {  -LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },                    // initial LEG JOING CLOSED TO THE GROUND, same as above, but at least it make sense
-    {       M_PI_2,     M_PI_2,      M_PI_2 },                    // leg angles, will be override by HAL update
-    { true, true, true, false, false, true },                     // inverse x, y, z, alpha, beta, gamma. Right legs are mirror images of the left (gears face forward)
-                                                                  // and every gear pair reverses, so left: tibia inverted, right: femur inverted. Worked out from the parts, check on the robot
-    { true, 0, 0 }                                                // FOOT SENSOR: is on ground state, pin, threshold for sensor
+    { -LEG_FRONT_BODY_X, LEG_FRONT_BODY_Y, LEG_BODY_Z },
+    { -LEG_FRONT_FOOT_X, LEG_FRONT_FOOT_Y, -LEG_FOOT_Z },
+    { M_PI_2, M_PI_2, M_PI_2 },                  // leg angles, set by the HAL
+    { true, true, true, false, false, false },          // inverse x, y, z, alpha, beta, gamma
+    { true, 0, 0 }                               // foot sensor
   },
   // left middle leg
   {
     { LEGLM, "LM" },
-    { -LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y,  LEG_MIDDLE_BODY_Z },
-    { -LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_MIDDLE_FOOT_Z },
-    {      LEG_SIZE_COXA,    LEG_SIZE_FEMUR,     LEG_SIZE_TIBIA },
-    {                  0,                 0,                  0 },
-    {               M_PI,              M_PI,               M_PI },
-    {             M_PI_2,            M_PI_2,             M_PI_2 },
+    { -LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y, LEG_BODY_Z },                  // default LEG POSITION ON BODY
+    { -LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_FOOT_Z },                 // default LEG ON GROUND: x, y, z
+    { LEG_SIZE_COXA, LEG_SIZE_FEMUR, LEG_SIZE_TIBIA },
+    { 0, 0, 0 },                                 // MIN ANGLES (enforced by MotionController)
+    { M_PI, M_PI, M_PI },                        // MAX ANGLES
+    { M_PI_2, M_PI_2, M_PI_2 },                  // calibration position
     {
-      { M_PI_2, M_PI_2, M_PI_2 },
-      {      4,      5,      6 },
-      {      0,      0,      0 },
-      {      2,      2,    1.5 }
+      { M_PI_2, M_PI_2, M_PI_2 },                // hardware middle
+      {  4,  5,  6 },                            // PCA9685 channels (16+ = second board)
+      { 0, 0, 0 },                               // servo middle trim
+      { 1, 1, 1 }                                // direct drive, no gears
     },
-    {  -LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y,  LEG_MIDDLE_BODY_Z },
-    {  -LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_MIDDLE_FOOT_Z },
-    {              M_PI_2,            M_PI_2,             M_PI_2 },
-    { true, true, true, false, false, true },                     // inverse x, y, z, alpha, beta, gamma: tibia servo mirrored vs the right legs
-    { true, 0, 0 }
+    { -LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y, LEG_BODY_Z },
+    { -LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_FOOT_Z },
+    { M_PI_2, M_PI_2, M_PI_2 },                  // leg angles, set by the HAL
+    { true, true, true, false, false, false },          // inverse x, y, z, alpha, beta, gamma
+    { true, 0, 0 }                               // foot sensor
   },
   // left rear leg
   {
     { LEGLR, "LR" },
-    {   -LEG_BODY_X,    -LEG_BODY_Y,     LEG_BODY_Z },
-    {   -LEG_FOOT_X,    -LEG_FOOT_Y,    -LEG_FOOT_Z },
+    { -LEG_REAR_BODY_X, LEG_REAR_BODY_Y, LEG_BODY_Z },                  // default LEG POSITION ON BODY
+    { -LEG_REAR_FOOT_X, LEG_REAR_FOOT_Y, -LEG_FOOT_Z },                 // default LEG ON GROUND: x, y, z
     { LEG_SIZE_COXA, LEG_SIZE_FEMUR, LEG_SIZE_TIBIA },
-    {             0,              0,              0 },
-    {          M_PI,           M_PI,           M_PI },
-    {        M_PI_2,         M_PI_2,         M_PI_2 },
+    { 0, 0, 0 },                                 // MIN ANGLES (enforced by MotionController)
+    { M_PI, M_PI, M_PI },                        // MAX ANGLES
+    { M_PI_2, M_PI_2, M_PI_2 },                  // calibration position
     {
-      { M_PI_2, M_PI_2, M_PI_2 },
-      {      8,      9,     10 },
-      {      0,      0,      0 },
-      {      2,      2,    1.5 }
+      { M_PI_2, M_PI_2, M_PI_2 },                // hardware middle
+      {  8,  9, 10 },                            // PCA9685 channels (16+ = second board)
+      { 0, 0, 0 },                               // servo middle trim
+      { 1, 1, 1 }                                // direct drive, no gears
     },
-    { -LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },
-    { -LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },
-    {       M_PI_2,    M_PI_2,      M_PI_2 },
-    { true, true, true, false, false, true },                     // inverse x, y, z, alpha, beta, gamma: tibia servo mirrored vs the right legs
-    { true, 0, 0 }
+    { -LEG_REAR_BODY_X, LEG_REAR_BODY_Y, LEG_BODY_Z },
+    { -LEG_REAR_FOOT_X, LEG_REAR_FOOT_Y, -LEG_FOOT_Z },
+    { M_PI_2, M_PI_2, M_PI_2 },                  // leg angles, set by the HAL
+    { true, true, true, false, false, false },          // inverse x, y, z, alpha, beta, gamma
+    { true, 0, 0 }                               // foot sensor
   },
-
   // right front leg
   {
     { LEGRF, "RF" },
-    {    LEG_BODY_X,     LEG_BODY_Y,     LEG_BODY_Z },
-    {    LEG_FOOT_X,     LEG_FOOT_Y,    -LEG_FOOT_Z },
+    { LEG_FRONT_BODY_X, LEG_FRONT_BODY_Y, LEG_BODY_Z },                  // default LEG POSITION ON BODY
+    { LEG_FRONT_FOOT_X, LEG_FRONT_FOOT_Y, -LEG_FOOT_Z },                 // default LEG ON GROUND: x, y, z
     { LEG_SIZE_COXA, LEG_SIZE_FEMUR, LEG_SIZE_TIBIA },
-    {             0,              0,              0 },
-    {          M_PI,           M_PI,           M_PI },
-    {        M_PI_2,         M_PI_2,         M_PI_2 },
+    { 0, 0, 0 },                                 // MIN ANGLES (enforced by MotionController)
+    { M_PI, M_PI, M_PI },                        // MAX ANGLES
+    { M_PI_2, M_PI_2, M_PI_2 },                  // calibration position
     {
-      { M_PI_2, M_PI_2, M_PI_2 },
-      {     16,     17,     18 },
-      {      0,      0,      0 },
-      {      2,      2,    1.5 }
+      { M_PI_2, M_PI_2, M_PI_2 },                // hardware middle
+      { 16, 17, 18 },                            // PCA9685 channels (16+ = second board)
+      { 0, 0, 0 },                               // servo middle trim
+      { 1, 1, 1 }                                // direct drive, no gears
     },
-    {  LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },
-    {  LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },
-    {      M_PI_2,     M_PI_2,      M_PI_2 },
-    { true, true, true, false, true, false },                     // inverse x, y, z, alpha, beta, gamma: femur servo mirrored vs the left legs
-    { true, 0, 0 }
+    { LEG_FRONT_BODY_X, LEG_FRONT_BODY_Y, LEG_BODY_Z },
+    { LEG_FRONT_FOOT_X, LEG_FRONT_FOOT_Y, -LEG_FOOT_Z },
+    { M_PI_2, M_PI_2, M_PI_2 },                  // leg angles, set by the HAL
+    { true, true, true, false, true, true },          // inverse x, y, z, alpha, beta, gamma
+    { true, 0, 0 }                               // foot sensor
   },
   // right middle leg
   {
     { LEGRM, "RM" },
-    { LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y,  LEG_MIDDLE_BODY_Z },
-    { LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_MIDDLE_FOOT_Z },
-    {     LEG_SIZE_COXA,    LEG_SIZE_FEMUR,     LEG_SIZE_TIBIA },
-    {                 0,                 0,                  0 },
-    {              M_PI,              M_PI,               M_PI },
-    {            M_PI_2,            M_PI_2,             M_PI_2 },
+    { LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y, LEG_BODY_Z },                  // default LEG POSITION ON BODY
+    { LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_FOOT_Z },                 // default LEG ON GROUND: x, y, z
+    { LEG_SIZE_COXA, LEG_SIZE_FEMUR, LEG_SIZE_TIBIA },
+    { 0, 0, 0 },                                 // MIN ANGLES (enforced by MotionController)
+    { M_PI, M_PI, M_PI },                        // MAX ANGLES
+    { M_PI_2, M_PI_2, M_PI_2 },                  // calibration position
     {
-      { M_PI_2, M_PI_2, M_PI_2 },
-      {     20,     21,     22 },
-      {      0,      0,      0 },
-      {      2,      2,    1.5 }
+      { M_PI_2, M_PI_2, M_PI_2 },                // hardware middle
+      { 20, 21, 22 },                            // PCA9685 channels (16+ = second board)
+      { 0, 0, 0 },                               // servo middle trim
+      { 1, 1, 1 }                                // direct drive, no gears
     },
-    {  LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y,  LEG_MIDDLE_BODY_Z },
-    {  LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_MIDDLE_FOOT_Z },
-    {             M_PI_2,            M_PI_2,             M_PI_2 },
-    { true, true, true, false, true, false },                     // inverse x, y, z, alpha, beta, gamma: femur servo mirrored vs the left legs
-    { true, 0, 0 }
+    { LEG_MIDDLE_BODY_X, LEG_MIDDLE_BODY_Y, LEG_BODY_Z },
+    { LEG_MIDDLE_FOOT_X, LEG_MIDDLE_FOOT_Y, -LEG_FOOT_Z },
+    { M_PI_2, M_PI_2, M_PI_2 },                  // leg angles, set by the HAL
+    { true, true, true, false, true, true },          // inverse x, y, z, alpha, beta, gamma
+    { true, 0, 0 }                               // foot sensor
   },
   // right rear leg
   {
     { LEGRR, "RR" },
-    {    LEG_BODY_X,    -LEG_BODY_Y,     LEG_BODY_Z },
-    {    LEG_FOOT_X,    -LEG_FOOT_Y,    -LEG_FOOT_Z },
+    { LEG_REAR_BODY_X, LEG_REAR_BODY_Y, LEG_BODY_Z },                  // default LEG POSITION ON BODY
+    { LEG_REAR_FOOT_X, LEG_REAR_FOOT_Y, -LEG_FOOT_Z },                 // default LEG ON GROUND: x, y, z
     { LEG_SIZE_COXA, LEG_SIZE_FEMUR, LEG_SIZE_TIBIA },
-    {             0,              0,              0 },
-    {          M_PI,           M_PI,           M_PI },
-    {        M_PI_2,         M_PI_2,         M_PI_2 },
+    { 0, 0, 0 },                                 // MIN ANGLES (enforced by MotionController)
+    { M_PI, M_PI, M_PI },                        // MAX ANGLES
+    { M_PI_2, M_PI_2, M_PI_2 },                  // calibration position
     {
-      { M_PI_2, M_PI_2, M_PI_2 },
-      {     24,     25,     26 },                                 // second board, channels 8-10 (mirrors left rear)
-      {      0,      0,      0 },
-      {      2,      2,    1.5 }
+      { M_PI_2, M_PI_2, M_PI_2 },                // hardware middle
+      { 24, 25, 26 },                            // PCA9685 channels (16+ = second board)
+      { 0, 0, 0 },                               // servo middle trim
+      { 1, 1, 1 }                                // direct drive, no gears
     },
-    { LEG_BODY_X, LEG_BODY_Y,  LEG_BODY_Z },
-    { LEG_FOOT_X, LEG_FOOT_Y, -LEG_FOOT_Z },
-    {      M_PI_2,    M_PI_2,      M_PI_2 },
-    { true, true, true, false, true, false },                     // inverse x, y, z, alpha, beta, gamma: femur servo mirrored vs the left legs
-    { true, 0, 0 }
+    { LEG_REAR_BODY_X, LEG_REAR_BODY_Y, LEG_BODY_Z },
+    { LEG_REAR_FOOT_X, LEG_REAR_FOOT_Y, -LEG_FOOT_Z },
+    { M_PI_2, M_PI_2, M_PI_2 },                  // leg angles, set by the HAL
+    { true, true, true, false, true, true },          // inverse x, y, z, alpha, beta, gamma
+    { true, 0, 0 }                               // foot sensor
   },
 };
 
+// MG90S: 500-2500 us over 180 deg [datasheet], linear until measured
 servoProfile servoMainProfile = {
     0,    // minAngle
     180,  // maxAngle
 
-    590,  // degMin
-    870,  // deg30
-    1080, // deg50
-    1290, // deg70
+    500,  // degMin
+    833,  // deg30
+    1056, // deg50
+    1278, // deg70
     1500, // deg90 - middle
-    1710, // deg110
-    1890, // deg130
-    2100, // deg150
-    2200  // degMax
+    1722, // deg110
+    1944, // deg130
+    2167, // deg150
+    2500  // degMax
 };
 
 const GaitParams GAIT_PARAMS = {
 	true,     // enabled
-	0.3,      // cycle time, s
-	0.5,      // duty factor: tripod, each leg swings 150 ms of every 300 ms. With 0.75 a swing
-	          // had only 100 ms and the femur lagged its target by up to 23 deg at 75 mm/s
+	0.3,      // cycle time, s: tripod, each leg swings 150 ms of every 300 ms
+	0.5,      // duty factor
 	{ 0.25, 0.75, 0.25, 0.75, 0.25, 0.75 },   // phase offsets LF, LM, LR, RF, RM, RR (LF, LR, RM swing together)
-	30,       // step height, mm
-	400,      // max speed, mm/s. Simulator (MG90S datasheet at 4.8 V, ~890 g): 400 forward with
-	          // ~23 deg servo lag and <2 deg tilt; above ~550 forward the servos can't go faster
-	0.75,     // max yaw rate, rad/s (faster turns run the 2:1 coxa servos out of range)
+	30,       // step height, mm (25 drifted 15-19 mm/s sideways in the simulator)
+	300,      // max speed, mm/s. Simulator (MG90S datasheet at 5 V, 815 g): ~250 mm/s forward,
+	          // servos at their torque limit ~2 % of the time. 400 walks ~380 but the femur
+	          // servos saturate 38 % of the time and it drifts sideways
+	1.0,      // max yaw rate, rad/s (simulator: ~0.73 turning; 1.3 saturates the coxa servos)
 	600,      // max acceleration, mm/s^2
 	6,        // max yaw acceleration, rad/s^2
 	3,        // idle tolerance, mm
-	false,    // no foot contact sensors
+	false,    // foot switches: set by the terrain mode
 	false,    // no static stability shift: a tripod always stands on three legs
 	0.1,      // (stability blend)
 	{ 1, 1, 0 },  // (stability gain)
-	{ 0, 0, 0 },  // centre of mass, mm from the body origin (not measured)
-	300       // max sideways foot speed, mm/s (strafe + turn): sideways tops out at ~380 in the
-	          // simulator with 60+ deg tibia lag and servo range clamps; 300 keeps clear of that
+	{ 0, 0, 0 },  // centre of mass, mm from the body origin (design: battery in the middle)
+	200       // max sideways foot speed, mm/s (strafe + turn): ~130 mm/s strafing in the simulator,
+	          // higher saturates the tibia servos
 };
 
 /**
@@ -230,16 +243,18 @@ const float SIT_HEIGHT = -30;
  * the terrain code (sim/examples/terrain_walk.py).
  *
  * Two VL53L5CX (8x8 zones, 45 deg field of view) on the front of the body,
- * turned 20 deg left and right: together they see the ground from just ahead
- * of the front feet, ~300 mm wide. The left one looks 35 deg down (terrain),
- * the right one 22 deg down: its top zone rows look nearly level, which the
- * room scan (TOF_SCAN_PARAMS) needs (at 35 deg the servo ranges can't tilt the
- * nose up far enough). Both at 22 deg the terrain code missed 70 mm gaps (sim).
+ * turned 20 deg left and right, so they see the ground where the front feet
+ * step (the front legs open 20 deg wider to keep out of the view: ~2 % of the
+ * zones hit a leg in the design concept). The left one looks 35 deg down
+ * (terrain), the right one 22 deg down like on the old hexapod: its top
+ * zone rows look nearly level, which the room scan (TOF_SCAN_PARAMS) needs.
+ * With both at 35 deg the scan would need the nose ~18 deg up; the simulator
+ * only gets ~11 deg out of the legs.
  */
 const TofSensor TOF_SENSORS[] = {
 	// position (mm, body frame), yaw (+ = left), tilt down (rad), field of view (rad), zones per side, max range (mm)
-	{ { -25, 90, 10 },  0.35, 0.61, 0.785, 8, 450 },
-	{ {  25, 90, 10 }, -0.35, 0.384, 0.785, 8, 450 },
+	{ { -14, 74, 2 },  0.35, 0.61, 0.785, 8, 450 },
+	{ {  14, 74, 2 }, -0.35, 0.384, 0.785, 8, 450 },
 };
 #define TOF_SENSOR_COUNT 2
 

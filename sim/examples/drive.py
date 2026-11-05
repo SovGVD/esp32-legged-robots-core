@@ -8,8 +8,6 @@ Drive the simulated dog by hand with the real firmware motion code.
   python examples/drive.py --terrain gaps --sensing none     # open loop, like the real robots today
   python examples/drive.py --nav tof                         # two rooms: ToF room scans, click the map to walk there
   python examples/drive.py --hexapod --nav lidar             # the same with the LD06 lidar
-  python examples/drive.py --hexapod --servos mg90s-direct   # what-if: MG90S without the printed gears
-  python examples/drive.py --hexapod2                        # the new hexapod (MG90S direct drive, model/hexapod2)
 
 --terrain: flat, bumps, rocks, rubble, bars, step, drop, gaps, bridge, course
 (legsim/terrain.py, sized for the robot). With a terrain the gait is the slower
@@ -59,7 +57,6 @@ from legsim import scenario, terrain as terrains  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--hexapod", action="store_true")
-ap.add_argument("--hexapod2", action="store_true", help="the new hexapod design (MG90S direct drive, not built yet)")
 ap.add_argument("--terrain", default="flat", choices=sorted(terrains.SCENES))
 ap.add_argument("--height", type=float, help="obstacle / deck height, mm (default: per robot)")
 ap.add_argument("--sensing", choices=sorted(scenario.SENSING),
@@ -71,14 +68,12 @@ ap.add_argument("--goal", nargs=2, type=float, metavar=("X", "Y"), help="with --
 ap.add_argument("--mount", type=float, metavar="DEG", help="with --nav tof: ToF sensors DEG down (TOF_SENSORS)")
 ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --nav tof: nose up while scanning")
 ap.add_argument("--gyro-bias", type=float, default=1.0, help="with --nav: gyro drift, deg/s (default 1)")
-ap.add_argument("--servos", default="geared", choices=("geared", "mg90s-direct", "mg90s-direct-6v"),
-                help="hexapod: MG90S + printed gears (now), or MG90S driving the joints directly at 5 / 6 V")
-ap.add_argument("--mass", type=float, metavar="G", help="hexapod: total robot mass, g (default ~892, min ~840); hexapod2: default 815")
+ap.add_argument("--mass", type=float, metavar="G", help="hexapod: total robot mass, g (default 815)")
 ap.add_argument("--floor", type=float, metavar="MM",
                 help="with --nav: rug, threshold, platform and tiles up to MM high (default 20 dog / 30 hexapod, 0 = none)")
 args = ap.parse_args()
 
-model = "hexapod2" if args.hexapod2 else "hexapod" if args.hexapod else "dog"
+model = "hexapod" if args.hexapod else "dog"
 if args.nav:
     # nav + ToF terrain sensing together (sim/README "Nav with terrain sensing"): the dog
     # walks to goals with it; the hexapod loses its place with the rough gait, off for now
@@ -127,26 +122,14 @@ if args.nav:
 else:
     ground = scenario.scene(model, args.terrain, args.height)
 if model == "hexapod":
-    import dataclasses
     from legsim.hexapod import SimHexapod, HexapodParams
-    from legsim.hexapod.params import mg90s, with_mass, HexHalParams, LINEAR_500_2500
-    hp = HexapodParams()
-    if args.servos != "geared":
-        hp = dataclasses.replace(hp, servo=mg90s(6.0 if args.servos.endswith("6v") else 5.0),
-                                 hal=HexHalParams(ratio=(1.0, 1.0, 1.0)), profile=LINEAR_500_2500)
-    if args.mass:
-        hp = with_mass(hp, args.mass)
-    dog = fw.place(SimHexapod(params=hp, terrain=ground))
-    view_distance = 1.1
-elif model == "hexapod2":
-    from legsim.hexapod import SimHexapod, new_body
-    hp = new_body.params(total_g=args.mass or 815.0)
+    from legsim.hexapod.params import with_mass
+    hp = with_mass(HexapodParams(), args.mass) if args.mass else HexapodParams()
     dog = fw.place(SimHexapod(params=hp, terrain=ground))
     view_distance = 0.9
 else:
     dog = fw.place(SimDog(terrain=ground))
     view_distance = 0.7
-IDEAL = model == "hexapod" and args.servos != "geared"   # firmware HAL still has the geared ratios
 ui = ManualControl(panel=PANEL if nav else None)
 NAV_HELP = ["Map: click = walk there, N scan the room, X stop"] if nav else []
 
@@ -194,7 +177,7 @@ with mujoco.viewer.launch_passive(dog.model, dog.data) as viewer:
         if not paused:
             # keep the sim in step with the wall clock, one firmware tick at a time
             while dog.data.time - sim_start < time.perf_counter() - wall_start:
-                fw.drive(dog, cmd.as_tuple(), ideal_servos=IDEAL)
+                fw.drive(dog, cmd.as_tuple())
                 if nav:
                     nav["ticks"] += 1
                     if nav["ticks"] % 10 == 0:

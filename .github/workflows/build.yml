@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [robot-dog, robot-dog-lidar, robot-tank, robot-biped, robot-hexapod, robot-hexapod2]
+        env: [robot-dog, robot-dog-lidar, robot-tank, robot-biped, robot-hexapod]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/cache@v6

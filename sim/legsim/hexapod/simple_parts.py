@@ -1,8 +1,7 @@
 """
-Visual and mass parts of a hexapod that has no CAD parts yet (new_body.py):
-boxes and cylinders sized like the design concept. mjcf.build_xml uses them
-when params.parts == "simple". Everything in mm and g here, converted to the
-MJCF's m and kg.
+Visual and mass parts of the hexapod, which has no CAD parts yet: boxes and
+cylinders sized like the design concept (params.py). Everything in mm and g
+here, converted to the MJCF's m and kg.
 
 Link frames as in mjcf.py: X along the leg (neutral direction), Z up, joint
 on the link origin, at the zero pose (femur level, tibia straight down).
@@ -12,7 +11,7 @@ import math
 
 import numpy as np
 
-from . import new_body
+from .params import plate_outline, BOTTOM_Z, TOP_Z
 
 MM = 0.001
 G = 0.001
@@ -64,7 +63,7 @@ class _Parts:
 
 def meshes(p):
     """The hexagon body plate (3 mm, convex) as an inline mesh asset."""
-    pts = new_body.plate_outline()
+    pts = plate_outline()
     v = [c for z in (0.0, 3.0) for (x, y) in pts for c in (x * MM, y * MM, z * MM)]
     return [f'<mesh name="hx2_plate" vertex="{_f(*v)}"/>']
 
@@ -73,9 +72,9 @@ def torso(p):
     m = p.masses
     t = _Parts("")
     # bottom plate and the (see-through) top cover
-    t.raw(f'<geom name="body_bottom" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, new_body.BOTTOM_Z * MM)}" '
+    t.raw(f'<geom name="body_bottom" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, BOTTOM_Z * MM)}" '
           f'mass="{30 * G:.6g}" rgba="{PLA_LIGHT}"/>', 30.0)
-    t.raw(f'<geom name="body_top" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, new_body.TOP_Z * MM)}" '
+    t.raw(f'<geom name="body_top" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, TOP_Z * MM)}" '
           f'mass="{22 * G:.6g}" rgba="0.85 0.82 0.77 0.35"/>', 22.0)
     # coxa servos upright, shaft on the coxa axis, body towards the centre
     for leg in p.legs:

@@ -26,8 +26,7 @@
 #define MODEL_DOG     100
 #define MODEL_BIPED   101
 #define MODEL_TANK    102
-#define MODEL_HEXAPOD 103
-#define MODEL_HEXAPOD2 104   // new hexapod: MG90S direct drive (model/hexapod2)
+#define MODEL_HEXAPOD 103   // MG90S direct drive, hexagon body (2026-11 design)
 
 /**
  * Number of legs/tracks

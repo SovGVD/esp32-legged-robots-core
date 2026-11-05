@@ -5,14 +5,13 @@ Check that every hexapod servo turns the way the firmware expects.
   python examples/hexapod_legtest.py --leg RF        # one leg
   python examples/hexapod_legtest.py --video legtest.mp4
   python examples/hexapod_legtest.py --view          # watch it in the MuJoCo viewer (needs a display)
-  python examples/hexapod_legtest.py --hexapod2      # the new hexapod (model/hexapod2)
 
 The robot hangs in the air. One leg at a time moves its foot up, out, forward
 and turns around its coxa, through the firmware's own IK and servo HAL (the
-inverse flags in model/hexapod/model_data.h), while the sim servos turn the
-way they are mounted on the real robot. A leg that moves the wrong way is
-reported with the joint and the inverse flag to flip. Edit model_data.h and
-run again: the firmware bridge rebuilds by itself.
+inverse flags in model/hexapod/model_data.h). The sim servos turn the way the
+flags say (the robot isn't built yet), so here it shows the moves to run on
+the real robot; a leg that moves the wrong way there points at the joint and
+the inverse flag to flip.
 """
 
 import argparse
@@ -29,18 +28,10 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--leg", action="append", help="LF, LM, LR, RF, RM or RR (repeat for several); default all")
 ap.add_argument("--video")
 ap.add_argument("--view", action="store_true")
-ap.add_argument("--hexapod2", action="store_true", help="the new hexapod (MG90S direct drive)")
 args = ap.parse_args()
 
-if args.hexapod2:
-    # its servos turn the way the flags say (nothing mounted yet), so this checks the
-    # moves themselves; the short rear legs reach ~12 mm forward, so 15 mm moves
-    from legsim.hexapod import new_body
-    fw = FirmwareCore(model="hexapod2")
-    robot = SimHexapod(params=new_body.params(), fixed_base=True)
-else:
-    fw = FirmwareCore(model="hexapod")
-    robot = SimHexapod(fixed_base=True)
+fw = FirmwareCore(model="hexapod")
+robot = SimHexapod(fixed_base=True)
 on_frame = None
 frames = []
 
@@ -63,7 +54,7 @@ if args.video:
         d = ImageDraw.Draw(img)
         color = (200, 0, 0) if label.endswith("WRONG") else (0, 120, 0) if label.endswith("OK") else (20, 20, 20)
         d.text((20, 16), label, fill=color, font=font)
-        d.text((20, 510), "front = +Y (camera board), view from front-right", fill=(60, 60, 60), font=font.font_variant(size=18) if hasattr(font, "font_variant") else font)
+        d.text((20, 510), "front = +Y (ToF sensors), view from front-right", fill=(60, 60, 60), font=font.font_variant(size=18) if hasattr(font, "font_variant") else font)
         frames.append(np.asarray(img))
 
 if args.view:
@@ -81,7 +72,7 @@ if args.view:
         if lag > 0:
             time.sleep(lag)
 
-results = legtest.run(fw, robot, legs=args.leg, on_frame=on_frame, move=15.0 if args.hexapod2 else legtest.MOVE)
+results = legtest.run(fw, robot, legs=args.leg, on_frame=on_frame)
 print("inverse flags (alpha, beta, gamma) in model_data.h:")
 for i, leg in enumerate(robot.p.legs):
     print(f"  {leg.name}: {fw.leg_inverse(i)}")

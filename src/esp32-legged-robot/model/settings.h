@@ -17,8 +17,4 @@
   #include "hexapod/settings.h"
 #endif
 
-#if ROBOT_MODEL == MODEL_HEXAPOD2
-  #include "hexapod2/settings.h"
-#endif
-
 #endif

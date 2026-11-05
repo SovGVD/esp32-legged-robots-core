@@ -1,5 +1,5 @@
 /**
- * Robot description data for the hexapod model.
+ * Robot description data for the new hexapod (MG90S direct drive).
  * Compile time configuration (pins, sizes, hardware) lives in config.h.
  */
 #include "../../robot.h"

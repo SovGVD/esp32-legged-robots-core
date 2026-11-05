@@ -33,9 +33,8 @@ from legsim.firmware import FirmwareCore  # noqa: E402
 GOALS = {
     "dog": [(-700, 3000), (1100, 2900), (300, 0)],
     "hexapod": [(-900, 3900), (1300, 3700), (500, 0)],
-    "hexapod2": [(-900, 3900), (1300, 3700), (500, 0)],
 }
-SCALE = {"dog": 1.0, "hexapod": 1.3, "hexapod2": 1.3}
+SCALE = {"dog": 1.0, "hexapod": 1.3}
 
 try:
     FONT = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
@@ -108,7 +107,7 @@ def draw_map(grid, cell, size, view, true_path, map_path, odom_path, plan, goal,
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--model", default="dog", choices=("dog", "hexapod", "hexapod2"))
+    ap.add_argument("--model", default="dog", choices=("dog", "hexapod"))
     ap.add_argument("--goal", nargs=2, type=float, action="append", metavar=("X", "Y"),
                     help="map point in mm (repeat for several); default: through the doorway and back")
     ap.add_argument("--gyro-bias", type=float, default=1.0, help="gyro drift, deg/s (default 1)")

@@ -2,15 +2,15 @@
 Leg sizing for a new hexapod: static servo load for a given leg shape and mass,
 direct drive (no gears) or with a gear ratio per joint.
 
-  python tools/hexapod_leg_sizing.py                      # current legs vs a few new shapes, MG90S
+  python tools/hexapod_leg_sizing.py                      # the design's legs vs a few other shapes, MG90S
   python tools/hexapod_leg_sizing.py --mass 800 --shape 55 40 85 30 80
       shape = coxa femur tibia reach height, mm: reach = foot out from the femur
       axis, height = foot below the femur axis
 
 Static, slippery-floor worst case: 3 feet carry the robot with vertical forces
 only, worst foot of the stride. On a grippy floor the feet also push sideways
-and share the load, so the MuJoCo sim (examples/hexapod_body_check.py) reads
-about half of this for the current legs. Target: <= ~60% here, so a weak
+and share the load, so the MuJoCo sim reads
+about half of this (more with 6 feet down at rest). Target: <= ~60% here, so a weak
 clone, 1 kg of robot, a slope or a smooth floor still walks. Stability = how far the centre of mass is
 inside the tripod triangle at the worst point of the stride.
 """
@@ -19,21 +19,21 @@ import argparse
 import math
 
 KGCM = 0.0980665
-SERVOS = {"MG90S 5V": 1.95, "MG90S 6V": 2.2}        # kg*cm stall, datasheet (clones often ~70%)
+SERVOS = {"MG90S 5V": 1.87, "MG90S 6V": 2.2}        # kg*cm stall, datasheet 1.8 @ 4.8 V, 2.2 @ 6 V (clones often ~70%)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--mass", type=float, nargs="+", default=[850.0], help="total robot mass, g")
 ap.add_argument("--shape", type=float, nargs=5, action="append",
                 metavar=("COXA", "FEMUR", "TIBIA", "REACH", "HEIGHT"))
 ap.add_argument("--stride", type=float, default=60.0, help="step length along the body, mm")
-ap.add_argument("--body", type=float, nargs=3, default=(46.0, 80.0, 57.5),
+ap.add_argument("--body", type=float, nargs=3, default=(35.0, 58.0, 45.0),
                 metavar=("X", "Y", "MIDX"), help="coxa axes: corner legs (+-X, +-Y), middle legs (+-MIDX, 0)")
 ap.add_argument("--femur-ratio", type=float, default=1.0)
 ap.add_argument("--tibia-ratio", type=float, default=1.0)
 args = ap.parse_args()
 
-SHAPES = [("now (35/55/110, gears 2/2/1.5)", (35, 55, 110, 83, 95), (2.0, 1.5)),
-          ("now legs, direct drive", (35, 55, 110, 83, 95), (1.0, 1.0)),
+SHAPES = [("design (60/50/60)", (60, 50, 60, 9, 100), (1.0, 1.0)),
+          ("old hexapod legs, direct drive", (35, 55, 110, 83, 95), (1.0, 1.0), (46, 80, 57.5)),
           ("tall, short reach", (45, 45, 95, 40, 85), (1.0, 1.0)),
           ("long coxa, short femur", (55, 40, 85, 30, 80), (1.0, 1.0)),
           ("long coxa, femur 1.5:1", (55, 50, 95, 45, 85), (1.5, 1.0)),

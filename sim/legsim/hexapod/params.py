@@ -1,13 +1,18 @@
 """
-Physical parameters of Gleb's hexapod (6 legs, 3 joints each, geared).
+Physical parameters of the hexapod (6 legs, 3 joints each, MG90S straight on
+every joint, no gears). The 2026-11 design ("Recommended" in the body study),
+not built yet: hexagon body, 2x 18650 at the bottom centre, a PCA9685 + 3
+Mini360 board standing along each side, the ESP32 standing across the front,
+GY-91 under the top cover in the middle, 2 VL53L5CX at the front, lever switch
+feet. There are no CAD parts yet, so the sim model is simple shapes
+(simple_parts.py) sized like the design concept (artifact "Direct-drive
+hexapod concept").
 
 Units follow the firmware: mm, g, degrees/radians as noted. The MJCF builder
 converts to SI. Every number says where it comes from:
 
   [code]  src/esp32-legged-robot/model/hexapod (config.h, model_data.h)
-  [cad]   Gleb's printed parts (STL exports of the FreeCAD design), measured:
-          axis holes, gear tooth tips, servo screw holes
-  [stl]   mass estimated from the STL volume (PLA, ~1 mm shell, 20% infill)
+  [design] the body study (sim/tools/hexapod_leg_sweep.py, the concept artifact)
   [ds]    MG90S datasheet (typical values, not measured on this robot)
   [est]   engineering guess, tune against the real robot
 """
@@ -40,65 +45,67 @@ class HexLegConfig:
         return math.atan2(self.foot[1] - self.body[1], self.foot[0] - self.body[0])
 
 
-# config.h: LEG_BODY_X/Y, LEG_FOOT_X/Y/Z, LEG_MIDDLE_* [code]. The STLs put the coxa
-# axes exactly here: bearing holes at (+-46, +-80) and (+-57.5, 0) [cad].
-_BX, _BY, _MX = 46.0, 80.0, 57.5
-_FX, _FY, _FZ, _MFX = 150.24, 135.31, 95.00, 175.5
+# config.h [code]: coxa axes at (+-35, +-58) and (+-45, 0); neutral feet 69 mm out
+# from the coxa axis, 100 mm below it; rear and middle legs straight out from the
+# body centre, the front legs 20 deg further out to the side (out of the ToF view)
+FRONT_BODY, FRONT_FOOT = (35.0, 58.0), (88.71, 101.32)
+REAR_BODY, REAR_FOOT = (35.0, -58.0), (70.65, -117.08)
+MIDDLE_BODY, MIDDLE_FOOT = (45.0, 0.0), (114.0, 0.0)
+FOOT_Z = 100.0
 
-# Angle inverse flags: left tibia, right femur (right legs are mirrored) [code]
-_INV_L = (False, False, True)
-_INV_R = (False, True, False)
+# Angle inverse flags: right legs mirrored, their femur and tibia servos turn the
+# other way [code, assumed until the robot is built: check with the leg test]
+_INV_L = (False, False, False)
+_INV_R = (False, True, True)
+
+
+def _leg(name, body, foot, right):
+    sx = 1 if right else -1
+    return HexLegConfig(name, (sx * body[0], body[1], 0.0), (sx * foot[0], foot[1], -FOOT_Z),
+                        inverse_abg=_INV_R if right else _INV_L)
+
 
 # Firmware order: LF, LM, LR, RF, RM, RR [code]
 LEGS = (
-    HexLegConfig("LF", (-_BX, _BY, 0.0), (-_FX, _FY, -_FZ), inverse_abg=_INV_L),
-    HexLegConfig("LM", (-_MX, 0.0, 0.0), (-_MFX, 0.0, -_FZ), inverse_abg=_INV_L),
-    HexLegConfig("LR", (-_BX, -_BY, 0.0), (-_FX, -_FY, -_FZ), inverse_abg=_INV_L),
-    HexLegConfig("RF", (_BX, _BY, 0.0), (_FX, _FY, -_FZ), inverse_abg=_INV_R),
-    HexLegConfig("RM", (_MX, 0.0, 0.0), (_MFX, 0.0, -_FZ), inverse_abg=_INV_R),
-    HexLegConfig("RR", (_BX, -_BY, 0.0), (_FX, -_FY, -_FZ), inverse_abg=_INV_R),
+    _leg("LF", FRONT_BODY, FRONT_FOOT, False),
+    _leg("LM", MIDDLE_BODY, MIDDLE_FOOT, False),
+    _leg("LR", REAR_BODY, REAR_FOOT, False),
+    _leg("RF", FRONT_BODY, FRONT_FOOT, True),
+    _leg("RM", MIDDLE_BODY, MIDDLE_FOOT, True),
+    _leg("RR", REAR_BODY, REAR_FOOT, True),
 )
 
 JOINTS = ("coxa", "femur", "tibia")   # alpha, beta, gamma
 
+PLATE_INFLATE = 14.0    # body plates reach 14 mm past the coxa axes [design]
+BOTTOM_Z = -28.0        # bottom plate under the femur axis (body origin) [design]
+TOP_Z = 16.0            # top cover [design]
+
 
 @dataclass
 class HexGeometry:
-    # Link lengths [code], all three confirmed by the parts [cad]:
-    #   Coxa: yaw axis x = 57.5 -> femur axis x = 92.5 (35)
-    #   Femur/Tibia: femur axis at the origin -> knee axis x = 55 -> tibia tip z = -110
-    coxa: float = 35.0
-    femur: float = 55.0
-    tibia: float = 110.0
-    # Body origin (firmware z = 0) is at the femur axis height: 28.7 mm above the
-    # bottom of the body [cad]. The body is 131 x 176 mm, 53.5 mm tall.
-    femur_axis_z: float = 28.7
-    torso_size: tuple = (100.0, 176.0, 53.5)   # collision box: main body without the coxa lobes [cad]
-    torso_z: float = -1.95                     # box centre relative to the body origin [cad]
-    foot_radius: float = 4.0                   # TibiaTip is 8 mm across, rounded [cad]
-    femur_width: float = 8.0                   # collision capsule radius, only the floor collides [est]
-    tibia_width: float = 6.0
+    coxa: float = 60.0              # link lengths [code]
+    femur: float = 50.0
+    tibia: float = 60.0
+    femur_axis_z: float = -BOTTOM_Z  # body origin above the bottom of the body [design]
+    torso_size: tuple = (110.0, 150.0, TOP_Z + 3 - BOTTOM_Z)   # collision box [design]
+    torso_z: float = (TOP_Z + 3 + BOTTOM_Z) / 2                # box centre relative to the body origin
+    foot_radius: float = 5.0        # lever switch pad [est]
+    femur_width: float = 7.0        # collision capsule radius, only the floor collides [est]
+    tibia_width: float = 5.0
 
 
 @dataclass
 class HexMasses:
-    """Grams. Total ~892 g, a scale reading would replace most of the [est].
-
-    Printed parts are placed as meshes (assembly.py), servos and electronics as
-    boxes, so MuJoCo computes centres of mass and inertias from them; whatever
-    is left of a link's total (screws, pins, bearings, wires) is a small lump.
-    """
-    # body top + bottom (124) [stl], 6 coxa servos + gears (86) [ds], 2x18650 + holder (106) [ds, est],
-    # electronics (47) [est], servo wires (30) [est], 12 coxa bearings (24) [est]
-    torso: float = 417.0
-    battery: float = 106.0      # 2x 18650 (~47 g each) + holder [ds, est]
-    electronics: float = 47.0   # ESP32-CAM, 2x PCA9685, INA219, MPU9250, bucks, switch [est]
-    # Coxa 11.6 + CoxaGear 3.3 [stl] + femur servo 13.4 + servo gear 1.0 [ds] + pins, screws
-    coxa: float = 31.3
-    # Femur 12.8 [stl] + tibia servo 13.4 + servo gear 1.0 [ds] + bearing, screws
-    femur: float = 28.7
-    # Tibia_side1 8.8 + Tibia_side2 9.5 + TibiaTip 0.4 [stl] + screws
-    tibia: float = 19.2
+    """Grams, ~815 g in all [design]. Legs: coxa bracket 8 + femur servo 13.4;
+    femur 7 + tibia servo 13.4; tibia 6 + lever switch 2 [est]. Body: the rest
+    (6 coxa servos, cells, boards, plates, wires)."""
+    torso: float = 516.2
+    battery: float = 100.0      # 2x 18650 (~47 g each) + holder [ds, est]
+    electronics: float = 55.0   # ESP32, 2x PCA9685, 7x Mini360, GY-91, 2x VL53L5CX, fuse, switch [est]
+    coxa: float = 21.4
+    femur: float = 20.4
+    tibia: float = 8.0
 
     def total(self) -> float:
         return self.torso + 6 * (self.coxa + self.femur + self.tibia)
@@ -106,8 +113,8 @@ class HexMasses:
 
 @dataclass
 class HexServoParams:
-    """MG90S clone (ServoGear_MG90S_clone.stl) at ~5 V [ds, est]. At the servo shaft;
-    the joint gears (2:1 coxa and femur, 1.5:1 tibia) are applied on top."""
+    """Servo model at the shaft (= the joint: direct drive). The defaults are
+    the MG90S at 4.8 V [ds]; `mg90s(volts)` gives other supply voltages."""
     stall_torque: float = 0.176         # N*m (1.8 kg*cm at 4.8 V) [ds]
     no_load_speed: float = math.radians(60) / 0.10   # rad/s (0.10 s/60 deg at 4.8 V) [ds]
     kp: float = 3.0                     # N*m/rad, saturates at ~3.4 deg error [est]
@@ -120,32 +127,62 @@ class HexServoParams:
     max_angle: float = 180.0
 
 
-# servoMainProfile in model/hexapod/model_data.h: pulse widths at 0, 30, 50, ..., 150, 180 deg [code]
-SERVO_PROFILE_DEG = (0, 30, 50, 70, 90, 110, 130, 150, 180)
-SERVO_PROFILE_US = (590, 870, 1080, 1290, 1500, 1710, 1890, 2100, 2200)
-SERVO_PROFILE = (SERVO_PROFILE_DEG, SERVO_PROFILE_US)
+# servoMainProfile in model/hexapod/model_data.h: 500-2500 us over 0-180 deg [code, ds]
+LINEAR_500_2500 = ((0, 180), (500, 2500))
+SERVO_PROFILE = LINEAR_500_2500
 
 
 @dataclass
 class HexHalParams:
-    """LR_legHal, same for every leg [code]. Gear ratios checked on the parts [cad]:
-    18-tooth servo gears (tip r 10, module 1), 36-tooth coxa sector and femur gear
-    (tip r ~19), 27-tooth tibia gear (tip r 14.5)."""
+    """LR_legHal, same for every leg [code]: direct drive, ratio 1."""
     mid: tuple = (math.pi / 2, math.pi / 2, math.pi / 2)
-    ratio: tuple = (2.0, 2.0, 1.5)
+    ratio: tuple = (1.0, 1.0, 1.0)
+
+
+# MG90S: 1.8 kg*cm, 0.10 s/60 deg at 4.8 V; 2.2 kg*cm, 0.08 s/60 deg at 6 V [ds]. Linear in between.
+MG90S = {4.8: (1.8, 0.10), 6.0: (2.2, 0.08)}
+_KGCM = 0.0980665   # N*m per kg*cm
+
+
+def mg90s(volts=5.0) -> HexServoParams:
+    """MG90S at `volts` (4.8-6.0). Loop gains scaled with the torque [est]."""
+    volts = min(max(volts, 4.8), 6.0)
+    f = (volts - 4.8) / 1.2
+    stall_kgcm, s60 = (a + f * (b - a) for a, b in zip(MG90S[4.8], MG90S[6.0]))
+    base = HexServoParams()
+    k = stall_kgcm * _KGCM / base.stall_torque
+    return dataclasses.replace(base, stall_torque=stall_kgcm * _KGCM, no_load_speed=math.radians(60) / s60,
+                               kp=base.kp * k, kd=base.kd * k, friction=base.friction * k)
 
 
 @dataclass
 class HexapodParams:
     geometry: HexGeometry = field(default_factory=HexGeometry)
     masses: HexMasses = field(default_factory=HexMasses)
-    servo: HexServoParams = field(default_factory=HexServoParams)
+    servo: HexServoParams = field(default_factory=lambda: mg90s(5.0))   # Mini360 bucks set to 5 V [design]
     hal: HexHalParams = field(default_factory=HexHalParams)
     env: Environment = field(default_factory=Environment)
     legs: tuple = LEGS
-    imu_pos: tuple = (0.0, 0.0, 0.0)    # mm, MPU9250 position unknown: body centre [est]
+    imu_pos: tuple = (0.0, 0.0, TOP_Z - 3.0)    # GY-91 under the top cover, body centre [design]
     profile: tuple = SERVO_PROFILE
-    parts: str = "stl"                  # "stl": Gleb's printed parts (meshes); "simple": boxes (new_body.py)
+
+
+def with_mass(params: HexapodParams, total_g: float) -> HexapodParams:
+    """Change the body mass (the torso lump) so the robot weighs `total_g`;
+    legs, servos, battery and electronics stay as they are."""
+    m = params.masses
+    return dataclasses.replace(params, masses=dataclasses.replace(m, torso=m.torso + total_g - m.total()))
+
+
+def plate_outline():
+    """Hexagon of the body plates (x, y) in mm, around the coxa axes."""
+    by = {leg.name: leg.body for leg in LEGS}
+    pts = []
+    for n in ("LF", "LM", "LR", "RR", "RM", "RF"):
+        x, y = by[n][0], by[n][1]
+        r = math.hypot(x, y)
+        pts.append((x + x / r * PLATE_INFLATE, y + y / r * PLATE_INFLATE))
+    return pts
 
 
 # ------------------------------------------------------------ other servos
@@ -159,7 +196,6 @@ PTK_7465MG = {
     7.4: (5.5, 0.075),
     8.4: (5.8, 0.070),
 }
-_KGCM = 0.0980665   # N*m per kg*cm
 
 
 def ptk_7465mg(volts=7.4, frame_hz=50.0) -> HexServoParams:
@@ -175,50 +211,9 @@ def ptk_7465mg(volts=7.4, frame_hz=50.0) -> HexServoParams:
     f = 0.0 if hi == lo else (volts - lo) / (hi - lo)
     stall_kgcm, s60 = (a + f * (b - a) for a, b in zip(PTK_7465MG[lo], PTK_7465MG[hi]))
     stall = stall_kgcm * _KGCM
-    mg90s = HexServoParams()
-    k = stall / mg90s.stall_torque
+    ref = HexServoParams()
+    k = stall / ref.stall_torque
     return HexServoParams(stall_torque=stall, no_load_speed=math.radians(60) / s60,
-                          kp=stall / math.radians(2.0), kd=mg90s.kd * k,
+                          kp=stall / math.radians(2.0), kd=ref.kd * k,
                           deadband_us=3.0, pwm_period=1.0 / frame_hz,
-                          armature=mg90s.armature, friction=mg90s.friction * k)
-
-
-# 500-2500 us over 0-180 deg [ds]
-LINEAR_500_2500 = ((0, 180), (500, 2500))
-
-
-def direct_drive(params: HexapodParams = None, servo: HexServoParams = None) -> HexapodParams:
-    """A what-if robot: same legs, stance and weight, but every joint driven
-    straight by its servo (no gears, so 180 deg of travel per joint).
-
-    The firmware HAL still has the geared ratios, so drive it by leg angles,
-    not pulses: FirmwareCore.drive(robot, cmd, ideal_servos=True)."""
-    import dataclasses
-    p = params or HexapodParams()
-    return dataclasses.replace(p, servo=servo or ptk_7465mg(), hal=HexHalParams(ratio=(1.0, 1.0, 1.0)),
-                               profile=LINEAR_500_2500)
-
-
-# MG90S (the datasheet the current robot's clone follows): 1.8 kg*cm, 0.10 s/60 deg
-# at 4.8 V; 2.2 kg*cm, 0.08 s/60 deg at 6 V [ds]. Linear in between.
-MG90S = {4.8: (1.8, 0.10), 6.0: (2.2, 0.08)}
-
-
-def mg90s(volts=5.0) -> HexServoParams:
-    """MG90S at `volts` (4.8-6.0). Same loop gains as the default servo,
-    scaled with the torque [est]."""
-    volts = min(max(volts, 4.8), 6.0)
-    f = (volts - 4.8) / 1.2
-    stall_kgcm, s60 = (a + f * (b - a) for a, b in zip(MG90S[4.8], MG90S[6.0]))
-    base = HexServoParams()
-    k = stall_kgcm * _KGCM / base.stall_torque
-    return dataclasses.replace(base, stall_torque=stall_kgcm * _KGCM, no_load_speed=math.radians(60) / s60,
-                               kp=base.kp * k, kd=base.kd * k, friction=base.friction * k)
-
-
-def with_mass(params: HexapodParams, total_g: float) -> HexapodParams:
-    """Change the body mass (the torso lump: screws, wires, bearings, the
-    printed halves) so the robot weighs `total_g`; legs, servos, battery and
-    electronics stay as they are."""
-    m = params.masses
-    return dataclasses.replace(params, masses=dataclasses.replace(m, torso=m.torso + total_g - m.total()))
+                          armature=ref.armature, friction=ref.friction * k)

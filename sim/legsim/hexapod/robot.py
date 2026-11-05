@@ -8,11 +8,10 @@ SimHexapod: the simulated hexapod, seen through the same interfaces as SimDog.
 
 plus set_leg_angles(), set_feet(), set_joint_targets() and ground truth, like SimDog.
 
-Pulses turn the joints the way the real servos would (assembly.servo_direction:
-shaft side, gear reversal, servo turning direction), not the way the firmware's
-inverse flags say. So a wrong flag in model_data.h makes a leg move the wrong
-way here too; `hal_mapping=True` gives the old behaviour (the sim follows the flags),
-the default for the new hexapod (new_body.py), which has no servo mounting yet.
+Pulses turn each joint the way `direction` says (+1: a longer pulse turns the
+joint its + q way). The servos aren't mounted yet, so it comes from the inverse
+flags in the params (kinematics.hal_direction); flip one entry to see what a
+servo mounted the other way does (the leg test catches it).
 """
 
 import math
@@ -22,8 +21,7 @@ import mujoco
 
 from .params import HexapodParams
 from .mjcf import build_xml, servo_joint_range
-from .assembly import servo_direction
-from .kinematics import leg_angles_to_q, q_to_leg_angles, firmware_ik, default_foot
+from .kinematics import leg_angles_to_q, q_to_leg_angles, firmware_ik, default_foot, hal_direction
 from .. import hal
 from ..servo import ServoArray
 from ..robot import SimDog
@@ -32,12 +30,10 @@ JOINT_NAMES = ("coxa", "femur", "tibia")
 
 
 class SimHexapod(SimDog):
-    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False, hal_mapping=None, terrain=None):
+    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False, terrain=None):
         self.p = params or HexapodParams()
         self.terrain = terrain
-        # a robot without CAD parts (new_body.py) has no servo mounting to follow: use the flags
-        self.hal_mapping = (self.p.parts == "simple") if hal_mapping is None else hal_mapping
-        self.direction = np.array([[servo_direction(leg, j) for j in range(3)] for leg in self.p.legs])
+        self.direction = np.array([[hal_direction(leg, j) for j in range(3)] for leg in self.p.legs])
         self.fixed_base = fixed_base
         self.xml = build_xml(self.p, fixed_base=fixed_base)
         if terrain is not None:
@@ -88,20 +84,13 @@ class SimHexapod(SimDog):
     # ------------------------------------------------------- servo bus layer
     def write_pulse(self, channel, us):
         leg_i, j = divmod(channel, 3)
-        leg = self.p.legs[leg_i]
         if us <= 0:
             self.servos.pending[channel] = np.nan
             return
         servo_angle = hal.pulse_to_angle(us, self.p.profile)
-        if self.hal_mapping:
-            a = hal.servo_angle_to_leg_angle(self.p.hal, leg, j, servo_angle, self.trim[leg_i, j])
-            angles = [math.pi / 2, math.pi / 2, math.pi / 2]
-            angles[j] = a
-            self.servos.pending[channel] = leg_angles_to_q(*angles)[j]
-        else:
-            # servo middle (90 deg) = the CAD pose (q = 0); the joint gear divides the turn
-            turn = servo_angle - math.pi / 2 - self.trim[leg_i, j]
-            self.servos.pending[channel] = self.direction[leg_i, j] * turn / self.p.hal.ratio[j]
+        # servo middle (90 deg) = the zero pose (q = 0)
+        turn = servo_angle - math.pi / 2 - self.trim[leg_i, j]
+        self.servos.pending[channel] = self.direction[leg_i, j] * turn / self.p.hal.ratio[j]
 
     def set_leg_angles(self, angles, firmware_trim=None):
         """Firmware leg angles [6][3] -> getHALAngle -> angleToPulse -> servo bus."""
@@ -114,8 +103,8 @@ class SimHexapod(SimDog):
 
     def set_leg_angles_ideal(self, angles):
         """Firmware leg angles [6][3] straight to the joint servos, skipping the
-        HAL and pulses: for what-if servos and gears the firmware HAL doesn't
-        describe (params.direct_drive). Out-of-travel angles are clamped."""
+        HAL and pulses: for what-if servos the firmware HAL doesn't describe.
+        Out-of-travel angles are clamped."""
         self.set_joint_targets(np.array([leg_angles_to_q(*a) for a in angles]).ravel())
 
     def set_joint_targets(self, q):

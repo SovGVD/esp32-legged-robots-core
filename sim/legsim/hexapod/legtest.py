@@ -4,12 +4,12 @@ Leg-by-leg direction test: does every servo turn the way the firmware expects?
 The robot hangs in the air (fixed base). One leg at a time gets foot targets
 through the firmware's own IK and servo HAL (FirmwareCore.leg_test_pulses, so
 the inverse flags in model_data.h are used), and the sim servos turn the way
-the real ones are mounted (SimHexapod: shaft side, gear reversal). Each move
-is checked on the sim foot:
+SimHexapod.direction says (from the flags until the robot is built; flip an
+entry to see a servo mounted the other way). Each move is checked on the sim foot:
 
-  UP       foot 30 mm up            -> tip rises
-  OUT      foot 20 mm outward       -> tip moves away from the body (30 is out of reach)
-  FORWARD  foot 30 mm forward       -> tip moves forward (+Y)
+  UP       foot 15 mm up            -> tip rises
+  OUT      foot 20 mm outward       -> tip moves away from the body
+  FORWARD  foot 15 mm forward       -> tip moves forward (+Y; the rear feet reach ~12 mm)
   TURN     leg 15 deg CCW from above around its coxa axis -> leg turns CCW
 
 and every joint that moved against the IK's plan is named, which points at
@@ -23,8 +23,8 @@ import numpy as np
 from .kinematics import firmware_ik, leg_angles_to_q, default_foot, coxa_position
 from .params import JOINTS
 
-MOVE = 30.0          # mm
-MOVE_OUT = 20.0      # mm: the neutral foot is 160 mm out, 30 more is past the reach
+MOVE = 15.0          # mm
+MOVE_OUT = 20.0      # mm
 TURN = 15.0          # deg
 RAMP = 0.6           # s, smooth move to the target and back
 HOLD = 0.3           # s
@@ -63,7 +63,7 @@ def _check(name, leg, before, after, move=MOVE):
 
 def run(fw, robot, legs=None, on_frame=None, frame_dt=1 / 30, move=MOVE):
     """Run the test. fw: FirmwareCore(model="hexapod"), robot: SimHexapod(fixed_base=True).
-    move: mm up and forward (the new hexapod's short rear legs reach ~12 mm forward: 15).
+    move: mm up and forward.
     on_frame(robot, label) is called every frame_dt of sim time (for videos).
     Returns a list of dicts: leg, move, expect, ok, measured, wrong_joints."""
     names = [l.name for l in robot.p.legs]
