@@ -183,7 +183,7 @@ def rocker(i):
     d.cbox("body", p("pwr_body_w"), p("pwr_body_len"), p("pwr_body_h"), "0 mm", "0 mm", "-" + p("pwr_body_h"), BLACK)
     d.cbox("bezel", p("pwr_bezel_w"), p("pwr_bezel_len"), p("pwr_bezel_t"), "0 mm", "0 mm", "0 mm", BLACK)
     d.cbox("rocker", "%s - 2 mm" % p("pwr_body_w"), "%s - 2 mm" % p("pwr_body_len"), p("pwr_rocker_h"), "0 mm", "0 mm", p("pwr_bezel_t"), GREY)
-    for sub, y in (("pin_a", "-" + p("pwr_pin_pitch")), ("pin_b", "0 mm"), ("pin_c", p("pwr_pin_pitch"))):
+    for sub, y in (("pin_a", "-" + p("pwr_pin_pitch")), ("pin_b", "0 mm")):
         d.cbox(sub, p("pwr_pin_t"), p("pwr_pin_w"), p("pwr_pin_len"), "0 mm", y, "-(%s + %s)" % (p("pwr_body_h"), p("pwr_pin_len")), SILVER)
 
 
