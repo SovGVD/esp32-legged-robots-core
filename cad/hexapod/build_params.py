@@ -7,6 +7,7 @@ Columns: A alias, B value, C source, D note.
 Source says how far to trust a value:
   config.h / params.py / model_data.h / simple_parts.py   the robot design, CAD must match
   hexapodv2 / hexapod.FCStd   taken from the old models in Dropbox/robots/hexapod
+  biped          leg_bottom_v2 in Dropbox/robots/biped/biped_maybebroken.FCStd
   design         a choice made for this CAD
   caliper        measured on the real part
   photo / drawing / web   from a picture or seller page, not measured
@@ -27,6 +28,7 @@ OLD2, OLD1 = "hexapodv2", "hexapod.FCStd"
 TODO, CALC = "TODO measure", "derived"
 CAL, PHOTO, DRAWING, WEB, STD, LOOSE = "caliper", "photo", "drawing", "web", "standard", "not critical"
 DESIGN = "design"
+BIPED = "biped"
 
 TABLE = [
     "Robot: links and leg geometry (origin: body centre at femur axis height; X right, Y forward, Z up)",
@@ -199,23 +201,30 @@ TABLE = [
     ("print_chamfer", "2 mm", DESIGN, "internal chamfers, for PLA strength"),
     ("pla_density", "1.24", STD, "g/cm3, solid, for the weight check"),
 
-    "Femur: a closed box holding the femur and tibia servos in line, horns on +Y (femur frame: origin on the femur axis, +X to the knee, Z up with the femur level)",
-    ("fem_plate_t", "3 mm", DESIGN, "plate the servo tabs screw to"),
-    ("fem_wall_t", "3 mm", DESIGN, "side and end walls"),
-    ("fem_floor_t", "3 mm", DESIGN, "floor under the servos, carries the 2 shafts"),
+    "Femur, after biped leg_bottom_v2: a thick plate with the 2 servos through it, tabs in pockets, and a strap at each end carrying the shaft (femur frame: origin on the femur axis, +X to the knee, Z up with the femur level, horns on +Y)",
+    ("fem_plate_floor", "4.7 mm", BIPED, "plate under the tab pockets"),
+    ("fem_rim_h", "8 mm", BIPED, "tab pocket depth, the rim around the tabs"),
+    ("fem_plate_y0", "=joint_seat_y - fem_plate_floor", CALC, "underside of the plate"),
+    ("fem_plate_y1", "=joint_seat_y + fem_rim_h", CALC, "top of the rim"),
+    ("fem_wall_t", "3 mm", DESIGN, "strap and rim walls"),
+    ("fem_floor_t", "3 mm", DESIGN, "strap floor under the servo, carries the shaft"),
     ("fem_floor_y1", "=-mg90_stack / 2 - joint_gap", CALC, "inner face of the floor"),
     ("fem_floor_y0", "=fem_floor_y1 - fem_floor_t", CALC, "outer face of the floor"),
-    ("fem_half_h", "=mg90_body_w / 2 + mg90_fit + fem_wall_t", CALC, "half the box height in Z"),
-    ("fem_plate_x0", "=-mg90_tab_near - 2 mm", CALC, "plate end past the femur servo tab"),
-    ("fem_plate_x1", "=femur_len + mg90_tab_near + 2 mm", CALC, "plate end past the tibia servo tab"),
-    ("fem_box_x0", "=-mg90_shaft_end - mg90_fit - fem_wall_t", CALC, "outer face of the end wall"),
-    ("fem_box_x1", "=femur_len + mg90_shaft_end + mg90_fit + fem_wall_t", CALC, "outer face of the end wall"),
-    ("fem_boss_d", "10 mm", DESIGN, "boss at the root of each shaft, bears on the bearing's inner ring only"),
-    ("fem_boss_h", "0.5 mm", DESIGN, "boss, keeps the bearing's outer ring off the floor"),
+    ("fem_half_h", "=mg90_body_w / 2 + mg90_fit + fem_wall_t", CALC, "half the height in Z"),
+    ("fem_plate_x0", "=-mg90_tab_near - mg90_fit - fem_wall_t", CALC, "plate end past the femur servo tab"),
+    ("fem_plate_x1", "=femur_len - fem_plate_x0", CALC, "plate end past the tibia servo tab"),
+    ("fem_corner", "4 mm", DESIGN, "plate corners cut off at the ends"),
+    ("fem_box_x0", "=-mg90_shaft_end - mg90_fit - fem_wall_t", CALC, "outer face of the strap's end wall"),
+    ("fem_strap_x1", "9 mm", DESIGN, "strap side walls reach this far past the shaft; between the straps the servos are bare"),
+    ("fem_strap_taper", "6 mm", DESIGN, "strap side walls taper into the plate"),
+    ("fem_lobe_d", "18 mm", DESIGN, "round floor around the shaft"),
+    ("fem_boss_d", "9 mm", BIPED, "leg_bottom_bearing_pad: spacer at the root of each shaft, on the bearing's inner ring only"),
+    ("fem_boss_h", "1 mm", BIPED, "spacer"),
     ("fem_shaft_d", "=bearing_id", CALC, "shaft"),
-    ("fem_shaft_len", "3 mm", DESIGN, "shaft: through the bearing and 0.5 past it"),
-    ("fem_wire_len", "10 mm", DESIGN, "cable hole in the side wall, between the 2 servos"),
-    ("fem_wire_h", "9 mm", DESIGN, "cable hole"),
+    ("fem_shaft_len", "3 mm", BIPED, "shaft"),
+    ("fem_edge_ch", "1 mm", BIPED, "chamfer on the plate's long edges"),
+    ("fem_shaft_ch", "0.4 mm", BIPED, "chamfer on the shaft tip"),
+    ("fem_boss_ch", "0.2 mm", BIPED, "chamfer on the spacer"),
 
     "Catalog: how the dummies are spread out in the document (not robot sizes)",
     ("catalog_pitch", "90 mm", "layout", "between dummies along X"),

@@ -1,9 +1,11 @@
 """FEA of the femur print alone, in its own unsaved document, with CalculiX.
 
-The servos stiffen the real part and are left out here, so this is on the safe
-side. It holds the femur where the coxa does: at the hip shaft and the femur servo's
+The servos stiffen the real part and are left out here, so this is well on the safe
+side: between its straps this print has only the plate, and the servos are what
+close the section. It holds the femur where the coxa does: at the hip shaft and the femur servo's
 tab screws. The loads come in at the knee, half through its shaft, half through the
-tibia servo's tab screws. Run inside FreeCAD with init_globals={"LOAD": name}.
+tibia servo's tab screws. Run inside FreeCAD with init_globals={"LOAD": name}; add
+"BONDED": True for both servos glued in solid, the opposite limit.
 
   walk   foot force 8 N up (900 g on 3 feet, x3 for walking), tibia servo at stall
   twist  walk + 4 N sideways at the foot, 60 mm below the knee
@@ -30,7 +32,7 @@ LOADS = {"walk": (8.0, 0.0, True), "twist": (8.0, 4.0, True), "fall": (30.0, 15.
 TIBIA_M = 0.060
 
 
-def build(load):
+def build(load, bonded=False):
     up, side, stall = LOADS[load]
     src = App.getDocument("hexapod")
     sheet = src.getObject("Params")
@@ -45,6 +47,21 @@ def build(load):
     doc = App.newDocument(name)
     obj = doc.addObject("Part::Feature", "Print")
     obj.Shape = src.getObject("Femur_Main").Shape.copy()
+    if bonded:
+        # both servos glued in, as solid plastic: the opposite limit to the print alone.
+        # The femur servo's shaft is then held by the coxa's horn, and the tibia's horn
+        # loads the tibia servo's shaft
+        rot = App.Rotation(App.Matrix(0, 1, 0, 0,  0, 0, 1, 0,  1, 0, 0, 0,  0, 0, 0, 1))
+        seat_y = val("joint_seat_y")
+        pieces = []
+        for x, r in ((0, rot.multiply(App.Rotation(App.Vector(0, 0, 1), 180))), (val("femur_len"), rot)):
+            for n in ("MG90S_body", "MG90S_tabs", "MG90S_turret", "MG90S_shaft"):
+                piece = src.getObject(n).Shape.copy()
+                piece.Placement = App.Placement(App.Vector(x, seat_y, 0), r).multiply(piece.Placement)
+                pieces.append(piece)
+        obj.Shape = obj.Shape.multiFuse(pieces).removeSplitter()
+        if len(obj.Shape.Solids) != 1:
+            raise ValueError("did not fuse into one solid: %d" % len(obj.Shape.Solids))
     doc.recompute()
     an = ObjectsFem.makeAnalysis(doc, "Analysis")
     mat = ObjectsFem.makeMaterialSolid(doc, "PLA")
@@ -66,13 +83,17 @@ def build(load):
     near, far = val("mg90_hole_near"), val("mg90_hole_far")
     pilot, shaft = val("mg90_screw_pilot_d") / 2, val("fem_shaft_d") / 2
     fixed = ObjectsFem.makeConstraintFixed(doc, "HeldByCoxa")
-    fixed.References = [(obj, tuple(cyl_faces(shaft, 0) + cyl_faces(pilot, -near) + cyl_faces(pilot, far)))]
+    servo_shaft = val("mg90_shaft_d") / 2
+    held = cyl_faces(servo_shaft, 0) if bonded else cyl_faces(pilot, -near) + cyl_faces(pilot, far)
+    fixed.References = [(obj, tuple(cyl_faces(shaft, 0) + held))]
     an.addObject(fixed)
 
     knee_shaft = cyl_faces(shaft, fl)
-    tab_a, tab_b = cyl_faces(pilot, fl - far), cyl_faces(pilot, fl + near)
-    arm = (val("joint_seat_y") - val("fem_plate_t") / 2) - (val("fem_floor_y0") - 1.5)
-    couple = STALL_NM / (val("mg90_screw_spacing") / 1000) if stall else 0.0
+    # bonded: the second load path is the tibia servo's shaft, both ways
+    tab_a = cyl_faces(servo_shaft, fl) if bonded else cyl_faces(pilot, fl - far)
+    tab_b = tab_a if bonded else cyl_faces(pilot, fl + near)
+    arm = (val("joint_horn_y") - 2.0 if bonded else val("joint_seat_y") - val("fem_plate_floor") / 2) - (val("fem_floor_y0") - 1.5)
+    couple = STALL_NM / (val("mg90_screw_spacing") / 1000) if stall and not bonded else 0.0
     twist = side * TIBIA_M / (arm / 1000)
     Z, Y = 3, 2
     loads = [
@@ -145,7 +166,7 @@ def report(frd, load, totals, fl):
     # the knee: mean movement, and how far it tips, which the tibia turns into foot movement
     ring = [n for n in disp if abs(coords[n][0] - fl) < 8 and abs(coords[n][2]) < 8]
     shaft = [n for n in ring if coords[n][1] < -17]
-    plate = [n for n in ring if coords[n][1] > -3]
+    plate = [n for n in ring if coords[n][1] > -4.5]
     mean = lambda nodes, k: sum(disp[n][k] for n in nodes) / len(nodes)
     dy = sum(coords[n][1] for n in plate) / len(plate) - sum(coords[n][1] for n in shaft) / len(shaft)
     tip = (mean(plate, 2) - mean(shaft, 2)) / dy
@@ -158,4 +179,4 @@ def report(frd, load, totals, fl):
         print("         %.2f MPa at %s" % (vm[n], [round(c, 1) for c in coords[n]]))
 
 
-build(globals().get("LOAD", "twist"))
+build(globals().get("LOAD", "twist"), globals().get("BONDED", False))
