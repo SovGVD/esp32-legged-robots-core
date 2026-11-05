@@ -10,6 +10,7 @@ void BodyKinematics::update(leg *legs, uint8_t legCount, const LR_figure &body, 
 	 */
 	float pitch = body.orientation.pitch - correction.pitch + command.rotate.pitch * commandTilt;
 	float roll  = body.orientation.roll  - correction.roll  + command.rotate.roll  * commandTilt;
+	_tilt = { pitch, roll, 0 };
 
 	float sinPitch = sinf(pitch);
 	float cosPitch = cosf(pitch);

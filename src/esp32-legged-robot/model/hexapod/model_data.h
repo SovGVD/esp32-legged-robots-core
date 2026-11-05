@@ -246,16 +246,14 @@ const float SIT_HEIGHT = -30;
  * Two VL53L5CX (8x8 zones, 45 deg field of view) on the front of the body,
  * turned 20 deg left and right, so they see the ground where the front feet
  * step (the front legs open 20 deg wider to keep out of the view: ~2 % of the
- * zones hit a leg in the design concept). The left one looks 35 deg down
- * (terrain), the right one 22 deg down like on the old hexapod: its top
- * zone rows look nearly level, which the room scan (TOF_SCAN_PARAMS) needs.
- * With both at 35 deg the scan would need the nose ~18 deg up; the simulator
- * only gets ~11 deg out of the legs.
+ * zones hit a leg in the design concept). Both look 35 deg down (terrain);
+ * the room scan (TOF_SCAN_PARAMS) tilts the nose 18 deg up so their top zone
+ * rows look level, like the dog does.
  */
 const TofSensor TOF_SENSORS[] = {
 	// position (mm, body frame), yaw (+ = left), tilt down (rad), field of view (rad), zones per side, max range (mm)
 	{ { -14, 74, 2 },  0.35, 0.61, 0.785, 8, 450 },
-	{ {  14, 74, 2 }, -0.35, 0.384, 0.785, 8, 450 },
+	{ {  14, 74, 2 }, -0.35, 0.61, 0.785, 8, 450 },
 };
 #define TOF_SENSOR_COUNT 2
 
@@ -315,7 +313,7 @@ const NavParams NAV_PARAMS = {
 	100,   // + 100 mm that still costs more (doorways: walk in the middle)
 	450,   // lookahead, mm
 	150,   // arrived within 150 mm
-	0.4,   // forward command 0.4 of GAIT_PARAMS max speed (160 mm/s)
+	0.4,   // forward command 0.4 of GAIT_PARAMS max speed (120 mm/s)
 	1.5,   // turn gain, 1/s
 	0.6,   // turn in place for heading errors over 35 deg
 	260,   // stop walking forward with something closer than 260 mm ahead
@@ -331,9 +329,9 @@ const NavParams NAV_PARAMS = {
  */
 #define TOF_SCAN_SUPPORTED 1
 const TofScanParams TOF_SCAN_PARAMS = {
-	0.105,  // nose up 6 deg while scanning. The top zone row looks 19.7 +- 2.8 deg above the
-	        // sensor's axis: nose up = mount angle (22, right sensor) - 17 deg puts its lower edge level. The
-	        // servo ranges allow ~10 deg at most, so the mount can't be much steeper than 27 deg
+	0.314,  // nose up 18 deg while scanning. The top zone row looks 19.7 +- 2.8 deg above the
+	        // sensor's axis: nose up = mount angle (35, both sensors) - 17 deg puts its lower edge level.
+	        // The legs reach ~20 deg (sim, with the crouch)
 	0.3,    // tilt rate, rad/s
 	0.45,   // turning while scanning, rad/s (slow: the sensor's frames lag a little)
 	6.7,    // turn a full circle plus 23 deg of overlap
@@ -344,7 +342,8 @@ const TofScanParams TOF_SCAN_PARAMS = {
 	1200,   // scan again after walking this far, mm
 	0.5,    // stand still 0.5 s before tilting up
 	40,     // walking: anything over 40 mm high ahead stops the robot
-	15      // body 15 mm lower while scanning: the legs reach a steeper tilt
+	15,     // body 15 mm lower while scanning: the legs reach a steeper tilt
+	2.6     // later scans sweep 150 deg around the heading (75 right, then left), matched to the map
 };
 
 const LidarMapParams TOF_MAP_PARAMS = {

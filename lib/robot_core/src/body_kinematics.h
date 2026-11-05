@@ -20,6 +20,11 @@ class BodyKinematics
 		float commandTilt = 0.2f;
 
 		void update(leg *legs, uint8_t legCount, const LR_figure &body, const LR_angle &correction, const LR_moveVector &command);
+		/** Body tilt the last update() used (pitch, roll; yaw unused), rad: the IK needs it too. */
+		const LR_angle &tilt() const { return _tilt; }
+
+	private:
+		LR_angle _tilt = { 0, 0, 0 };
 };
 
 #endif

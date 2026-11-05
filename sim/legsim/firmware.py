@@ -113,7 +113,7 @@ class FirmwareCore:
         L.rc_tilt_estimate.argtypes = [ctypes.c_float, f32p, f32p, f32p]
         L.rc_tilt_reset.restype = None
         L.rc_heading_feed.restype = None
-        L.rc_heading_feed.argtypes = [ctypes.c_float, ctypes.c_float, f32p]
+        L.rc_heading_feed.argtypes = [ctypes.c_float, f32p, f32p]
         L.rc_heading_hold.restype = None
         L.rc_heading_hold.argtypes = [ctypes.c_int]
         L.rc_turn_to.restype = None
@@ -176,6 +176,8 @@ class FirmwareCore:
         L.rc_tofnav_params.argtypes = [f32p]
         L.rc_tofnav_tune.restype = None
         L.rc_tofnav_tune.argtypes = [f32p, ctypes.c_int]
+        L.rc_nav_tune.restype = None
+        L.rc_nav_tune.argtypes = [f32p, ctypes.c_int]
         L.rc_tof_mount.restype = None
         L.rc_tof_mount.argtypes = [ctypes.c_int, ctypes.c_float]
         self.legs = L.rc_leg_count()
@@ -215,20 +217,20 @@ class FirmwareCore:
         prev = h.get("R")
         h["R"] = R
         if prev is None or dt <= 0:
-            rate_z = float(robot.read_imu()["gyro"][2])
+            rate = np.array(robot.read_imu()["gyro"], dtype=float)
         else:
             Rel = prev.T @ R
             angle = math.acos(max(-1.0, min(1.0, (np.trace(Rel) - 1) / 2)))
             axis = np.array([Rel[2, 1] - Rel[1, 2], Rel[0, 2] - Rel[2, 0], Rel[1, 0] - Rel[0, 1]])
             n = np.linalg.norm(axis)
-            rate_z = float(axis[2] / n * angle / dt) if n > 1e-12 else 0.0
-        yaw_rate = rate_z + h["bias"]
+            rate = axis / n * angle / dt if n > 1e-12 else np.zeros(3)
+        gyro = (ctypes.c_float * 3)(float(rate[0]), float(rate[1]), float(rate[2]) + h["bias"])
         mag = None
         h["tick"] += 1
         if h["mag"] and h["tick"] % 4 == 0:
             m = R.T @ h["field"] + h["rng"].normal(0, h["noise"], 3)
             mag = (ctypes.c_float * 3)(*map(float, m))
-        self.lib.rc_heading_feed(dt, yaw_rate, mag)
+        self.lib.rc_heading_feed(dt, gyro, mag)
 
     def heading_hold(self, on=True):
         """Heading hold on/off (`heading on|off`): keeps the heading the robot has when the yaw command is let go."""
@@ -282,9 +284,9 @@ class FirmwareCore:
 
     def tof_scan_params(self):
         """The model's TOF_SCAN_PARAMS (tof_scan.h): tilt (rad), rates, turn angle, ranges (mm), ..."""
-        v = self._floats(self.lib.rc_tofnav_params, 12)
+        v = self._floats(self.lib.rc_tofnav_params, 13)
         keys = ("tilt", "tilt_rate", "turn_rate", "turn_angle", "band", "min_range", "max_range", "min_height",
-                "scan_every", "settle_time", "obstacle_height", "crouch")
+                "scan_every", "settle_time", "obstacle_height", "crouch", "rescan_angle")
         return dict(zip(keys, map(float, v)))
 
     def set_tof_nav(self, on=True, sensor_range=None, **tof_args):
@@ -313,11 +315,11 @@ class FirmwareCore:
     def tune_tof_scan(self, reset=False, **fields):
         """Override TOF_SCAN_PARAMS fields (names as tof_scan_params()) for experiments."""
         keys = ("tilt", "tilt_rate", "turn_rate", "turn_angle", "band", "min_range", "max_range", "min_height",
-                "scan_every", "settle_time", "obstacle_height", "crouch")
+                "scan_every", "settle_time", "obstacle_height", "crouch", "rescan_angle")
         v = [float(fields.pop(k, -1)) for k in keys]
         if fields:
             raise TypeError(f"unknown fields {list(fields)}")
-        self.lib.rc_tofnav_tune((ctypes.c_float * 12)(*v), 1 if reset else 0)
+        self.lib.rc_tofnav_tune((ctypes.c_float * 13)(*v), 1 if reset else 0)
 
     def set_tof_mount(self, i, tilt_deg=None):
         """Experiment: ToF sensor i looks tilt_deg down instead of its TOF_SENSORS tilt
@@ -372,9 +374,10 @@ class FirmwareCore:
         self.lib.rc_nav_stop()
 
     def nav_state(self):
-        v = self._floats(self.lib.rc_nav_state, 10)
+        v = self._floats(self.lib.rc_nav_state, 11)
         return {"state": self.NAV_STATES[int(v[0])], "blocked": bool(v[1]), "distance": float(v[2]),
                 "phase": self.TOF_PHASES[int(v[7])], "tilt": float(v[8]), "scan_points": int(v[9]),
+                "partial": bool(v[10]),
                 "goal": v[3:5], "forward": float(v[5]), "yaw": float(v[6])}
 
     def nav_path(self):
@@ -417,6 +420,17 @@ class FirmwareCore:
 
     TERRAIN_FIELDS = ("search_depth", "search_speed", "clearance", "max_step", "body_rate", "edge_limit",
                       "foothold_shift", "foot_radius", "tolerance", "latency", "gap_margin")
+
+    def tune_nav(self, reset=False, **fields):
+        """Override NAV_PARAMS fields (navigator.h) for experiments: robot_radius, margin, lookahead,
+        goal_tolerance (mm), speed (0..1 of the gait's max), turn_gain, turn_in_place, stop_distance,
+        replan_period. Applies to the lidar and the ToF navigator from their next start."""
+        keys = ("robot_radius", "margin", "lookahead", "goal_tolerance", "speed", "turn_gain", "turn_in_place",
+                "stop_distance", "replan_period")
+        v = [float(fields.pop(k, -1)) for k in keys]
+        if fields:
+            raise TypeError(f"unknown fields {list(fields)}")
+        self.lib.rc_nav_tune((ctypes.c_float * 9)(*v), 1 if reset else 0)
 
     def tune_terrain(self, reset=False, **fields):
         """Change TERRAIN_PARAMS fields for experiments (kept until tune_terrain(reset=True)),

@@ -49,8 +49,10 @@ class Imu {
 		 */
 		virtual bool heading(float &rad) const { (void)rad; return false; }
 		virtual bool hasMagnetometer() const { return false; }
-		// turn rate about the body's up axis, rad/s, counter-clockwise > 0
+		// heading rate, rad/s, counter-clockwise > 0 (lrHeadingRate: also on a tilted body)
 		virtual float yawRate() const { return 0; }
+		// last gyro reading in the body frame (x right, y forward, z up), rad/s; false: none
+		virtual bool gyro(float out[3]) const { (void)out; return false; }
 		// gyro bias the heading estimator learned (rad/s, subtract from yawRate())
 		virtual float gyroBias() const { return 0; }
 		// the magnetometer has set the heading (it is a compass heading)

@@ -8,12 +8,18 @@
  * level, and turns in place once around. Every frame, the zones whose ray is
  * within `band` of level and that hit something above the floor become
  * points of a 360 degree scan, placed with the odometry (gait + gyro) of
- * that moment. The finished scan goes into the same map and scan matcher as
+ * that moment. Level zones that get nothing back (no target, or beyond
+ * maxRange) count as empty up to maxRange (or to where their lower edge
+ * would reach the floor): the map marks that free, so the planner can walk
+ * there instead of treating it as unknown. The finished scan goes into the same map and scan matcher as
  * a lidar scan (LidarSlam::addPoints).
  *
  * Walking to a goal (TofNavigator): scan, walk scanEvery mm along the planned
  * path on odometry alone, stop, scan again (which corrects the pose), and so
- * on until the goal. While walking the sensors look down at the ground as
+ * on until the goal. Once the map has a full scan, rescans on the way only
+ * sweep rescanAngle around the heading (the matcher needs the map, not a
+ * whole circle). A partial sweep that doesn't fit the map turns on all the
+ * way round on the spot; scan() and a rejected full scan ask for a full turn again. While walking the sensors look down at the ground as
  * usual and stop the robot in front of anything higher than obstacleHeight.
  *
  * Frames: map frame and LR_pose2 as in lidar.h. Body tilt in the firmware
@@ -40,6 +46,8 @@ typedef struct {
 	float settleTime;     // s standing still before tilting up
 	float obstacleHeight; // mm above the floor: something this high ahead stops the walk
 	float crouch;         // mm the body goes down while scanning (the legs reach a steeper tilt)
+	float rescanAngle;    // rad, later scans sweep only this much around the heading (turn right half,
+	                      // then left all of it), matched against the map; 0 = a full turn every time
 } TofScanParams;
 
 /** One room scan: collects points from ToF frames while the robot turns. */
@@ -61,6 +69,14 @@ class TofScanBuilder {
 		 * scan's centre at most (x, y: LR_LIDAR_BINS each). Returns the count.
 		 */
 		uint16_t finish(const LR_pose2 &odomEnd, float *x, float *y) const;
+		/**
+		 * Free space: for every degree without a point, where the level zones
+		 * looked and got nothing back (no target, or further than maxRange),
+		 * the far end of what they saw empty, in the body frame of odomEnd.
+		 * The map marks the cells up to it free (not occupied): "nothing
+		 * there as far as the sensor reaches". Returns the count.
+		 */
+		uint16_t finishClear(const LR_pose2 &odomEnd, float *x, float *y) const;
 		uint16_t points() const { return _points; }
 		uint32_t readings() const { return _readings; }
 
@@ -70,6 +86,7 @@ class TofScanBuilder {
 		float    _x[LR_LIDAR_BINS];            // closest point per degree, odometry frame
 		float    _y[LR_LIDAR_BINS];
 		float    _r[LR_LIDAR_BINS];            // its distance from the centre, 0 = none
+		float    _clear[LR_LIDAR_BINS];        // seen empty this far from the centre, 0 = not looked
 		uint16_t _points = 0;
 		uint32_t _readings = 0;
 };
@@ -98,8 +115,10 @@ class TofNavigator {
 	public:
 		void begin(const TofScanParams &scan, const NavParams &nav);
 		const TofScanParams &params() const { return _params; }
-		/** One scan now (no goal): the map grows, the pose is corrected. */
+		/** One full scan now (no goal): the map grows, the pose is corrected. */
 		void scan();
+		/** The scan running now is a partial sweep (rescanAngle), not a full turn. */
+		bool partialScan() const { return _sweep > 0; }
 		/** Scan, then walk to (x, y), mm in the map frame. false: no memory for the planner. */
 		bool setGoal(float x, float y);
 		/** Stop walking and scanning (the nose comes back down). */
@@ -143,7 +162,11 @@ class TofNavigator {
 		TofScanPhase   _phase = TOF_SCAN_IDLE;
 		float    _tilt = 0;
 		float    _time = 0;        // in this phase, s
-		float    _turned = 0;      // rad, this scan
+		float    _turned = 0;      // rad, this scan (counter-clockwise +)
+		float    _sweep = 0;       // rad: this scan is a partial sweep of this much (0 = full turn)
+		bool     _sweepBack = false;   // partial sweep: turning back left after the first half to the right
+		bool     _haveFull = false;    // a full scan went into the map: rescans may be partial
+		bool     _wantFull = true;     // the next scan turns all the way round
 		float    _walked = 0;      // mm since the last scan
 		float    _sinceFrame = 1;  // s since the last obstacle check
 		bool     _blocked = false;
@@ -156,6 +179,8 @@ class TofNavigator {
 		uint16_t _lastPoints = 0;
 		float    _px[LR_LIDAR_BINS];
 		float    _py[LR_LIDAR_BINS];
+		float    _fx[LR_LIDAR_BINS];   // free space ends (finishClear)
+		float    _fy[LR_LIDAR_BINS];
 
 		void startScan();
 };

@@ -314,7 +314,8 @@ const TofScanParams TOF_SCAN_PARAMS = {
 	1000,   // scan again after walking this far, mm
 	0.5,    // stand still 0.5 s before tilting up
 	40,     // walking: anything over 40 mm high ahead stops the robot
-	15      // body 15 mm lower while scanning: the legs reach a steeper tilt
+	15,     // body 15 mm lower while scanning: the legs reach a steeper tilt
+	2.6     // later scans sweep 150 deg around the heading (75 right, then left), matched to the map
 };
 
 const LidarMapParams TOF_MAP_PARAMS = {

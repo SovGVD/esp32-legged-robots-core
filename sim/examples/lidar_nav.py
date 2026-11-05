@@ -121,18 +121,27 @@ def main():
     ap.add_argument("--mount", type=float, metavar="DEG",
                     help="with --tof: the ToF sensors look DEG down instead of their TOF_SENSORS angle")
     ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --tof: nose up while scanning (TOF_SCAN_PARAMS tilt)")
+    ap.add_argument("--rescan", type=float, metavar="DEG",
+                    help="with --tof: later scans sweep DEG around the heading (TOF_SCAN_PARAMS rescanAngle; 0 = full turns)")
+    ap.add_argument("--log", action="store_true", help="with --tof: print every scan (match, pose error)")
+    ap.add_argument("--nav-speed", type=float, metavar="F",
+                    help="walking speed while navigating, 0..1 of the gait's max speed (NAV_PARAMS speed)")
     args = ap.parse_args()
 
     model = args.model
     goals = [tuple(g) for g in args.goal] if args.goal else GOALS[model]
     fw = FirmwareCore(model=model)
     fw.set_heading_sensors(gyro_bias_dps=args.gyro_bias, magnetometer=False, seed=args.seed)
+    if args.nav_speed is not None:
+        fw.tune_nav(speed=args.nav_speed)
     if args.tof:
         if args.mount is not None:
             for i in range(len(fw.tof_sensors())):
                 fw.set_tof_mount(i, args.mount)
         if args.scan_tilt is not None:
             fw.tune_tof_scan(tilt=math.radians(args.scan_tilt))
+        if args.rescan is not None:
+            fw.tune_tof_scan(rescan_angle=math.radians(args.rescan))
         # VL53L5CX: 8x8 at 15 Hz, closest target in each zone (2x2 rays), frames reach the firmware ~40 ms late
         fw.set_tof_nav(True, seed=args.seed, subrays=2, latency=0.04)
         sensor = "ToF room scans"
@@ -156,12 +165,26 @@ def main():
     t = 0.0
     results = []
 
+    last_phase = ["idle", False]
+
     def tick(goal):
         nonlocal t
         fw.drive(robot)
         t += dt
         p = robot.body_position_mm()
         mp, op = fw.lidar_pose()
+        if args.log and args.tof:
+            ns = fw.nav_state()
+            if ns["phase"] == "turn" and last_phase[0] != "turn":
+                last_phase[1] = ns["partial"]
+            if ns["phase"] != "turn" and last_phase[0] == "turn":
+                ls = fw.lidar_state()
+                yaw = robot.body_orientation()["yaw"]
+                yerr = math.degrees(abs((mp[2] - yaw + math.pi) % (2 * math.pi) - math.pi))
+                print(f"  t {t:6.1f} s  {'partial' if last_phase[1] else 'full   '} scan: {ls['match']:9s} "
+                      f"score {ls['score']:.2f}, {ns['scan_points']:4d} points, pose error "
+                      f"{math.hypot(mp[0] - p[0], mp[1] - p[1]):4.0f} mm {yerr:4.1f} deg")
+            last_phase[0] = ns["phase"]
         if int(t / dt) % 10 == 0:
             true_path.append((p[0], p[1]))
             map_path.append((mp[0], mp[1]))

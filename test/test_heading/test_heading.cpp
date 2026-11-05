@@ -185,9 +185,23 @@ void test_terrain_tilt_modes_and_aging()
 	TEST_ASSERT_FLOAT_WITHIN(1e-6f, -0.05f, tt.tilt().pitch);
 }
 
+/** A turn about the vertical with the nose 18 deg up (a ToF scan): the full heading rate, also with the tilt estimate 1.5 deg off. */
+void test_vertical_rate_on_a_tilted_body()
+{
+	LR_angle tilt = { 0.03f, 0.314f, 0 };
+	float cp = cosf(tilt.pitch), sp = sinf(tilt.pitch), cr = cosf(tilt.roll), sr = sinf(tilt.roll);
+	float gyro[3] = { -sp, cp * sr, cp * cr };   // 1 rad/s about world up, in the body frame (Rz Ry Rx)
+	TEST_ASSERT_FLOAT_WITHIN(1e-5f, 1.0f, lrHeadingRate(gyro, tilt));
+	LR_angle off = { tilt.pitch, tilt.roll - 0.026f, 0 };
+	TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, lrHeadingRate(gyro, off));
+	// gyro z alone would read 5 % short
+	TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.95f, gyro[2]);
+}
+
 int main()
 {
 	UNITY_BEGIN();
+	RUN_TEST(test_vertical_rate_on_a_tilted_body);
 	RUN_TEST(test_wrap_angle);
 	RUN_TEST(test_mag_heading_level_and_tilted);
 	RUN_TEST(test_tilt_ignored_would_be_wrong);

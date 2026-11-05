@@ -24,10 +24,14 @@ uint8_t MotionController::update(float dt, const LR_moveVector &command, const L
 	_body.position.z += _height;
 
 	_bodyKinematics.update(_legs, _legCount, _body, correction, command);
+	// the IK works in the tilted body frame (LegIK::legVector)
+	LR_figure ikBody = _body;
+	ikBody.orientation.pitch = _bodyKinematics.tilt().pitch;
+	ikBody.orientation.roll  = _bodyKinematics.tilt().roll;
 
 	uint8_t unsolved = 0;
 	for (uint8_t i = 0; i < _legCount; i++) {
-		iksolver solution = _ik->solve(_legs[i], _body, command);
+		iksolver solution = _ik->solve(_legs[i], ikBody, command);
 		// Out of reach: keep the last valid angles instead of a pose bent by
 		// the solver's clamping
 		if (!solution.isSolved) {
