@@ -114,7 +114,7 @@ def keep_sharp(e):
     on_split = bb.YLength < 1e-4 and abs(bb.YMin) < 1e-4
     inside_tip = abs(bb.XMin) <= cx + 0.2 and abs(bb.XMax) <= cx + 0.2 and abs(bb.YMin) <= hw + 0.2 and abs(bb.YMax) <= hw + 0.2
     pocket_area = abs(bb.XMin) <= v("horn_hub_d") / 2 + 0.2 and abs(bb.XMax) <= v("horn_hub_d") / 2 + 0.2 and bb.YMin > low_y - 0.1 and bb.ZMin > -v("horn_reach") - 0.2
-    near_knee = bb.YMax < -19 and abs(bb.XMin) <= 7 and abs(bb.XMax) <= 7 and abs(bb.ZMin) <= 7 and abs(bb.ZMax) <= 7
+    near_knee = bb.YMax < y1 + 0.1 and abs(bb.XMin) <= 7 and abs(bb.XMax) <= 7 and abs(bb.ZMin) <= 7 and abs(bb.ZMax) <= 7
     screw = e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 3
     return on_split or inside_tip or pocket_area or near_knee or screw
 
