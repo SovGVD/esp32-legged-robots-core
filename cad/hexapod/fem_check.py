@@ -133,7 +133,7 @@ def build(case, load, bonded):
         probe = None
     else:
         hub = val("coxa_len")
-        held = cyl_faces(val("coxa_shaft_d") / 2, 0) + (cyl_faces(servo_shaft, 0) if bonded else cyl_faces(pilot, near) + cyl_faces(pilot, -far))
+        held = cyl_faces(val("coxa_shaft_d") / 2, 0) + (cyl_faces(servo_shaft, 0) if bonded else cyl_faces(pilot, -near) + cyl_faces(pilot, far))
         seat = cyl_faces(val("bearing_seat_d") / 2, hub)
         horn = cyl_faces(val("horn_screw_d") / 2, hub - val("horn_screw_r1")) + cyl_faces(val("horn_screw_d") / 2, hub - val("horn_screw_r2"))
         lever = 0.100
@@ -175,7 +175,7 @@ def build(case, load, bonded):
         nodes = set()
         if faces[0] == "near":
             _, zv, xlim, ylim = faces
-            nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.05 and abs(v.x) <= xlim and abs(v.y) <= ylim}
+            nodes = {n for n, v in mesh.FemMesh.Nodes.items() if abs(v.z - zv) < 0.2 and abs(v.x) <= xlim and abs(v.y) <= ylim}
         else:
             for face in faces:
                 nodes.update(mesh.FemMesh.getNodesByFace(obj.Shape.getElement(face)))
