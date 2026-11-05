@@ -83,9 +83,10 @@ def mg90s(i):
     hub_z = "%s + %s" % (p("mg90_turret_top"), p("horn_gap"))
     d.cyl("horn_hub", p("horn_hub_d"), p("horn_hub_h"), "0 mm", "0 mm", hub_z, WHITE)
     arm_z = "%s - %s" % (p("horn_top"), p("horn_arm_t"))
-    # horn arms along X, the widest clearance case for the body neighbours
+    # cross horn: long arms along X, short arms along Y
     arm = "%s - %s" % (p("horn_span"), p("horn_tip_w"))
     d.cbox("horn_arm", arm, p("horn_tip_w"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
+    d.cbox("horn_short_arm", p("horn_short_w"), p("horn_short_span"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
     for sub, sign in (("horn_tip_a", ""), ("horn_tip_b", "-")):
         d.cyl(sub, p("horn_tip_w"), p("horn_arm_t"), "%s(%s) / 2" % (sign, arm), "0 mm", arm_z, WHITE)
 
@@ -134,30 +135,32 @@ def gy91(i):
     t = p("gy91_t")
     d.cbox("pcb", p("gy91_w"), p("gy91_len"), t, "0 mm", "0 mm", "-" + t, PCB_PURPLE)
     d.cbox("imu", p("gy91_chip"), p("gy91_chip"), p("gy91_chip_h"), "0 mm", "0 mm", "0 mm", BLACK)
-    hx = "%s / 2 - %s / 2" % (p("gy91_w"), p("gy91_hdr_w"))
-    d.cbox("header", p("gy91_hdr_w"), p("gy91_hdr_len"), p("gy91_hdr_h"), hx, "0 mm",
-           "-(%s + %s)" % (t, p("gy91_hdr_h")), GOLD)
 
 
 def vl53l5cx(i):
     d = Dummy("VL53L5CX", i)
     t = p("tof_t")
-    d.cbox("pcb", p("tof_w"), p("tof_h"), t, "0 mm", "0 mm", "-" + t, PCB_PURPLE)
+    off = p("tof_sensor_off")
+    d.cbox("pcb", p("tof_len"), p("tof_wid"), t, "0 mm", off, "-" + t, PCB_GREEN)
+    for sub, sign in (("a", ""), ("b", "-")):
+        x = "%s(%s / 2)" % (sign, p("tof_hole_span"))
+        d.cyl("ear_" + sub, p("tof_ear_d"), t, x, off, "-" + t, PCB_GREEN)
+        # dark plug standing for the hole, proud of the ear so it shows
+        d.cyl("hole_" + sub, p("tof_hole_d"), "%s + 0.1 mm" % t, x, off, "-" + t, BLACK)
+    d.cbox("pin_row", p("tof_pin_row_len"), p("tof_pin_row_w"), "0.1 mm", "0 mm",
+           "%s + %s" % (off, p("tof_pin_row_off")), "0 mm", GOLD)
     d.cbox("sensor", p("tof_chip_w"), p("tof_chip_h"), p("tof_chip_t"), "0 mm", "0 mm", "0 mm", BLACK)
 
 
 def microswitch(i):
     d = Dummy("Microswitch", i)
-    y0 = "-%s / 2" % p("sw_h")
-    d.cbox("body", p("sw_len"), p("sw_h"), p("sw_t"), "0 mm", "0 mm", "-%s / 2" % p("sw_t"), BLACK)
-    # lever from the -X end of the body, sticking out past +X, in the switch's mid plane
-    d.box("lever", p("sw_lever_len"), p("sw_lever_t"), p("sw_lever_w"),
-          "-%s / 2" % p("sw_len"), "%s / 2 + %s" % (p("sw_h"), p("sw_lever_gap")),
-          "-%s / 2" % p("sw_lever_w"), SILVER)
-    for sub, x in (("term_a", "-" + p("sw_term_pitch")), ("term_b", "0 mm"), ("term_c", p("sw_term_pitch"))):
-        d.box(sub, p("sw_term_t"), p("sw_term_len"), p("sw_term_w"),
-              "%s - %s / 2" % (x, p("sw_term_t")), "%s - %s" % (y0, p("sw_term_len")),
-              "-%s / 2" % p("sw_term_w"), GOLD)
+    d.cbox("body", p("sw_w"), p("sw_w"), p("sw_body_h"), "0 mm", "0 mm", "0 mm", BLACK)
+    d.cyl("button", p("sw_btn_d"), "%s - %s" % (p("sw_total_h"), p("sw_body_h")), "0 mm", "0 mm", p("sw_body_h"), GREY)
+    lead = "%s - %s" % (p("sw_lead_span"), p("sw_w"))
+    for sub, sign in (("lead_a", ""), ("lead_b", "-")):
+        d.box(sub, lead, p("sw_lead_w"), p("sw_lead_t"), "%s / 2" % p("sw_w"),
+              "%s(%s / 2) - %s / 2" % (sign, p("sw_lead_pitch"), p("sw_lead_w")),
+              "%s - %s" % (p("sw_lead_z"), p("sw_lead_t")), SILVER)
 
 
 BUILDERS = {"MG90S": mg90s, "18650_pair": cells, "PCA9685": pca9685, "Mini360": mini360,

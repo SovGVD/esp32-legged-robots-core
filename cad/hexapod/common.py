@@ -20,9 +20,13 @@ def get_doc():
     return doc
 
 
-def save(doc):
+def broken(doc):
     doc.recompute()
-    bad = [o.Name for o in doc.Objects if o.State and ("Invalid" in o.State or "Error" in o.State)]
+    return [o.Name for o in doc.Objects if o.State and ("Invalid" in o.State or "Error" in o.State)]
+
+
+def save(doc):
+    bad = broken(doc)
     if bad:
         raise RuntimeError("recompute failed: %s" % bad)
     doc.save()
