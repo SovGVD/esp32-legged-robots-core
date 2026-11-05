@@ -92,7 +92,7 @@ def torso(p):
     t.box("logic_buck", (0, -44, -12), (8.5, 1.5, 5.5), 2.0, BUCK)
     t.box("gy91", tuple(p.imu_pos), (7, 10, 1), 3.0, "0.6 0.1 0.6 1")  # under the top cover, centre
     for sx in (-1, 1):
-        t.box(f"tof_{'l' if sx < 0 else 'r'}", (sx * 14, 74, 2), (6.5, 1.5, 4.5), 3.0, "0.48 0.25 0.69 1", -sx * 0.35)
+        t.box(f"tof_{'l' if sx < 0 else 'r'}", (sx * 14, 74, 22), (6.5, 1.5, 4.5), 3.0, "0.48 0.25 0.69 1", -sx * 0.35)
     rest = m.electronics - (t.used - e0)
     if rest > 0:                     # fuse, switch, connectors
         t.box("electronics_misc", (0, -30, -24), (6, 4, 2), rest, "0.2 0.2 0.2 1")

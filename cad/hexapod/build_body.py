@@ -116,8 +116,8 @@ for sign in (1, -1):
         bot_parts.append(block(bx + gap, bx + gap + rail_t, y0, y0 + rail_len, top_bot, top_bot + rail_h))
 esp_y, esp_len = v("esp_y"), v("esp_len")
 for xo in (-esp_len / 2 + 8, esp_len / 2 - 8 - rail_len, -rail_len / 2):
-    bot_parts.append(block(xo, xo + rail_len, esp_y - v("esp_t") - rfit - rail_t, esp_y - v("esp_t") - rfit, top_bot, top_bot + rail_h))
-    bot_parts.append(block(xo, xo + rail_len, esp_y + rfit, esp_y + rfit + rail_t, top_bot, top_bot + rail_h))
+    bot_parts.append(block(xo, xo + rail_len, esp_y - v("esp_t") - rfit - rail_t, esp_y - v("esp_t") - rfit, top_bot, top_bot + v("esp_rail_h")))
+    bot_parts.append(block(xo, xo + rail_len, esp_y + rfit, esp_y + rfit + rail_t, top_bot, top_bot + v("esp_rail_h")))
 bottom_solid = plate_prism(skin, top_bot).fuse(bot_parts).removeSplitter()
 
 bot_cuts = []
@@ -188,7 +188,63 @@ def top_sharp(e):
 print("bottom")
 bottom = common["as_part"](doc, part, "Body_Bottom", common["smooth"](bottom_shape, edge_r, lambda e: bottom_sharp(e) or (e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 8)), COL_BOT)
 print("top")
-top = common["as_part"](doc, part, "Body_Top", common["smooth"](top_shape, edge_r, top_sharp), COL_TOP)
+top_round = common["smooth"](top_shape, edge_r, top_sharp)
+
+
+# ------------------------------------------------------------ ToF brackets and the power switch, after the rounding
+def tof_frame(side):
+    """Sensor frame in the body: origin on the sensor, Z where it looks, Y up (pin row), X = Y x Z."""
+    yaw = math.radians(v("tof_yaw")) * (1 if side < 0 else -1)          # + = left: each turned outward
+    tilt = math.radians(v("tof_tilt_left") if side < 0 else v("tof_tilt_right"))
+    f = App.Vector(-math.sin(yaw) * math.cos(tilt), math.cos(yaw) * math.cos(tilt), -math.sin(tilt))
+    r = App.Vector(math.cos(yaw), math.sin(yaw), 0)
+    u = r.cross(f)
+    x = u.cross(f)
+    m = App.Matrix(x.x, u.x, f.x, 0, x.y, u.y, f.y, 0, x.z, u.z, f.z, 0, 0, 0, 0, 1)
+    return App.Placement(App.Vector(side * v("tof_x"), v("tof_y"), v("tof_z")), App.Rotation(m))
+
+
+t_pcb, off, fit = v("tof_t"), v("tof_sensor_off"), v("tof_fit")
+span, ear = v("tof_hole_span"), v("tof_ear_d")
+half_w = span / 2 + ear / 2 + v("tof_back_margin")
+base_z1 = top1 + v("tof_base_t")
+msx, msy = v("tof_mount_screw_x"), v("tof_mount_screw_y")
+backs, fronts, mount_cuts = [], [], []
+for side in (-1, 1):
+    pl = tof_frame(side)
+    back = block(-half_w, half_w, -40, off + v("tof_wid") / 2, -t_pcb - v("tof_back_t"), -t_pcb)
+    back.Placement = pl
+    backs.append(back)
+    front = block(-half_w - 3, half_w + 3, -60, 60, -t_pcb, 60)        # nothing of the mount in front of a board
+    front.Placement = pl
+    fronts.append(front)
+    for sx in (-1, 1):
+        pilot = rod(v("mg90_screw_pilot_d"), v("tof_screw_depth") + 0.5, (sx * span / 2, off, -t_pcb - v("tof_screw_depth")), "z")
+        pilot.Placement = pl
+        mount_cuts.append(pilot)
+over_plate = plate_prism(top1 - 1, base_z1 + 40)
+base = block(-msx - 5, msx + 5, msy - 5, v("tof_y") + 4, top1, base_z1)      # a bridge between the 2 backs, around the screws and wires
+bosses = [rod(v("tof_mount_boss_d"), 8, (sx * msx, msy, top1), "z") for sx in (-1, 1)]
+mount = base.fuse(bosses + [b.common(block(-40, 40, 0, 100, top1, 60)) for b in backs]).common(over_plate)
+mount = mount.cut(Part.makeCompound(fronts)).removeSplitter()
+mount_cuts += [rod(v("mg90_screw_pilot_d"), v("tof_mount_depth") + 0.5, (sx * msx, msy, top1 - 0.5), "z") for sx in (-1, 1)]
+mount_cuts.append(rod(v("tof_wire_d"), 50, (0, v("tof_wire_y"), top1 - 1), "z"))
+mount = mount.cut(Part.makeCompound(mount_cuts)).removeSplitter()
+try:
+    picked = common["chamfer_edges"](mount, 0.6, lambda e: False)
+    mount = mount.makeChamfer(0.6, [mount.Edges[i - 1] for i, _, __ in picked]) if picked else mount
+except Exception as exc:
+    print("mount chamfer skipped:", exc)
+top_holes = [rod(2.2, top1 - top0 + 2, (sx * msx, msy, top0 - 1), "z") for sx in (-1, 1)]
+top_holes.append(rod(v("tof_wire_d"), v("rib_h") + top1 - top0 + 2, (0, v("tof_wire_y"), top0 - v("rib_h") - 1), "z"))
+px_, py_, pf = v("pwr_x"), v("pwr_y"), v("pwr_fit")
+pw, plen, fr = v("pwr_body_w") + 2 * pf, v("pwr_body_len") + 2 * pf, v("pwr_frame")
+pwr_cut = [block(px_ - pw / 2, px_ + pw / 2, py_ - plen / 2, py_ + plen / 2, top0 - v("rib_h") - 1, top1 + 1),
+           block(px_ - pw / 2 - fr, px_ + pw / 2 + fr, py_ - plen / 2 - fr, py_ + plen / 2 + fr, top0 - v("rib_h") - 1, top1 - v("pwr_panel_t"))]
+top_final = top_round.cut(Part.makeCompound(top_holes + pwr_cut)).removeSplitter()
+print("top: solids %d valid %s; ToF mount: solids %d valid %s %.1f g" % (len(top_final.Solids), top_final.isValid(), len(mount.Solids), mount.isValid(), mount.Volume / 1000 * v("pla_density")))
+top = common["as_part"](doc, part, "Body_Top", top_final, COL_TOP)
+tof_mount = common["as_part"](doc, part, "Body_ToF_Mount", mount, COL_TOP)
 col_len = top0 - top_bot
 col_raw = rod(v("col_d"), col_len, (0, 0, 0), "z").cut(Part.makeCompound([
     rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, -1), "z"),
@@ -226,6 +282,11 @@ link("pca_r", "Dummy_PCA9685", (px, py, pz), PCA_RIGHT)
 link("pca_l", "Dummy_PCA9685", (-px, -py, pz), Z180.multiply(PCA_RIGHT))
 link("esp32", "Dummy_ESP32_devkit", (0, esp_y, v("esp_z")), ESP_FRONT)
 link("gy91", "Dummy_GY91", (0, 0, v("gy91_z")))
+link("tof_mount", "Body_ToF_Mount", (0, 0, 0))
+link("rocker", "Dummy_Rocker", (v("pwr_x"), v("pwr_y"), top1))
+for side in (-1, 1):
+    tl = link("tof_%s" % ("l" if side < 0 else "r"), "Dummy_VL53L5CX", (0, 0, 0))
+    tl.Placement = tof_frame(side)
 common["save"](doc)
 
 # ------------------------------------------------------------ report
@@ -248,6 +309,10 @@ inside = {
     "pca l": solids_of(doc, names("Dummy_PCA9685"), Pl((-px, -py, pz), Z180.multiply(PCA_RIGHT))),
     "esp32": solids_of(doc, names("Dummy_ESP32_devkit"), Pl((0, esp_y, v("esp_z")), ESP_FRONT)),
     "gy91": solids_of(doc, names("Dummy_GY91"), Pl((0, 0, v("gy91_z")))),
+    "rocker": solids_of(doc, names("Dummy_Rocker"), Pl((v("pwr_x"), v("pwr_y"), top1))),
+    "tof mount": solids_of(doc, ["Body_ToF_Mount"]),
+    "tof l": solids_of(doc, names("Dummy_VL53L5CX"), tof_frame(-1)),
+    "tof r": solids_of(doc, names("Dummy_VL53L5CX"), tof_frame(1)),
 }
 static = {}
 keys = list(inside)

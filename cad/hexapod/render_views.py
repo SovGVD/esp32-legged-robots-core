@@ -92,7 +92,19 @@ TARGETS = {
     "whole leg, neutral pose": leg,
     "body top": [("Body_Top", None, GREY)],
     "body bottom": [("Body_Bottom", None, GREY)],
+    "tof mount": [("Body_ToF_Mount", None, GREY)],
 }
+check_pl = lambda link: doc.getObject("BodyCheck_" + link).Placement
+front = [("Body_Top", None, GREY), ("Body_ToF_Mount", None, (0.55, 0.55, 0.6))]
+for link, part_name in (("tof_l", "Dummy_VL53L5CX"), ("tof_r", "Dummy_VL53L5CX"), ("rocker", "Dummy_Rocker")):
+    for child in doc.getObject(part_name).Group:
+        if hasattr(child, "Shape") and child.Shape.Solids:
+            front.append((child.Name, check_pl(link), tuple(child.ViewObject.ShapeColor[:3])))
+for link in ("coxa_RF", "coxa_LF"):
+    front.append((doc.getObject("BodyCheck_" + link).LinkedObject.Name, check_pl(link), GOLD))
+TARGETS["top plate with ToF mount, switch, front coxas"] = front
+if globals().get("ONLY"):
+    TARGETS = {k: TARGETS[k] for k in ONLY}
 for name, items in TARGETS.items():
     print(draw(name, items))
 print("foot at", tibia_at.multVec(App.Vector(0, 0, -v("tibia_len"))))
