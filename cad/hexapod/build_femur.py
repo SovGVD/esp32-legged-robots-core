@@ -27,7 +27,7 @@ def p(alias):
     return "Params." + alias
 
 
-common["remove_built"](doc, ("Femur", "FemurPrim", "FemurCheck"))
+common["remove_built"](doc, ("TibiaCheck", "Femur", "FemurPrim", "FemurCheck"))
 part = doc.addObject("App::Part", "Femur")
 part.setExpression("Placement.Base.x", p("catalog_part_pitch"))
 part.setExpression("Placement.Base.y", p("catalog_row2_y"))
@@ -156,7 +156,7 @@ HORN_90 = SERVO_IN_LEG.multiply(App.Rotation(App.Vector(0, 0, 1), 90))
 link("femur_servo", doc.getObject("Dummy_MG90S"), ("0 mm", seat_y, "0 mm"), SERVO_IN_LEG)
 link("femur_horn", doc.getObject("Dummy_Horn"), ("0 mm", seat_y, "0 mm"), HORN_90)
 link("tibia_servo", doc.getObject("Dummy_MG90S"), (axis_x, seat_y, "0 mm"), SERVO_IN_LEG)
-link("tibia_horn", doc.getObject("Dummy_Horn"), (axis_x, seat_y, "0 mm"), HORN_90)
+link("tibia_horn", doc.getObject("Dummy_Horn"), (axis_x, seat_y, "0 mm"), SERVO_IN_LEG)
 link("hip_bearing", doc.getObject("Dummy_Bearing"), ("0 mm", cap_y0, "0 mm"), BEARING_IN_CAP)
 link("knee_bearing", doc.getObject("Dummy_Bearing"), (axis_x, cap_y0, "0 mm"), BEARING_IN_CAP)
 common["save"](doc)
@@ -183,7 +183,7 @@ print("main %.1f g solid, horn %.1f g solid; valid %s %s; solids %d %d" % (
     main.Shape.isValid(), horn.Shape.isValid(), len(main.Shape.Solids), len(horn.Shape.Solids)))
 print("overlap mm3: tibia servo %.3f, tibia horn with main %.3f, femur horn %.3f, knee bearing %.3f, hip bearing %.3f, main with horn arm %.3f" % (
     clash(solids_of(doc, SERVO, knee_place), main_s + horn_s),
-    clash(solids_of(doc, HORN, knee_place.multiply(turn_90)), main_s),
+    clash(solids_of(doc, HORN, knee_place), main_s),
     clash(solids_of(doc, HORN, hip_place.multiply(turn_90)), main_s + horn_s),
     clash(solids_of(doc, ["Bearing_body"], App.Placement(App.Vector(fl, cap, 0), BEARING_IN_CAP)), main_s),
     clash(solids_of(doc, ["Bearing_body"], App.Placement(App.Vector(0, cap, 0), BEARING_IN_CAP)), main_s),

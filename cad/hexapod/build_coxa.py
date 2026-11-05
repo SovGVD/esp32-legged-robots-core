@@ -29,7 +29,7 @@ def p(alias):
     return "Params." + alias
 
 
-common["remove_built"](doc, ("CoxaLink", "CoxaPrim", "CoxaCheck"))
+common["remove_built"](doc, ("TibiaCheck", "FemurCheck", "CoxaLink", "CoxaPrim", "CoxaCheck"))
 part = doc.addObject("App::Part", "CoxaLink")
 part.setExpression("Placement.Base.y", p("catalog_row2_y"))
 check = doc.addObject("App::Part", "CoxaLink_Check")

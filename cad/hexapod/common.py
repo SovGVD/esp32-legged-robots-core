@@ -64,6 +64,11 @@ class Prims:
             obj.Placement = App.Placement(obj.Placement.Base, App.Rotation(App.Vector(1, 0, 0), -90))
         return obj
 
+    def sphere(self, name, r, x, y, z):
+        obj = self._prim("Part::Sphere", name, x, y, z)
+        obj.setExpression("Radius", r)
+        return obj
+
     def gusset(self, name, corner, u, v, lu, lv, along, length):
         """45-degree style internal chamfer, a triangular prism driven by Params.
         corner = right-angle edge at the low end along `along`; u, v = axis and
@@ -101,7 +106,8 @@ class Prims:
 
     def cut(self, name, solid, holes, color):
         """A finished print: solid minus holes, and its mirror for the other side."""
-        base, tool = self.fuse(name + "_solid", solid), self.fuse(name + "_holes", holes)
+        base = self.fuse(name + "_solid", solid)
+        tool = holes[0] if len(holes) == 1 else self.fuse(name + "_holes", holes)
         obj = self.doc.addObject("Part::Cut", name)
         self.part.addObject(obj)
         obj.Base, obj.Tool = base, tool

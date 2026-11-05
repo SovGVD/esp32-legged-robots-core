@@ -1,6 +1,6 @@
 """FEA of one finished print, in its own unsaved document, with CalculiX.
 
-Run inside FreeCAD with init_globals={"CASE": "coxa"} or "femur", and optionally
+Run inside FreeCAD with init_globals={"CASE": "coxa"}, "femur" or "tibia", and optionally
 "TWIST": True and, for the coxa, "BOTH": True (lower + top joined at the bosses,
 held at the hip bearing and the horn: the realistic one) or "NO_TOP": True (the top
 plate helps nothing, the worst case). Solves and
@@ -53,6 +53,8 @@ def build(case, twist=False, no_top=False, both=False):
     obj = doc.addObject("Part::Feature", "Print")
     if case == "femur":
         obj.Shape = src.getObject("Femur_Main").Shape.copy()
+    elif case == "tibia":
+        obj.Shape = src.getObject("Tibia_Main").Shape.copy()
     elif both:
         # lower + top joined at the bosses, as if the 2 screws were glue
         obj.Shape = src.getObject("CoxaLink_Lower").Shape.fuse(src.getObject("CoxaLink_Top").Shape).removeSplitter()
@@ -110,6 +112,16 @@ def build(case, twist=False, no_top=False, both=False):
     pilot_r = val("mg90_screw_pilot_d") / 2
     spacing = val("mg90_screw_spacing")
     couple = STALL_NM / (spacing / 1000)
+    if case == "tibia":
+        fix("Pin", cyl_faces(val("coxa_pin_d") / 2, 0))
+        fix("HornScrews", cyl_faces(pilot_r, val("tibia_screw_x")) + cyl_faces(pilot_r, -val("tibia_screw_x")))
+        # the foot force comes in through the screw across the shank
+        screw = cyl_faces(pilot_r, 0, val("tip_screw_z"))
+        force("FootUp", screw, FOOT_N, zdir)
+        if twist:
+            force("FootSide", screw, SIDE_N, ydir)
+            force("FootForward", screw, SIDE_N, 1)
+        return finish(doc, an, obj, loads, case)
     if case == "coxa":
         joint_x = val("coxa_len")
         fix("HipSeat", cyl_faces(seat_r, 0))
@@ -143,6 +155,10 @@ def build(case, twist=False, no_top=False, both=False):
         force("TwistTabIn", hole_a, pair / 2, zdir)
         force("TwistTabOut", hole_b, pair / 2, zdir)
 
+    return finish(doc, an, obj, loads, case)
+
+
+def finish(doc, an, obj, loads, case):
     mesh = ObjectsFem.makeMeshGmsh(doc, "Mesh")
     mesh.Shape = obj
     mesh.CharacteristicLengthMax = 1.5
