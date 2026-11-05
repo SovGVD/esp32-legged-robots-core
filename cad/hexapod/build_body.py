@@ -130,6 +130,14 @@ for x, y in COLUMNS:
     bot_cuts.append(rod(v("col_d") + v("col_fit"), v("rib_bot_h") + 1, (x, y, top_bot), "z"))
     bot_cuts.append(rod(2.2, top_bot - z_bot + 1, (x, y, z_bot - 0.5), "z"))
     bot_cuts.append(rod(v("col_head_d"), v("col_head_h") + 1, (x, y, z_bot - 1), "z"))
+# notch the border rib behind the PCA9685 pin groups (outside the slots), with a little room
+for sign in (1, -1):
+    x0 = pca_x + pca_t / 2 + rfit + rail_t + 0.5
+    x1 = pca_x + pca_t / 2 + v("pca_grp_h") + 1.0
+    for n in "123":
+        gy = sign * (pca_y + v("pca_grp_x" + n))
+        half = v("pca_grp_w") / 2 + 0.8
+        bot_cuts.append(block(min(sign * x0, sign * x1), max(sign * x0, sign * x1), gy - half, gy + half, top_bot, top_bot + v("rib_bot_h") + 1))
 bottom_shape = bottom_solid.cut(Part.makeCompound(bot_cuts)).removeSplitter()
 
 # ------------------------------------------------------------ top print
