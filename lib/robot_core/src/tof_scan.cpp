@@ -9,6 +9,7 @@ void TofScanBuilder::start(const LR_pose2 &odom)
 	_cx = odom.x;
 	_cy = odom.y;
 	memset(_r, 0, sizeof(_r));
+	memset(_clear, 0, sizeof(_clear));
 	_points = 0;
 	_readings = 0;
 }
@@ -30,7 +31,8 @@ void TofScanBuilder::addFrame(const TofSensor &s, const float *mm, const LR_pose
 	float halfZone = s.fov / (s.zones ? s.zones : 1) * 0.5f;
 	for (uint8_t z = 0; z < zones; z++) {
 		float d = mm[z];
-		if (d <= 0 || d < _params.minRange || d > _params.maxRange) {
+		bool nothing = d <= 0 || d > _params.maxRange;
+		if (!nothing && d < _params.minRange) {
 			continue;
 		}
 		LR_point o, dir;
@@ -39,6 +41,29 @@ void TofScanBuilder::addFrame(const TofSensor &s, const float *mm, const LR_pose
 			continue;   // looking at the floor (or the ceiling)
 		}
 		float lowZ = sinf(asinf(dir.z) - halfZone);
+		if (nothing) {
+			// empty as far as the sensor reaches, or until the zone's lower edge
+			// would come down to the floor (it would have seen that)
+			float free = _params.maxRange;
+			if (lowZ < 0) {
+				float toFloor = (o.z - floorZ - _params.minHeight) / -lowZ;
+				free = toFloor < free ? toFloor : free;
+			}
+			if (free < _params.minRange) {
+				continue;
+			}
+			float wx, wy;
+			lrPoseApply(odom, o.x + dir.x * free, o.y + dir.y * free, wx, wy);
+			float rx = wx - _cx, ry = wy - _cy;
+			float r = sqrtf(rx * rx + ry * ry);
+			int bin = (int)floorf((atan2f(ry, rx) + (float)M_PI) * (LR_LIDAR_BINS / (2 * (float)M_PI)));
+			if (bin < 0) bin = 0;
+			if (bin >= LR_LIDAR_BINS) bin = LR_LIDAR_BINS - 1;
+			if (r > _clear[bin]) {
+				_clear[bin] = r;
+			}
+			continue;
+		}
 		if (o.z + lowZ * d - floorZ < _params.minHeight) {
 			continue;   // the floor after all (or it could be)
 		}
@@ -87,6 +112,21 @@ uint16_t TofScanBuilder::finish(const LR_pose2 &odomEnd, float *x, float *y) con
 	return n;
 }
 
+uint16_t TofScanBuilder::finishClear(const LR_pose2 &odomEnd, float *x, float *y) const
+{
+	LR_pose2 inv = lrPoseInverse(odomEnd);
+	uint16_t n = 0;
+	for (uint16_t i = 0; i < LR_LIDAR_BINS; i++) {
+		if (_r[i] != 0 || _clear[i] == 0) {
+			continue;   // a point there (its beam frees the cells before it), or not looked
+		}
+		float a = (i + 0.5f) * (2 * (float)M_PI / LR_LIDAR_BINS) - (float)M_PI;
+		lrPoseApply(inv, _cx + _clear[i] * cosf(a), _cy + _clear[i] * sinf(a), x[n], y[n]);
+		n++;
+	}
+	return n;
+}
+
 bool lrTofObstacleAhead(const TofSensor &s, const float *mm, const LR_angle &tilt, float floorZ,
                         float distance, float halfWidth, float height, LR_point *at)
 {
@@ -124,6 +164,9 @@ void TofNavigator::begin(const TofScanParams &scan, const NavParams &nav)
 	_havePrev = false;
 	_blocked = false;
 	_sinceGap = 1;
+	_haveFull = false;
+	_wantFull = true;
+	_sweep = 0;
 }
 
 void TofNavigator::startScan()
@@ -135,6 +178,7 @@ void TofNavigator::startScan()
 
 void TofNavigator::scan()
 {
+	_wantFull = true;
 	if (_phase == TOF_SCAN_IDLE || _phase == TOF_SCAN_LEVEL) {
 		startScan();
 	}
@@ -145,9 +189,14 @@ bool TofNavigator::setGoal(float x, float y)
 	if (!_nav.setGoal(x, y)) {
 		return false;
 	}
-	_walked = 0;
 	if (_phase == TOF_SCAN_IDLE || _phase == TOF_SCAN_LEVEL) {
-		startScan();   // where am I: a fresh scan before walking
+		// where am I: a fresh scan before walking, unless the last one fit the map
+		// and the robot walked less than half the scan distance since
+		bool fresh = _haveFull && !_wantFull && _walked < 0.5f * _params.scanEvery;
+		if (!fresh) {
+			_walked = 0;
+			startScan();
+		}
 	}
 	return true;
 }
@@ -213,26 +262,53 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 				if (_time >= _params.tilt / _params.tiltRate + _params.settleTime) {
 					_builder.start(odom);
 					_turned = 0;
+					bool full = _wantFull || !_haveFull || slam.scans() == 0 || _params.rescanAngle <= 0
+					            || _params.rescanAngle >= _params.turnAngle;
+					_sweep = full ? 0 : _params.rescanAngle;
+					_sweepBack = false;
 					_phase = TOF_SCAN_TURN;
 					_time = 0;
 				}
 			}
 			return cmd;
 
-		case TOF_SCAN_TURN:
+		case TOF_SCAN_TURN: {
 			_turned += turn;
-			if (fabsf(_turned) >= _params.turnAngle || _time > 4 * _params.turnAngle / _params.turnRate) {
+			// full: once around counter-clockwise. Partial: right to -sweep/2, then left to +sweep/2
+			float total = _sweep > 0 ? 1.5f * _sweep : _params.turnAngle;
+			if (_sweep > 0 && !_sweepBack && _turned <= -_sweep * 0.5f) {
+				_sweepBack = true;
+			}
+			bool done = _sweep > 0 ? _sweepBack && _turned >= _sweep * 0.5f : fabsf(_turned) >= _params.turnAngle;
+			if (done || _time > 4 * total / _params.turnRate) {
 				uint16_t n = _builder.finish(odom, _px, _py);
+				uint16_t nf = _builder.finishClear(odom, _fx, _fy);
 				_lastPoints = n;
-				slam.addPoints(_px, _py, n, odom);
+				LidarMatch m = slam.addPoints(_px, _py, n, odom, _fx, _fy, nf);
+				if (_sweep > 0 && m != LIDAR_MATCH_OK) {
+					// the partial sweep didn't fit the map (or saw mostly new area): turn all the
+					// way round here and now, before walking on with a doubtful pose
+					_builder.start(odom);
+					_turned = 0;
+					_time = 0;
+					_sweep = 0;
+					return cmd;
+				}
+				bool good = m == LIDAR_MATCH_OK || m == LIDAR_MATCH_NEW;
+				if (_sweep == 0 && good) {
+					_haveFull = true;
+				}
+				_wantFull = !good;   // lost (or too few points): look all the way round next time
 				_phase = TOF_SCAN_LEVEL;
 				_time = 0;
 				_walked = 0;
 				return cmd;
 			}
 			// command > 0 turns clockwise: counter-clockwise is negative
-			cmd.rotate.yaw = maxYawRate > 0 ? -constrain(_params.turnRate / maxYawRate, 0.0f, 1.0f) : 0;
+			float rate = maxYawRate > 0 ? constrain(_params.turnRate / maxYawRate, 0.0f, 1.0f) : 0;
+			cmd.rotate.yaw = _sweep > 0 && !_sweepBack ? rate : -rate;
 			return cmd;
+		}
 
 		case TOF_SCAN_LEVEL:
 			_tilt -= _params.tiltRate * dt;
@@ -259,11 +335,27 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 		_obstacle = _gap;
 	}
 	_blockedTime = blocked ? _blockedTime + dt : 0;
+	if (_blockedTime > 1.0f && !gap && _walked > 300) {
+		// stopped by something solid after walking on odometry: most likely the
+		// pose drifted (a door frame where the map has the doorway). Look first:
+		// the scan corrects the pose and the planner goes on from there. Marked
+		// only if it is still in the way right after a scan.
+		_blockedTime = 0;
+		_walked = 0;
+		_wantFull = true;
+		startScan();
+		LR_moveVector zero = { { 0, 0, 0 }, { 0, 0, 0 } };
+		return zero;
+	}
 	if (_blockedTime > 1.0f) {
 		// stopped by something the map doesn't have (too low for the scan, or
 		// that scan was thrown away): put it in, the planner goes around
 		LR_pose2 pose = slam.pose(odom);
-		for (int k = -1; k <= 1; k++) {
+		// a strip as wide as the robot plus a cell each side: a low step or platform
+		// is wider than the point seen, and a few cells at a time sends the planner
+		// along its edge one cell further each time
+		int side = (int)(_nav.params().robotRadius / slam.grid().cellSize()) + 1;
+		for (int k = -side; k <= side; k++) {
 			float bx = _obstacle.x + k * slam.grid().cellSize(), by = _obstacle.y + slam.grid().cellSize() * 0.5f;
 			float mx, my;
 			lrPoseApply(pose, bx, by, mx, my);
@@ -273,6 +365,15 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 		_nav.setGoal(_nav.goalX(), _nav.goalY());   // replan now
 	}
 	if (_walked >= _params.scanEvery) {
+		startScan();
+		return cmd;
+	}
+	float doubt = _nav.doubtDistance();
+	if (doubt > 300 && doubt < 700 && _walked > 250 && !blocked) {
+		// the path crosses a doubtful wall (seen once, from afar: often a doorway seen
+		// at a slant) just ahead: look again from here before walking into it. A wall
+		// gets hit again and the planner goes around, a doorway gets cleared
+		_wantFull = true;
 		startScan();
 		return cmd;
 	}

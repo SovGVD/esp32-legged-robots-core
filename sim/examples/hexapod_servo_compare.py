@@ -1,10 +1,10 @@
 """
 What-if: the hexapod with other servos. Same legs, stance and weight, firmware
-tripod gait; compares the current MG90S + gears with PTK 7465MG servos driving
-the joints directly (no gears).
+tripod gait; compares the MG90S at 5 V (the design) and 6 V with PTK 7465MG
+servos (all straight on the joints).
 
-  python examples/hexapod_servo_compare.py                       # 6 V and 7.4 V at 50 Hz, 7.4 V at 333 Hz
-  python examples/hexapod_servo_compare.py --volts 8.4 --hz 333 --speeds 400 700 900
+  python examples/hexapod_servo_compare.py                       # 7465MG 6 V and 7.4 V at 50 Hz, 7.4 V at 333 Hz
+  python examples/hexapod_servo_compare.py --volts 8.4 --hz 333 --speeds 300 500 700
 
 For each setup: femur/tibia load standing (share of stall torque), then per
 commanded speed the speed reached, the worst servo lag behind its target, and
@@ -12,6 +12,7 @@ the worst body tilt. Datasheet torque/speed only: real servos are usually weaker
 """
 
 import argparse
+import dataclasses
 import math
 import os
 import sys
@@ -20,39 +21,42 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import numpy as np
 from legsim import FirmwareCore
-from legsim.hexapod import SimHexapod, HexapodParams, ptk_7465mg, direct_drive
+from legsim.hexapod import SimHexapod, HexapodParams, mg90s, ptk_7465mg
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--volts", type=float, nargs="*", help="7465MG supply voltages (5.0-8.4)")
 ap.add_argument("--hz", type=float, default=None, help="servo frame rate for the 7465MG setups (PCA9685: 50)")
-ap.add_argument("--speeds", type=float, nargs="+", default=[400, 700])
+ap.add_argument("--speeds", type=float, nargs="+", default=[300, 500])
 ap.add_argument("--cycle", type=float, default=0.3, help="gait cycle time, s (duty 0.5)")
 args = ap.parse_args()
 
+def with_servo(servo):
+    return dataclasses.replace(HexapodParams(), servo=servo)
+
+
 if args.volts:
-    setups = [(f"7465MG {v:.1f} V {args.hz or 50:.0f} Hz", direct_drive(servo=ptk_7465mg(v, args.hz or 50)))
+    setups = [(f"7465MG {v:.1f} V {args.hz or 50:.0f} Hz", with_servo(ptk_7465mg(v, args.hz or 50)))
               for v in args.volts]
 else:
-    setups = [(f"7465MG {v:.1f} V {hz} Hz", direct_drive(servo=ptk_7465mg(v, hz)))
+    setups = [(f"7465MG {v:.1f} V {hz} Hz", with_servo(ptk_7465mg(v, hz)))
               for v, hz in ((6.0, 50), (7.4, 50), (7.4, 333))]
-setups.insert(0, ("MG90S + gears (now)", HexapodParams()))
+setups[:0] = [("MG90S 5 V (design)", HexapodParams()), ("MG90S 6 V", with_servo(mg90s(6.0)))]
 
 fw = FirmwareCore(model="hexapod")
 
 
 def run(params, command, seconds, speed=None):
-    ideal = params.hal.ratio != HexapodParams().hal.ratio
     fw.reset()
     if speed:
         fw.tune_gait(cycle_time=args.cycle, duty_factor=0.5, max_speed=speed)
         fw.set_side_limits(0)
     robot = fw.place(SimHexapod(params=params))
     robot.step(0.3)
-    fw.drive(robot, command, 1.5, ideal_servos=ideal)
+    fw.drive(robot, command, 1.5)
     p0 = robot.body_position_mm().copy()
     lag, tilt = np.zeros(3), 0.0
     for _ in range(int(round(seconds / fw.loop_dt))):
-        fw.drive(robot, command, ideal_servos=ideal)
+        fw.drive(robot, command)
         err = np.nan_to_num(np.abs(robot.servos.target - robot.joint_q())).reshape(6, 3).max(axis=0)
         lag = np.maximum(lag, np.degrees(err))
         o = robot.body_orientation()

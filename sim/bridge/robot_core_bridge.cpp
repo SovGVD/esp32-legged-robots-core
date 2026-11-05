@@ -77,11 +77,13 @@ static LR_pose2         scanStartOdom = { 0, 0, 0 };
 static LR_moveVector    navCmd = {};
 static bool             lidarOn = false;
 static float            lastYawRate = 0;
+static float            lastGyro[3] = { 0, 0, 0 };   // body frame, rad/s (rc_heading_feed)
 static float            simTime = 0;
 static float            lastScanTime = 0;
 // ToF room scans instead of the lidar (tof_scan.h), as in lidar.cpp / motion.cpp without LIDAR_TYPE
 static TofNavigator     tofNav;
 static TofScanParams    tofParams = TOF_SCAN_PARAMS;   // tunable from Python (rc_tofnav_tune)
+static NavParams        navParams = NAV_PARAMS;        // tunable from Python (rc_nav_tune)
 static bool             tofNavOn = false;
 static LR_moveVector    tofCmd = {};
 static const LidarParams TOF_ORIGIN = { { 0, 0, 0 }, 0, false, 0, 0, 0 };   // the map's beams start at the body origin
@@ -105,6 +107,24 @@ static bool initialSaved = false;
 RC_API int rc_leg_count() { return LEG_NUM; }
 RC_API int rc_leg_dof()   { return LEG_DOF; }
 RC_API float rc_loop_dt() { return BRIDGE_LOOP_DT; }
+
+/**
+ * Experiment: the neutral stance's feet |x| mm out from the centre and z mm
+ * down (< 0: keep), all legs (config.h LEG_POINT_X / LEG_POINT_Z). Call rc_init() after.
+ */
+RC_API void rc_set_stance(float x, float z)
+{
+	if (!initialSaved) {
+		memcpy((void *)initialLegs, (const void *)legs, sizeof(legs));
+		initialSaved = true;
+	}
+	leg *l = (leg *)(void *)initialLegs;
+	for (int i = 0; i < LEG_NUM; i++) {
+		LR_point *d = (LR_point *)(void *)&l[i].defaultFoot;   // const in the model: the saved copy is ours
+		if (x >= 0) d->x = l[i].foot.x = d->x < 0 ? -x : x;
+		if (z >= 0) d->z = l[i].foot.z = -z;
+	}
+}
 
 /**
  * (Re)start: legs back to the model's defaults, gait idle, joint angles
@@ -141,7 +161,7 @@ RC_API void rc_init()
 	}
 	if (tofNavOn) {
 		slam.reset();
-		tofNav.begin(tofParams, NAV_PARAMS);
+		tofNav.begin(tofParams, navParams);
 		tofCmd = {};
 	}
 	applyTerrain();
@@ -185,10 +205,10 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 			tofNav.stop();
 		}
 		if (terrainOn && motion.gait().isBlocked()) {
-			tofNav.gapAhead(NAV_PARAMS.stopDistance);   // lidar.cpp: terrain mode stopped at a gap
+			tofNav.gapAhead(navParams.stopDistance);   // lidar.cpp: terrain mode stopped at a gap
 		}
 		tofCmd = tofNav.update(dt, slam, odom.pose(), motion.gait().params().maxYawRate, motion.gait().isActive());
-		scanTilt = tofNav.tilt();
+		scanTilt = tofNav.bodyTilt();   // 0 with a sensor servo: the sensors tilt, the body stays level
 		motion.setHeightOffset(-tofNav.crouch(), 200.0f);
 		if (tofNav.active()) {
 			cmd = tofCmd;
@@ -225,10 +245,11 @@ RC_API int rc_update(float dt, const float *command, const float *imu, uint16_t 
 	LR_angle correction = commanded;   // with the scan's nose up
 	int unsolved = motion.update(dt, cmd, correction);
 	// odometry for the lidar: gait velocity, turned by the gyro (or the gait's own yaw without one)
-	// the gyro's z axis tilts with the body (the scan's nose up): a turn about the
-	// vertical shows on it as rate * cos(tilt)
-	float yawRate = headingFed ? (lastYawRate - headingEst.gyroBias()) / (cosf(lastImu.pitch) * cosf(lastImu.roll))
-	                           : motion.gait().yawRate();
+	// the heading rate (also with a scan's nose up), both biases off the gyro z first
+	float yawRate = motion.gait().yawRate();
+	if (headingFed) {
+		yawRate = lrHeadingRate(lastGyro, lastImu, headingEst.gyroBias() + odom.bias()) - headingEst.gyroBias();
+	}
 	odom.update(dt, motion.gait().velocity(), yawRate, headingFed && !motion.gait().isActive());
 	for (uint8_t i = 0; i < LEG_NUM; i++) {
 		lrLegPulses(legs[i], LEG_DOF, servoMainProfile, &pulses[i * LEG_DOF]);
@@ -330,12 +351,14 @@ RC_API void rc_tilt_estimate(float dt, const float *accel, const float *gyro, fl
 }
 
 /**
- * Heading sensors for one tick, like Mpu9250Imu::read(): gyro rate about the
- * body's up axis (rad/s, counter-clockwise > 0) and, when there is a new
- * reading, the magnetometer in the body frame (uT, x right, y forward, z up).
+ * Heading sensors for one tick, like Mpu9250Imu::read(): the gyro in the body
+ * frame (rad/s, x right, y forward, z up) and, when there is a new reading,
+ * the magnetometer in the body frame (uT).
  */
-RC_API void rc_heading_feed(float dt, float yawRate, const float *mag)
+RC_API void rc_heading_feed(float dt, const float *gyro, const float *mag)
 {
+	float yawRate = lrHeadingRate(gyro, lastImu, headingEst.gyroBias());
+	for (int i = 0; i < 3; i++) lastGyro[i] = gyro[i];
 	headingEst.update(dt, yawRate, lastImu, mag);
 	headingFed = true;
 	lastYawRate = yawRate;
@@ -512,6 +535,14 @@ static const TofSensor &tofSensor(int i)
 	return tofSensors[i];
 }
 
+/** Sensor i as it looks now: a sensor servo (TofScanParams::sensorServo) tilts it up for a room scan. */
+static TofSensor tofSensorNow(int i)
+{
+	TofSensor t = tofSensor(i);
+	if (tofNavOn) t.tilt -= tofNav.sensorTilt();
+	return t;
+}
+
 /** Sensor i looks tilt rad down (< 0: back to TOF_SENSORS). */
 RC_API void rc_tof_mount(int i, float tilt)
 {
@@ -537,7 +568,7 @@ RC_API int rc_tof_sensor(int i, float *out)
 RC_API void rc_tof_rays(int i, float *out)
 {
 	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
-	const TofSensor &t = tofSensor(i);
+	const TofSensor t = tofSensorNow(i);
 	for (uint8_t z = 0; z < t.zones * t.zones; z++) {
 		LR_point d = TerrainMap::zoneDirection(t, z);
 		out[z * 3 + 0] = d.x; out[z * 3 + 1] = d.y; out[z * 3 + 2] = d.z;
@@ -552,7 +583,7 @@ RC_API void rc_tof_rays(int i, float *out)
 RC_API void rc_tof_frame(int i, const float *distances)
 {
 	if (i < 0 || i >= TOF_SENSOR_COUNT) return;
-	const TofSensor &t = tofSensor(i);
+	const TofSensor t = tofSensorNow(i);
 	LR_figure pose = motion.body();
 	// the floor's own tilt in this frame where there is a floor (motion.cpp updateTerrain)
 	LR_angle tilt = floorTiltOn ? frameTilt.place(t, distances, terrainTilt.tilt(), frameGain)
@@ -653,7 +684,7 @@ RC_API int rc_lidar_enable(int on)
 	if (lidarOn) {
 		lidarScans.begin(LIDAR_PARAMS);
 		lidarParser.reset();
-		nav.begin(NAV_PARAMS);
+		nav.begin(navParams);
 		if (!slam.begin(LIDAR_PARAMS, LIDAR_MAP_PARAMS)) return 0;
 	}
 	return 1;
@@ -746,7 +777,8 @@ static const Navigator &activeNav() { return tofNavOn ? tofNav.nav() : nav; }
 
 /**
  * state (NavState), blocked, distance (mm), goal x, goal y, forward command,
- * yaw command, ToF scan phase (TofScanPhase), scan tilt (rad), points of the last ToF scan
+ * yaw command, ToF scan phase (TofScanPhase), scan tilt (rad), points of the last ToF scan,
+ * the ToF scan running now is a partial sweep (1) or a full turn (0)
  */
 RC_API void rc_nav_state(float *out)
 {
@@ -756,6 +788,8 @@ RC_API void rc_nav_state(float *out)
 	out[3] = n.goalX(); out[4] = n.goalY();
 	out[5] = c.move.y; out[6] = c.rotate.yaw;
 	out[7] = tofNavOn ? tofNav.phase() : 0; out[8] = tofNav.tilt(); out[9] = tofNav.lastPoints();
+	out[10] = tofNavOn && tofNav.partialScan();
+	out[11] = tofNavOn ? tofNav.sensorTilt() : 0;
 }
 
 /** ToF room scans on (1) / off (0) instead of the lidar; kept across rc_init() (which clears the map). */
@@ -763,7 +797,7 @@ RC_API int rc_tofnav_enable(int on)
 {
 	tofNavOn = on != 0;
 	if (tofNavOn) {
-		tofNav.begin(tofParams, NAV_PARAMS);
+		tofNav.begin(tofParams, navParams);
 		if (!slam.begin(TOF_ORIGIN, TOF_MAP_PARAMS)) return 0;
 	}
 	return 1;
@@ -772,13 +806,14 @@ RC_API int rc_tofnav_enable(int on)
 /** One ToF room scan now (`map scan`). */
 RC_API void rc_tofnav_scan() { if (tofNavOn) tofNav.scan(); }
 
-/** The model's TOF_SCAN_PARAMS: tilt, tilt rate, turn rate, turn angle, band, min range, max range, min height, scan every, settle, obstacle height */
+/** The model's TOF_SCAN_PARAMS: tilt, tilt rate, turn rate, turn angle, band, min range, max range, min height, scan every, settle, obstacle height, crouch, rescan angle */
 RC_API void rc_tofnav_params(float *out)
 {
 	const TofScanParams &p = tofParams;
 	out[0] = p.tilt; out[1] = p.tiltRate; out[2] = p.turnRate; out[3] = p.turnAngle; out[4] = p.band;
 	out[5] = p.minRange; out[6] = p.maxRange; out[7] = p.minHeight; out[8] = p.scanEvery; out[9] = p.settleTime;
-	out[10] = p.obstacleHeight; out[11] = p.crouch;
+	out[10] = p.obstacleHeight; out[11] = p.crouch; out[12] = p.rescanAngle;
+	out[13] = p.sensorServo;
 }
 
 /** Override TOF_SCAN_PARAMS fields (same order as rc_tofnav_params, < 0 = keep; reset = 1 back to the model's) */
@@ -787,9 +822,22 @@ RC_API void rc_tofnav_tune(const float *v, int reset)
 	if (reset) tofParams = TOF_SCAN_PARAMS;
 	float *f[] = { &tofParams.tilt, &tofParams.tiltRate, &tofParams.turnRate, &tofParams.turnAngle, &tofParams.band,
 	               &tofParams.minRange, &tofParams.maxRange, &tofParams.minHeight, &tofParams.scanEvery,
-	               &tofParams.settleTime, &tofParams.obstacleHeight, &tofParams.crouch };
-	for (int i = 0; i < 12; i++) if (v[i] >= 0) *f[i] = v[i];
-	if (tofNavOn) tofNav.begin(tofParams, NAV_PARAMS);
+	               &tofParams.settleTime, &tofParams.obstacleHeight, &tofParams.crouch,
+	               &tofParams.rescanAngle, &tofParams.sensorServo };
+	for (int i = 0; i < 14; i++) if (v[i] >= 0) *f[i] = v[i];
+	if (tofNavOn) tofNav.begin(tofParams, navParams);
+}
+
+/** Override NAV_PARAMS fields (robot radius, margin, lookahead, goal tolerance, speed, turn gain,
+ *  turn in place, stop distance, replan period, doubtful; < 0 = keep; reset = 1 back to the model's) */
+RC_API void rc_nav_tune(const float *v, int reset)
+{
+	if (reset) navParams = NAV_PARAMS;
+	float *f[] = { &navParams.robotRadius, &navParams.margin, &navParams.lookahead, &navParams.goalTolerance,
+	               &navParams.speed, &navParams.turnGain, &navParams.turnInPlace, &navParams.stopDistance,
+	               &navParams.replanPeriod, &navParams.doubtful };
+	for (int i = 0; i < 10; i++) if (v[i] >= 0) *f[i] = v[i];
+	if (tofNavOn) tofNav.begin(tofParams, navParams);
 }
 
 /** Planned path, map frame mm: out x0, y0, ... Returns the count. */

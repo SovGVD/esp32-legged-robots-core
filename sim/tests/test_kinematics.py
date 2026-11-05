@@ -59,7 +59,8 @@ def test_hip_pitch_drop_offsets_feet(leg):
 
 def test_default_pose_angles():
     a = firmware_ik(GEO, P.legs[0], default_foot(GEO, P.legs[0]))
-    np.testing.assert_allclose(np.degrees(a), (78.35, 54.08, 106.56), atol=0.01)
+    # feet 64 mm out (config.h LEG_POINT_X; 56 gave 78.35, 54.08, 106.56)
+    np.testing.assert_allclose(np.degrees(a), (72.97, 55.93, 110.37), atol=0.01)
 
 
 @pytest.mark.parametrize("leg", P.legs, ids=lambda l: l.name)

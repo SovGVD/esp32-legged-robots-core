@@ -198,130 +198,109 @@ control" window (`pip install pygame-ce`; if plain `pygame` is also installed, `
 Keyboard and pad add up. Any pad SDL knows as a game controller works
 (Xbox 360/One, most others). Linux and Windows.
 
+### Dog stance width
+
+`FirmwareCore.set_stance(x)` (and `lidar_nav.py --stance-x`) tries other neutral foot widths
+(config.h `LEG_POINT_X`; the hip roll axes are 39.5 mm out). Sweep, 2026-11-05 (trot at full
+stick, ToF terrain walks, a 0.1 s sideways push while trotting in place):
+
+| feet out, mm | push that tips it | 20 mm step (1.0 / 0.8 speed) | trot roll p2p, deg |
+|---|---|---|---|
+| 39.5 (legs vertical) | 4 N | stuck / stuck | 4.4 |
+| 50 | 5 N | ok / ok | 2.9 |
+| 56 (old) | 6 N | ok / ok | 3.8 |
+| 60 | 8 N | ok / stuck | 4.0 |
+| 64 (new) | 10 N | ok / ok (447 mm) | 4.4 |
+| 68 | > 10 N | ok / ok | 2.0 |
+| 74-80 | > 10 N | stuck / stuck | 3 |
+
+Speeds (150 mm/s forward, 50 sideways, 33 deg/s turning) and servo loads barely change.
+Vertical legs fail the step (the front feet reach the edge and the body pitches); over ~70 mm
+the same. 64 mm is the middle of the range that climbs, with most of the push margin.
+Gaps (30 / 40 mm) vary run to run at every width.
+
 ## Hexapod
 
 | | |
 |---|---|
-| ![Hexapod standing](docs/hexapod_standing.png) | ![Hexapod walking with the firmware gait](docs/hexapod_walking.gif) |
-| Neutral stance, built from Gleb's printed parts | Walking forward, driven by the firmware's own gait and `HexapodLegIK` |
+| ![Hexapod standing](docs/hexapod_standing.png) | ![Hexapod walking with the firmware gait](docs/hexapod_walking.png) |
+| Neutral stance (simple shapes: no CAD yet) | Walking forward, driven by the firmware's own gait and `HexapodLegIK` |
+
+The 2026-11 design ("Recommended" in the body study), not built yet: hexagon
+body, coxa / femur / tibia 60 / 50 / 60 mm, 18 MG90S straight on the joints
+(no gears), 2x 18650 at the bottom centre, a PCA9685 + 3 Mini360 board along
+each side, the ESP32 across the front, GY-91 under the top cover, two VL53L5CX
+at the front (+-20 deg), lever switch feet, ~815 g. The front legs open 20 deg
+wider than the others so the ToFs see past them. The old geared hexapod
+(STL parts, 35 / 55 / 110 legs) is gone from the firmware and the sim.
 
 ```
 python examples/drive.py --hexapod             # drive it by keyboard / Xbox pad (needs a display)
+python examples/drive.py --hexapod --terrain rubble
+python examples/drive.py --hexapod --nav tof   # rooms, click the map to walk there
 python examples/hexapod_walk.py                # scripted walk, prints distance, tilt, servo load
-python examples/hexapod_walk.py --video walk.mp4
-python examples/hexapod_legtest.py             # does every servo turn the way the firmware expects?
-python examples/hexapod_legtest.py --video legtest.mp4   # or --view, --leg RF
-python examples/snapshot.py hexapod.png --hexapod
+python examples/hexapod_legtest.py             # the leg-by-leg direction test (--video, --view, --leg RF)
+python examples/hexapod_servo_compare.py       # MG90S 5 / 6 V vs PTK 7465MG
 python -m pytest -q tests/test_hexapod.py
 ```
 
-`models/hexapod.xml` opens in MuJoCo's `simulate` app. In code:
+In code:
 
 ```python
 from legsim import FirmwareCore
 from legsim.hexapod import SimHexapod
 fw = FirmwareCore(model="hexapod")             # builds sim/build/librobot_core_bridge_hexapod.so
 robot = fw.place(SimHexapod())
-fw.drive(robot, (0, 1, 0, 0, 0, 0), duration=3.0)   # forward, full speed (400 mm/s), 3 s
+fw.drive(robot, (0, 1, 0, 0, 0, 0), duration=3.0)   # forward, full speed, 3 s
 ```
 
 `SimHexapod` has the same interface as `SimDog` (`write_pulses`, `read_imu`,
 `set_leg_angles`, `set_feet`, ground truth) with 18 channels, `leg*3 + joint`
-in the firmware leg order LF, LM, LR, RF, RM, RR (not the PCA9685 channel;
-the second board at 0x42 only matters on hardware). `joint_torque_ratio()`
-says how close each servo is to stall.
+in the firmware leg order LF, LM, LR, RF, RM, RR (not the PCA9685 channel).
+`joint_torque_ratio()` says how close each servo is to stall.
 
 | Part | Source | Notes |
 |---|---|---|
-| Coxa axes at (±46, ±80) and (±57.5, 0) mm, coxa 35, femur 55, tibia 110 | `model/hexapod/config.h`, checked on the STLs | Bearing holes in the body, the coxa's yaw and femur axes, the knee axis and tibia tip all land on the firmware numbers |
-| Body origin at the femur axis height, 28.7 mm above the body bottom | STLs | Standing height 67.3 mm (IK), 38.6 mm ground clearance |
-| Gears: coxa 2:1, femur 2:1, tibia 1.5:1 | STLs (tooth tips: 18-tooth servo gears, 36-tooth coxa sector and femur gear, 27-tooth tibia gear, module 1) | Same as the HAL ratios in `model_data.h` |
-| Servos: coxa servos upside down in the body bottom, femur servo in the coxa, tibia servo in the femur | servo screw holes in the STLs | Shafts placed at the gear centre distances (27 and 22.5 mm) |
-| MG90S clone: 0.176 N·m stall, 0.10 s/60° | datasheet at 4.8 V | Same servo model as the dog otherwise |
-| Pulse → angle: hexapod `servoMainProfile` (0-180°, 590-2200 µs) | `model_data.h` | |
-| Masses: ~892 g total | STL volumes + datasheets + estimates | Body halves 124 g, 18 servos 241 g, 2x18650 + holder 106 g, electronics 47 g; per leg coxa 31, femur 29, tibia 19 g |
-| Right legs mirrored, left legs turned | photos | All femur and tibia gears face forward, like on the real robot |
+| Coxa axes at (+-35, +-58) and (+-45, 0) mm; coxa 60, femur 50, tibia 60; neutral feet 69 mm out from the coxa axis, 100 mm down | `model/hexapod/config.h` (design) | Femur ~58 deg down at rest: the foot is nearly under the femur axis |
+| Body: hexagon plates 14 mm past the coxa axes, 28 mm under and 16 mm over the femur axis | design concept | `legsim/hexapod/simple_parts.py`: boxes and cylinders |
+| MG90S at 5 V: 1.87 kg cm stall, 0.093 s/60 deg | datasheet (1.8 @ 4.8 V, 2.2 @ 6 V) | Not measured; clones are often weaker |
+| Pulse -> angle: 500-2500 us over 0-180 deg | `model_data.h` | Linear until measured |
+| Masses: 815 g | design estimate | Per leg: coxa 21, femur 20, tibia 8 g (servos 13.4 g each) |
+| Servo directions | the inverse flags (right legs mirrored) | Nothing to check against until it is built |
 
-The STLs (`tmp-hexapod-*`, `tmp-Femur`, servo gear) are the ones that match
-the photos; `tools/prepare_hexapod_meshes.py` decimates them into
-`models/meshes/hexapod/`. The `hexapodv2` body in the FreeCAD file is a
-newer, different body and isn't used. Estimated: the electronics and battery
-positions, the IMU at the body centre, and everything that needs a scale.
+What the sim says (`tests/test_hexapod.py`):
 
-Stance (`model/hexapod/config.h`): feet 118 mm out from the coxa axis and
-95 mm down, so the femur is 11.6° up and the tibia ~15° off vertical. The first
-model stance (160 mm out, 67 mm down) put the femur servos at their limit;
-a lower body or a higher knee (femur more than ~12° up) runs into the femur's
-45° range as soon as a foot lifts 30 mm.
-
-First findings (with the estimated 892 g at ~5 V):
-
-* The firmware gait walks it as configured (tripod, 0.3 s cycle): about
-  1.1 m forward in 3 s (400 mm/s), ~300 mm/s strafing, turning at 0.75 rad/s,
-  with under 2° of tilt and no IK failures.
-* Top speed with MG90S servos (tripod, duty 0.5): forward tops out at about
-  550 mm/s and sideways at ~380 mm/s; past that the servos only lag more
-  (femur/tibia 23°/23° at 400 mm/s, 38°/62° commanding 800). The old
-  default (duty 0.75, 75 mm/s) gave each swing only 100 ms.
-* Femur servos use ~30 % of stall torque standing and stay below it while
-  walking (with the old wide stance: 46 % standing, saturated 10 % of the
-  time on three legs, 5-9 mm of sag).
-* Servo directions: see below.
+* Standing: femur servos at ~5 % of stall, tibia ~12 %.
+* Tripod, 0.3 s cycle: ~250 mm/s forward with the servos at their torque limit
+  ~2 % of the time; ~130 mm/s sideways; ~1.5 rad/s (86 deg/s) turning. 400 mm/s asked
+  walks ~380 but the femur servos saturate 38 % of the time.
+* Room scans: the right ToF looks 22 deg down. With both at 35 deg the scan
+  needs the nose ~18 deg up and the legs only give ~11.
 
 ### Servo directions (leg test)
-
-The hexapod sim turns each joint the way its servo is mounted, not the way
-the firmware's `inverse` flags say: `legsim/hexapod/assembly.py` knows which
-side each servo shaft points to, that every gear pair reverses the rotation,
-and that a longer pulse turns an MG90 counter-clockwise seen from the shaft
-(taken from the dog's working config). The right legs are mirror images of
-the left (all gears face forward, as in the photos). So a wrong flag in
-`model_data.h` makes a leg move the wrong way in the sim, like on the robot.
 
 `examples/hexapod_legtest.py` hangs the robot in the air and, one leg at a
 time, moves the foot up, out, forward and turns the leg around its coxa
 through the firmware's own IK and HAL (`FirmwareCore.leg_test_pulses`). It
 prints OK/WRONG per move, the joints that turned against the IK's plan and
-the flags to flip. Edit `model_data.h` and run it again; the bridge rebuilds.
-With the original flags (none inverted) it reports the tibias on LF, LM, LR
-and the femurs on RF, RM, RR; with the flags in this model all 24 moves pass.
-The assumptions it rests on (shaft sides, servo direction) are the
-`SHAFT`/`SERVO_TURNS_CCW` constants in `assembly.py`: if the robot disagrees,
-fix those and the test tells you the flags.
+the flags to flip. In the sim each servo turns the way `SimHexapod.direction`
+says, taken from the flags; flip an entry to see what a servo mounted the
+other way does. Run the same moves on the robot once it is built.
 
 ### What-if: other servos
 
-`examples/hexapod_servo_compare.py` runs the firmware tripod on the same legs,
-stance and weight with PTK 7465MG servos driving every joint directly (no
-gears, 180° per joint), next to the current MG90S + gears:
+`examples/hexapod_servo_compare.py` runs the firmware tripod with the MG90S at
+5 and 6 V and with PTK 7465MG servos (`ptk_7465mg(volts, frame_hz)`, datasheet
+torque and speed at 5.0-8.4 V, up to 333 Hz frames).
 
-```python
-from legsim.hexapod import SimHexapod, direct_drive, ptk_7465mg
-robot = fw.place(SimHexapod(params=direct_drive(servo=ptk_7465mg(volts=7.4, frame_hz=333))))
-fw.drive(robot, (0, 1, 0, 0, 0, 0), 3.0, ideal_servos=True)
-```
-
-`ptk_7465mg(volts, frame_hz)` takes the datasheet torque and speed at 5.0-8.4 V.
-The firmware HAL still has the geared ratios, so `ideal_servos=True` sends
-its leg angles straight to the joints instead of its pulses; its joint limits
-also stay the geared ones (coxa ±45°), so longer steps and faster turns that
-direct drive would allow aren't used.
-
-Findings (datasheet values, tripod, 0.3 s cycle):
-
-| | MG90S + gears | 7465MG 6 V | 7465MG 7.4 V | 7465MG 7.4 V, 333 Hz |
-|---|---|---|---|---|
-| Standing femur load (of stall) | 30 % | 24 % | 20 % | 20 % |
-| Lag at 400 mm/s forward | 23° | 16° | 15° | 2-3° |
-| Clean top speed forward / sideways, mm/s | ~550 / ~330 | ~700 / ~380 | ~700 / ~400 | ~900 / ~520 |
-
-At 50 Hz frames (the PCA9685 now) the stronger servos jump to each new target
-and the body rocks 3-5°, so a higher voltage gains little. The 7465MG reads
-up to 333 Hz pulses, and the PCA9685 can run that fast (2500 µs fits in 3 ms).
+`tools/hexapod_leg_sizing.py` is a quick static check for a leg shape (coxa /
+femur / tibia lengths, foot reach and height, mass): femur and tibia load as a
+share of MG90S stall with 3 feet down at the worst point of the stride, and
+how far the centre of mass is inside the tripod. It is a slippery-floor worst
+case. `tools/hexapod_leg_sweep.py` searches shapes against load, stability,
+clearance, lift and speed.
 
 ## Rough ground: foot switches and ToF sensors
-
-![Hexapod on a 30 mm step with ToF + foot switches](docs/hexapod_step.png)
 
 ```
 python examples/terrain_walk.py                              # dog, obstacle course, foot switches + ToF
@@ -517,6 +496,27 @@ target of 2 x 2 rays per zone, out to 3 m, ~40 ms late. `set_tof_mount(i, deg)` 
     python examples/lidar_nav.py --tof --model hexapod
     python examples/lidar_nav.py --tof --mount 40 --scan-tilt 15                # the old, steeper mount
     MUJOCO_GL=glfw xvfb-run -a python examples/lidar_nav.py --tof --video out/dog-tof.mp4 --speedup 6
+    python examples/drive.py --hexapod --nav tof --mount 35 --sensor-servo 18   # live, ToFs on a tilt servo
+    python examples/lidar_nav.py --tof --model hexapod --mount 35 --sensor-servo 18 --log
+
+**Sensor tilt servo** (`TofScanParams.sensorServo`, sim only so far, the firmware doesn't drive
+a servo yet): one small servo tilts both ToF sensors up `tilt` for a room scan instead of the
+body, which stays level (with the crouch: the hexapod turns faster lower). Both sensors can
+then look 35 deg down for footholds and 17 deg for walls. Hexapod, three seeds, three goals:
+all arrived, 0 rejected scans, heading error at the scans ~1.2 deg (2.8 with the 18 deg body
+tilt it would otherwise need, which the IMU's tilt estimate doesn't follow well while turning).
+Terrain tests about the same as the 35 / 22 mount (the 40 mm gap is still not crossed).
+
+**Doubtful walls** (`NAV_PARAMS` doubtful = 40 log-odds): a map cell hit by only one scan from
+afar (often a doorway seen at a slant) doesn't block the planner, it costs more. When the path
+crosses one 300-700 mm ahead, the robot stops and scans there first: a wall gets confirmed and
+the planner goes around, a doorway gets cleared. `lidar_nav.py --floor 30` puts drive.py's rug,
+threshold, platform and tiles in the rooms. With them the hexapod (walking open loop, 30 mm
+steps) caught its feet on the platform edge and got lost in about half the runs; it now stops at
+anything over 25 mm (`obstacleHeight`) and maps a strip as wide as itself: 0 rejected scans
+in 6 runs, 15 of 18 goals reached (the misses: ~0.2-1.9 m short of the goal behind the platform
+at timeout). The dog with the floor objects and ToF terrain sensing still gets lost in 2 of 3
+runs (not fixed yet).
 
 The legs can tilt the dog's nose up ~15 deg (with the crouch; 20 deg runs the legs out of reach)
 and the hexapod's ~10 deg (servo ranges). The sensors' top zone row looks 19.7 +- 2.8 deg above
@@ -548,6 +548,7 @@ vs 0). The dog's gap runs are poor at either angle. Both hexapod sensors at 22 d
 gaps (324 vs 700 mm in the test), hence the mixed mount, which crosses them and climbs the 30 mm
 step (695 vs 674 mm, a few footholds out of reach).
 Tests: `tests/test_lidar.py` (ToF room scans), `tests/test_terrain.py`, `test/test_tof_scan` (native).
+
 
 ### Nav with terrain sensing
 

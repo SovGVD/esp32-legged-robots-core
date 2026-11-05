@@ -82,13 +82,16 @@ void Navigator::buildCost(const OccupancyGrid &grid)
 {
 	uint8_t *clr = _cost;
 	const int8_t *fine = grid.cells();
+	_fine = fine;
+	// doubtful (seen once, from afar) occupied cells don't block: they cost (below)
+	int sure = _params.doubtful > 1 ? (int)_params.doubtful : 1;
 	for (int y = 0; y < NAV_N; y++) {
 		for (int x = 0; x < NAV_N; x++) {
 			bool occ = false;
 			for (int fy = 0; fy < LR_NAV_FACTOR && !occ; fy++) {
 				const int8_t *row = fine + ((y + _oy) * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + (x + _ox) * LR_NAV_FACTOR;
 				for (int fx = 0; fx < LR_NAV_FACTOR; fx++) {
-					if (row[fx] > 0) {
+					if (row[fx] >= sure) {
 						occ = true;
 						break;
 					}
@@ -134,7 +137,9 @@ void Navigator::buildCost(const OccupancyGrid &grid)
 			}
 			int cost = 10;
 			if (m > 0 && c < r + m) {
-				cost += 30 * (r + m - c) / m;
+				// steep enough that a doorway's middle beats its edge by more than
+				// the few extra cells of going round
+				cost += 80 * (r + m - c) / m;
 			}
 			bool unknown = true;
 			for (int fy = 0; fy < LR_NAV_FACTOR && unknown; fy++) {
@@ -148,6 +153,9 @@ void Navigator::buildCost(const OccupancyGrid &grid)
 			}
 			if (unknown) {
 				cost += 15;
+			}
+			if (sure > 1 && doubtfulCell(x, y)) {
+				cost += 60;   // rather around, if there is a way that isn't much longer
 			}
 			clr[y * NAV_N + x] = (uint8_t)nmin(cost, 255);
 		}
@@ -267,9 +275,26 @@ bool Navigator::downhill(int &ix, int &iy) const
 	return true;
 }
 
+bool Navigator::doubtfulCell(int x, int y) const
+{
+	if (_fine == nullptr || _params.doubtful <= 1) {
+		return false;
+	}
+	for (int fy = 0; fy < LR_NAV_FACTOR; fy++) {
+		const int8_t *row = _fine + ((y + _oy) * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + (x + _ox) * LR_NAV_FACTOR;
+		for (int fx = 0; fx < LR_NAV_FACTOR; fx++) {
+			if (row[fx] > 0 && row[fx] < _params.doubtful) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void Navigator::tracePath(const LR_pose2 &pose)
 {
 	_pathLen = 0;
+	_doubtDist = -1;
 	int x, y;
 	if (_dist == nullptr || !startCell(pose, x, y)) {
 		return;
@@ -277,9 +302,20 @@ void Navigator::tracePath(const LR_pose2 &pose)
 	_pathX[0] = pose.x;
 	_pathY[0] = pose.y;
 	_pathLen = 1;
+	float along = 0, lx = pose.x, ly = pose.y;
 	for (int step = 0; step < 4 * NAV_N; step++) {
 		if (!downhill(x, y)) {
 			break;
+		}
+		if (_doubtDist < 0) {
+			float cx, cy;
+			centre(x, y, cx, cy);
+			along += hypotf(cx - lx, cy - ly);
+			lx = cx;
+			ly = cy;
+			if (doubtfulCell(x, y)) {
+				_doubtDist = along;
+			}
 		}
 		if (step % 2 == 1 && _pathLen < LR_NAV_PATH - 1) {
 			centre(x, y, _pathX[_pathLen], _pathY[_pathLen]);
@@ -364,11 +400,28 @@ LR_moveVector Navigator::update(float dt, const LidarSlam &slam, const LR_pose2 
 		return cmd;
 	}
 
-	// the point `lookahead` mm down the path
+	// the point `lookahead` mm down the path, but not past a bend: the straight
+	// line to it must stay within 50 mm of the path, or the robot cuts the corner
+	// (a door frame) the path goes round
 	float tx = _pathX[_pathLen - 1], ty = _pathY[_pathLen - 1];
 	float walked = 0;
 	for (uint8_t i = 1; i < _pathLen; i++) {
 		walked += hypotf(_pathX[i] - _pathX[i - 1], _pathY[i] - _pathY[i - 1]);
+		bool bend = false;
+		float cx = _pathX[i] - pose.x, cy = _pathY[i] - pose.y;
+		float len = hypotf(cx, cy);
+		for (uint8_t j = 1; j < i && len > 1; j++) {
+			float qx = _pathX[j] - pose.x, qy = _pathY[j] - pose.y;
+			if (fabsf(qx * cy - qy * cx) / len > 50) {
+				bend = true;
+				break;
+			}
+		}
+		if (bend) {
+			tx = _pathX[i - 1];
+			ty = _pathY[i - 1];
+			break;
+		}
 		if (walked >= _params.lookahead) {
 			tx = _pathX[i];
 			ty = _pathY[i];

@@ -59,6 +59,9 @@ void OccupancyGrid::addBeam(float x0, float y0, float x1, float y1, bool hit, in
 			return;   // left the map
 		}
 		int8_t &c = _cells[y * LR_LIDAR_GRID + x];
+		if (!hit && c > 0) {
+			return;   // free space beam (nothing seen): stops at a known wall, it may have looked over it
+		}
 		int v = c - missStep;
 		c = (int8_t)(v < -limit ? -limit : v);
 		int e2 = 2 * err;
@@ -300,6 +303,17 @@ void LidarSlam::insert(const LR_pose2 &pose)
 		float wy = pose.y + _px[i] * s + _py[i] * c;
 		_grid.addBeam(ox, oy, wx, wy, true, _params.hit, _params.miss, _params.maxLogOdds);
 	}
+	for (uint16_t i = 0; i < _nf; i++) {
+		float fx = _fx[i], fy = _fy[i];
+		float r = hypotf(fx, fy);
+		if (r > _params.mapRange) {
+			fx *= _params.mapRange / r;
+			fy *= _params.mapRange / r;
+		}
+		float wx = pose.x + fx * c - fy * s;
+		float wy = pose.y + fx * s + fy * c;
+		_grid.addBeam(ox, oy, wx, wy, false, _params.hit, _params.miss, _params.maxLogOdds);
+	}
 	_lastInsert = pose;
 }
 
@@ -326,7 +340,8 @@ LidarMatch LidarSlam::addScan(const LidarScan &scan, const LR_pose2 &odomStart, 
 	return process(odomEnd);
 }
 
-LidarMatch LidarSlam::addPoints(const float *x, const float *y, uint16_t n, const LR_pose2 &odomEnd)
+LidarMatch LidarSlam::addPoints(const float *x, const float *y, uint16_t n, const LR_pose2 &odomEnd,
+                                 const float *fx, const float *fy, uint16_t nf)
 {
 	if (!_grid.ready()) {
 		return LIDAR_MATCH_NONE;
@@ -342,7 +357,13 @@ LidarMatch LidarSlam::addPoints(const float *x, const float *y, uint16_t n, cons
 	}
 	_originX = 0;
 	_originY = 0;
-	return process(odomEnd);
+	_fx = fx;
+	_fy = fy;
+	_nf = fx && fy ? nf : 0;
+	LidarMatch m = process(odomEnd);
+	_fx = _fy = nullptr;
+	_nf = 0;
+	return m;
 }
 
 LidarMatch LidarSlam::process(const LR_pose2 &odomEnd)
@@ -352,6 +373,9 @@ LidarMatch LidarSlam::process(const LR_pose2 &odomEnd)
 	if (_n < 30) {
 		_pose = guess;
 		_last = LIDAR_MATCH_FEW;
+		if (!_frozen && _nf >= 30) {
+			insert(_pose);   // nothing to match, but the free space is worth keeping (odometry pose)
+		}
 		return _last;
 	}
 	if (_empty) {

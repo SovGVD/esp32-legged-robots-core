@@ -59,6 +59,20 @@ typedef struct {
 	float fieldTolerance;  // 0..1, readings whose strength differs more than this from the calibrated field are ignored
 } HeadingParams;
 
+/**
+ * Heading rate (rad/s, counter-clockwise > 0) from the body frame gyro
+ * (x right, y forward, z up) and the body tilt: the yaw rate of
+ * Rz(yaw) * Ry(pitch) * Rx(roll), as in BodyKinematics. Gyro z alone reads
+ * only rate * cos(tilt) on a tilted body (a ToF scan's nose up), and the
+ * gyro's x and y matter too while the tilted body wobbles around a turn: in
+ * the simulator gyro z / cos(tilt) lost ~2 deg per room scan at 18 deg nose
+ * up, this ~0.4 deg.
+ * bias: the gyro z bias (HeadingEstimator::gyroBias): taken off z before and
+ * added back after, so it comes out as it is (the estimator takes it off and
+ * keeps learning it), not scaled by the tilt.
+ */
+float lrHeadingRate(const float gyro[3], const LR_angle &tilt, float bias = 0);
+
 class HeadingEstimator {
 	public:
 		void begin(const HeadingParams &params) { _params = params; reset(); }
@@ -68,7 +82,7 @@ class HeadingEstimator {
 		/** Calibration from MagCalibrator; field = calibrated field strength (0: unknown, no check) */
 		void setMagCalibration(const float offset[3], const float scale[3], float field);
 		/**
-		 * @param yawRate rad/s about body z (up), counter-clockwise > 0 (gyro z)
+		 * @param yawRate rad/s about the vertical, counter-clockwise > 0 (lrHeadingRate)
 		 * @param tilt    body tilt (firmware convention), for the tilt compensation
 		 * @param mag     body frame field in uT, raw (calibration applied here); nullptr: none this tick
 		 */

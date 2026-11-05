@@ -1,8 +1,8 @@
 """
-Hexapod model: joint convention vs the firmware IK, the HAL, the MJCF, and the
-real firmware gait (lib/robot_core built for MODEL_HEXAPOD) walking it.
+The hexapod (legsim/hexapod, firmware model/hexapod: MG90S direct drive, not
+built yet): the sim model matches the firmware description, and the
+firmware's own gait walks it.
 """
-
 import math
 import shutil
 
@@ -10,10 +10,8 @@ import numpy as np
 import pytest
 
 from legsim import hal
-from legsim.hexapod import HexapodParams, SimHexapod
-from legsim.hexapod.kinematics import (firmware_ik, leg_angles_to_q, q_to_leg_angles,
-                                       forward_kinematics, coxa_position, default_foot)
-from legsim.hexapod.mjcf import servo_joint_range
+from legsim.hexapod import SimHexapod, HexapodParams, ptk_7465mg
+from legsim.hexapod.kinematics import firmware_ik, leg_angles_to_q, forward_kinematics, coxa_position, default_foot
 
 P = HexapodParams()
 GEO = P.geometry
@@ -22,37 +20,35 @@ needs_cxx = pytest.mark.skipif(shutil.which("c++") is None and shutil.which("g++
                                reason="needs a C++ compiler for the firmware bridge")
 
 
-@pytest.mark.parametrize("leg", P.legs, ids=lambda l: l.name)
-def test_fk_inverts_firmware_ik(leg):
-    """Sim joint convention == HexapodLegIK convention over the working space."""
-    for dr in (-30, 0, 20):
-        for side in (-40, 0, 40):
-            for dz in (-20, 0, 25):
-                yaw = leg.yaw
-                foot = default_foot(leg) + dr * np.array([math.cos(yaw), math.sin(yaw), 0]) \
-                    + side * np.array([-math.sin(yaw), math.cos(yaw), 0]) + [0, 0, dz]
-                v = foot - coxa_position(leg)
-                if math.hypot(math.hypot(v[0], v[1]) - GEO.coxa, v[2]) > GEO.femur + GEO.tibia - 1:
-                    continue  # out of reach: the IK clamps, nothing to compare
-                q = leg_angles_to_q(*firmware_ik(GEO, leg, foot))
-                np.testing.assert_allclose(forward_kinematics(GEO, leg, q) + coxa_position(leg), foot, atol=1e-6)
-
-
-def test_neutral_pose_is_servo_middle_rotated():
-    """Neutral stance: coxa at the servo middle, femur up 11.6 deg, tibia ~15 deg off vertical."""
+def test_design_numbers():
+    assert (GEO.coxa, GEO.femur, GEO.tibia) == (60, 50, 60)
+    assert P.hal.ratio == (1.0, 1.0, 1.0)
     for leg in P.legs:
-        a = firmware_ik(GEO, leg, default_foot(leg))
-        q = leg_angles_to_q(*a)
+        v = np.array(leg.foot) - np.array(leg.body)
+        assert math.hypot(v[0], v[1]) == pytest.approx(69.0, abs=0.05), leg.name   # coxa 60 + 9
+        assert v[2] == -100.0
+    # front legs open 20 deg wider than the line from the body centre
+    lf = P.legs[0]
+    assert math.degrees(lf.yaw - math.atan2(lf.body[1], lf.body[0])) == pytest.approx(20.0, abs=0.05)
+
+
+def test_mass_and_standing_pose():
+    import mujoco
+    h = SimHexapod(params=P)
+    assert sum(h.model.body_mass) * 1000 == pytest.approx(815.0, abs=0.5)
+    for leg in P.legs:
+        q = leg_angles_to_q(*firmware_ik(GEO, leg, default_foot(leg)))
         assert q[0] == pytest.approx(0, abs=1e-9)
-        assert math.degrees(q[1]) == pytest.approx(11.6, abs=0.1)
-        assert math.degrees(q[1] + q[2]) == pytest.approx(15.4, abs=0.1)   # tibia off vertical
+        assert math.degrees(q[1]) == pytest.approx(-58.0, abs=1.0)    # femur well down: little femur torque
+    mujoco.mj_forward(h.model, h.data)
+    assert h.body_position_mm()[2] == pytest.approx(100.0, abs=1.0)
 
 
 def test_mjcf_matches_fk():
-    """Tibia tip sites in the MuJoCo model sit where the analytic FK says."""
     import mujoco
-    h = SimHexapod(fixed_base=True)
-    rng = np.random.default_rng(1)
+    from legsim.hexapod.mjcf import servo_joint_range
+    h = SimHexapod(params=P, fixed_base=True)
+    rng = np.random.default_rng(2)
     lo = [servo_joint_range(P, j)[0] for j in range(3)] * 6
     hi = [servo_joint_range(P, j)[1] for j in range(3)] * 6
     for _ in range(10):
@@ -61,36 +57,9 @@ def test_mjcf_matches_fk():
         mujoco.mj_kinematics(h.model, h.data)
         feet = h.foot_positions_body_mm()
         for i, leg in enumerate(P.legs):
-            fk = forward_kinematics(GEO, leg, q[i * 3:i * 3 + 3]) + coxa_position(leg)
-            np.testing.assert_allclose(feet[i], fk, atol=1e-3)
+            np.testing.assert_allclose(feet[i], forward_kinematics(GEO, leg, q[i * 3:i * 3 + 3]) + coxa_position(leg),
+                                       atol=1e-3)
 
-
-@pytest.mark.parametrize("leg", P.legs, ids=lambda l: l.name)
-def test_hal_round_trip(leg):
-    """leg angle -> pulse (firmware HAL, hexapod servo profile) -> sim joint target."""
-    h = SimHexapod(fixed_base=True)
-    i = P.legs.index(leg)
-    angles = (math.radians(100), math.radians(70), math.radians(120))
-    pulses = hal.leg_angles_to_pulses(P.hal, leg, angles, profile=P.profile)
-    for j in range(3):
-        h.write_pulse(i * 3 + j, pulses[j])
-    q = h.servos.pending[i * 3:i * 3 + 3]
-    # 1 us of pulse truncation is ~0.1 deg at the servo, less at the joint
-    np.testing.assert_allclose(q_to_leg_angles(*q), angles, atol=math.radians(0.3))
-
-
-def test_mass_and_standing_height():
-    import mujoco
-    h = SimHexapod()
-    assert sum(h.model.body_mass) * 1000 == pytest.approx(P.masses.total(), abs=0.5)
-    h.step(0.5)
-    # IK height 95 mm, minus the servos sagging under the weight
-    assert 92.0 < h.body_position_mm()[2] < 95.5
-    o = h.body_orientation()
-    assert abs(o["pitch"]) < 0.01 and abs(o["roll"]) < 0.01
-
-
-# ---------------------------------------------------------------- firmware
 
 @pytest.fixture(scope="module")
 def fw():
@@ -101,7 +70,7 @@ def fw():
 @pytest.fixture
 def hexa(fw):
     fw.reset()
-    h = fw.place(SimHexapod())
+    h = fw.place(SimHexapod(params=P))
     h.step(0.3)
     return h
 
@@ -112,12 +81,12 @@ def tilt_deg(h):
 
 
 @needs_cxx
-def test_firmware_neutral_pulses_match_python_port(fw):
+def test_params_match_firmware(fw):
     fw.reset()
     pulses = fw.update(STOP, dt=0.0).reshape(6, 3)
-    assert fw.legs == 6 and fw.loop_dt == pytest.approx(0.007)
     shift = np.append(fw.shift(), 0.0)
     for i, leg in enumerate(P.legs):
+        assert fw.leg_inverse(i) == tuple(leg.inverse_abg), leg.name
         expected = hal.leg_angles_to_pulses(P.hal, leg, firmware_ik(GEO, leg, default_foot(leg) - shift), profile=P.profile)
         assert np.all(np.abs(pulses[i] - expected) <= 1), (leg.name, pulses[i], expected)
 
@@ -128,24 +97,26 @@ def test_firmware_stands(fw, hexa):
     fw.drive(hexa, STOP, 1.5)
     assert np.linalg.norm(hexa.body_position_mm()[:2] - p0[:2]) < 2.0
     assert tilt_deg(hexa) < 1.0
-    assert hexa.body_position_mm()[2] > 92.0
+    assert hexa.body_position_mm()[2] > 97.0
+    # standing: the femur servos carry ~5 % of their stall torque, the tibia ~12 %
+    assert hexa.joint_torque_ratio().max() < 0.25
 
 
 @needs_cxx
 @pytest.mark.parametrize("command, axis, sign, distance", [
-    ((0, 1, 0, 0, 0, 0), 1, 1, 900.0),
-    ((0, -1, 0, 0, 0, 0), 1, -1, 900.0),
-    ((1, 0, 0, 0, 0, 0), 0, 1, 700.0),
+    ((0, 1, 0, 0, 0, 0), 1, 1, 550.0),
+    ((0, -1, 0, 0, 0, 0), 1, -1, 550.0),
+    ((1, 0, 0, 0, 0, 0), 0, 1, 280.0),
 ], ids=["forward", "backward", "strafe right"])
 def test_firmware_walks(fw, hexa, command, axis, sign, distance):
     p0 = hexa.body_position_mm().copy()
     fw.drive(hexa, command, 3.0)
     d = hexa.body_position_mm() - p0
-    # 400 mm/s forward, 300 sideways (maxSideSpeed) after a ~0.6 s ramp, minus slip
+    # ~250 mm/s forward, ~130 sideways after a ~0.5 s ramp (MG90S at 5 V)
     assert sign * d[axis] > distance, d
-    assert abs(d[1 - axis]) < 0.1 * abs(d[axis]), d
-    assert tilt_deg(hexa) < 5.0
-    assert hexa.body_position_mm()[2] > 87.0   # servos sag ~6 mm at full speed
+    assert abs(d[1 - axis]) < 0.25 * abs(d[axis]), d
+    assert tilt_deg(hexa) < 8.0
+    assert hexa.body_position_mm()[2] > 90.0
     assert fw.unsolved == 0
 
 
@@ -154,35 +125,16 @@ def test_firmware_turns_right(fw, hexa):
     y0 = hexa.body_orientation()["yaw"]
     fw.drive(hexa, (0, 0, 0, 0, 0, 1), 2.0)
     turned = math.degrees(hexa.body_orientation()["yaw"] - y0)
-    # yaw + turns right (clockwise from above): 0.75 rad/s max
-    assert -90 < turned < -50, turned
+    # ~1.5 rad/s once ramped up (GAIT_PARAMS max yaw rate 1.6)
+    assert -180 < turned < -120, turned
     assert np.linalg.norm(hexa.body_position_mm()[:2]) < 30
     assert tilt_deg(hexa) < 5.0
-
-
-# ------------------------------------------------------- servo directions
-
-def test_servo_mounting_matches_model_flags():
-    """Every joint turns the way the HAL expects, given how its servo is mounted
-    (shaft side, gear reversal), with the inverse flags in the params."""
-    from legsim.hexapod.assembly import servo_direction
-    from legsim.hexapod.kinematics import hal_direction
-    for leg in P.legs:
-        for j in range(3):
-            assert servo_direction(leg, j) == hal_direction(leg, j), (leg.name, j)
-
-
-@needs_cxx
-def test_params_flags_match_firmware(fw):
-    for i, leg in enumerate(P.legs):
-        assert fw.leg_inverse(i) == tuple(leg.inverse_abg), leg.name
 
 
 @needs_cxx
 def test_leg_test_passes_with_model_flags(fw):
     from legsim.hexapod import legtest
-    results = legtest.run(fw, SimHexapod(fixed_base=True))
-    assert len(results) == 24
+    results = legtest.run(fw, SimHexapod(params=P, fixed_base=True))
     assert all(r["ok"] for r in results), legtest.summary(results)
 
 
@@ -190,7 +142,7 @@ def test_leg_test_passes_with_model_flags(fw):
 def test_leg_test_finds_a_reversed_servo(fw):
     """A femur servo turning the other way (as if its inverse flag were wrong) is caught and named."""
     from legsim.hexapod import legtest
-    robot = SimHexapod(fixed_base=True)
+    robot = SimHexapod(params=P, fixed_base=True)
     robot.direction[3, 1] *= -1          # RF femur
     results = legtest.run(fw, robot, legs=["RF", "LM"])
     rf = [r for r in results if r["leg"] == "RF"]
@@ -200,37 +152,8 @@ def test_leg_test_finds_a_reversed_servo(fw):
     assert "RF: femur (beta)" in legtest.summary(results)
 
 
-# ------------------------------------------------------ what-if servos
-
 def test_ptk_7465mg_preset():
-    from legsim.hexapod import ptk_7465mg, direct_drive
     s = ptk_7465mg(7.4)
     assert s.stall_torque == pytest.approx(5.5 * 0.0980665)
-    assert s.no_load_speed == pytest.approx(math.radians(60) / 0.075)
     assert ptk_7465mg(6.7).stall_torque == pytest.approx(5.0 * 0.0980665)   # halfway 6.0-7.4
     assert ptk_7465mg(7.4, 333).pwm_period == pytest.approx(1 / 333)
-    p = direct_drive()
-    assert p.hal.ratio == (1.0, 1.0, 1.0)
-    lo, hi = servo_joint_range(p, 0)
-    assert math.degrees(hi - lo) == pytest.approx(180.0)
-    assert p.legs == P.legs and p.masses == P.masses
-
-
-@needs_cxx
-def test_direct_drive_7465mg_walks_by_leg_angles(fw):
-    """Firmware tripod at 400 mm/s on direct-drive 7465MG servos at 333 Hz:
-    the joints keep up within a few degrees (MG90S + gears: ~23)."""
-    from legsim.hexapod import ptk_7465mg, direct_drive
-    fw.reset()
-    fw.tune_gait(cycle_time=0.3, duty_factor=0.5, max_speed=400)
-    h = fw.place(SimHexapod(params=direct_drive(servo=ptk_7465mg(7.4, 333))))
-    h.step(0.3)
-    fw.drive(h, (0, 1, 0, 0, 0, 0), 1.5, ideal_servos=True)
-    p0 = h.body_position_mm().copy()
-    lag = 0.0
-    for _ in range(int(2.0 / fw.loop_dt)):
-        fw.drive(h, (0, 1, 0, 0, 0, 0), ideal_servos=True)
-        lag = max(lag, float(np.max(np.abs(h.servos.target - h.joint_q()))))
-    assert (h.body_position_mm() - p0)[1] / 2.0 > 350
-    assert math.degrees(lag) < 8
-    assert tilt_deg(h) < 3

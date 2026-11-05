@@ -12,7 +12,20 @@ LR_point LegIK::legVector(const leg &l, const LR_figure &body)
 	foot     = lrRotateZ(foot, s, c);
 	shoulder = lrRotateZ(shoulder, s, c);
 
-	LR_point v = { foot.x - shoulder.x, foot.y - shoulder.y, foot.z - shoulder.z };
+	LR_point w = { foot.x - shoulder.x, foot.y - shoulder.y, foot.z - shoulder.z };
+	// and by the body tilt (BodyKinematics: shoulder = position + T * defaultBody,
+	// T = Ry(pitch) * Rx(roll)): the leg is mounted on the tilted body, so its
+	// foot must be in the body's frame, T^-1 * w. Without this only the shoulders
+	// moved up and down, and the body tilted by only (shoulder y / foot y) of the
+	// asked angle: about right for legs straight down (the dog), half for the
+	// hexapod's legs reaching out
+	float sp = sinf(body.orientation.pitch), cp = cosf(body.orientation.pitch);
+	float sr = sinf(body.orientation.roll),  cr = cosf(body.orientation.roll);
+	LR_point v = {
+		cp * w.x - sp * w.z,
+		sp * sr * w.x + cr * w.y + cp * sr * w.z,
+		sp * cr * w.x - sr * w.y + cp * cr * w.z
+	};
 	if (l.inverse.x) v.x = -v.x;
 	if (l.inverse.y) v.y = -v.y;
 	if (l.inverse.z) v.z = -v.z;

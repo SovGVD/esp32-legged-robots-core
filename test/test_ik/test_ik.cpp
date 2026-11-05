@@ -108,6 +108,37 @@ void test_ik_ignores_body_yaw_and_position()
 	TEST_ASSERT_FLOAT_WITHIN(1e-3f, a.angle.gamma, b.angle.gamma);
 }
 
+/**
+ * A tilted body with the feet still on the ground: the joint angles are the
+ * ones of the same foot in the (tilted) body frame, also for a foot reaching
+ * far out from the shoulder (hexapod: only half the tilt before the fix).
+ */
+void test_ik_works_in_the_tilted_body_frame()
+{
+	HexapodLegIK ik;
+	leg l = { { 0, "" }, { 35, 58, 0 }, { 88.7f, 101.3f, -100 }, { 60, 50, 60, 0, 0, 0 } };
+	LR_point fb = { 88.7f, 101.3f, -100 };   // foot in the body frame
+	l.body = l.defaultBody;
+	l.foot = fb;
+	iksolver a = ik.solve(l, ORIGIN, NO_MOVE);
+	TEST_ASSERT_TRUE(a.isSolved);
+
+	BodyKinematics bk;
+	LR_figure body = { { 0, 0, 0 }, { 0.05f, 0.18f, 0 } };   // 3 deg sideways, 10 deg nose up
+	bk.update(&l, 1, body, LR_angle{ 0, 0, 0 }, NO_MOVE);
+	// the foot where the tilted body has it: the same rotation BodyKinematics applies to the shoulder
+	leg probe = { { 1, "" }, fb, fb, { 60, 50, 60, 0, 0, 0 } };
+	bk.update(&probe, 1, body, LR_angle{ 0, 0, 0 }, NO_MOVE);
+	l.foot = probe.body;
+	LR_figure ikBody = body;
+	ikBody.orientation.pitch = bk.tilt().pitch;
+	ikBody.orientation.roll  = bk.tilt().roll;
+	iksolver b = ik.solve(l, ikBody, NO_MOVE);
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, a.angle.alpha, b.angle.alpha);
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, a.angle.beta,  b.angle.beta);
+	TEST_ASSERT_FLOAT_WITHIN(1e-3f, a.angle.gamma, b.angle.gamma);
+}
+
 void test_hexapod_knee_angle_matches_foot_distance()
 {
 	// Law of cosines: the tibia angle must reproduce the femur-joint-to-foot distance.
@@ -152,6 +183,7 @@ int main()
 	RUN_TEST(test_quadruped_ik_out_of_reach_is_finite_and_not_solved);
 	RUN_TEST(test_quadruped_ik_foot_on_shoulder_is_finite);
 	RUN_TEST(test_ik_ignores_body_yaw_and_position);
+	RUN_TEST(test_ik_works_in_the_tilted_body_frame);
 	RUN_TEST(test_hexapod_knee_angle_matches_foot_distance);
 	RUN_TEST(test_tank_drive_forward_and_turn);
 	return UNITY_END();

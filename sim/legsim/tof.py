@@ -35,6 +35,7 @@ class ToFArray:
         self.latency = latency
         self._queue = []         # (time left, frames) measured but not delivered yet
         self.last_hits = []      # world points (m) of the last frames, for drawing
+        self.servo = None        # sensor tilt servo, for drawing: {"pivot": body mm} (FirmwareCore sets it)
         self._geomgroup = np.array([1, 0, 0, 0, 0, 0], dtype=np.uint8)
         self._geomid = np.zeros(1, dtype=np.int32)
 
@@ -144,12 +145,45 @@ class ToFArray:
                             break
                         mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_LINE, np.zeros(3), np.zeros(3), np.eye(3).ravel(), rgba)
                         mujoco.mjv_connector(g, mujoco.mjtGeom.mjGEOM_LINE, 2.0, a, b)
+        if box and self.servo is not None:
+            self._draw_servo(R, p0, add)
         if hits:
             for p in self.last_hits:
                 if (g := add()) is None:
                     break
                 mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_SPHERE, np.array([0.0025, 0, 0]),
                                     np.asarray(p, dtype=float), np.eye(3).ravel(), np.array([0.1, 0.6, 1.0, 0.9], dtype=np.float32))
+
+    def _draw_servo(self, R, p0, add):
+        """The sensor tilt servo (an MG90S on its side, shaft across the body, just
+        behind the sensors) and the bracket that holds both sensors, tilted as the
+        sensors look now."""
+        pivot = np.asarray(self.servo["pivot"], dtype=float) * 0.001
+        # how far the sensors look down now (mean of their view centres, body frame)
+        downs = []
+        for s in self.sensors:
+            c, _ = self._corners(s["rays"])
+            downs.append(math.atan2(-c[2], math.hypot(c[0], c[1])))
+        a = float(np.mean(downs))
+        y = np.array([0.0, math.cos(a), -math.sin(a)])
+        x = np.array([1.0, 0.0, 0.0])
+        z = np.cross(x, y)
+        spread = max(abs(float(s["position"][0])) for s in self.sensors) * 0.001 + 0.007
+        parts = [
+            # servo body: 23 x 12.2 x 22.5 mm, shaft along x; fixed to the body
+            (pivot + np.array([0, -0.011, 0]), np.eye(3), np.array([0.0115, 0.0061, 0.0113]), (0.08, 0.08, 0.1, 1)),
+            # bracket plate behind the sensor boards, turning with them
+            (pivot - y * 0.004, np.column_stack([x, y, z]), np.array([spread, 0.001, 0.0055]), (0.85, 0.85, 0.8, 1)),
+            # its arm down to the servo horn
+            (pivot - y * 0.004 + z * -0.0005 + np.array([0, -0.004, 0]), np.column_stack([x, y, z]),
+             np.array([0.0015, 0.004, 0.004]), (0.85, 0.85, 0.8, 1)),
+        ]
+        for pos, mat, size, rgba in parts:
+            g = add()
+            if g is None:
+                return
+            mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_BOX, size, p0 + R @ pos, (R @ mat).ravel(),
+                                np.array(rgba, dtype=np.float32))
 
     def poll(self, robot, dt):
         """Call every control tick: a new frame list when the sensors have one, else None."""

@@ -59,7 +59,8 @@ class OccupancyGrid {
 		void cellCentre(int ix, int iy, float &x, float &y) const;
 		int8_t at(int ix, int iy) const { return _cells[iy * LR_LIDAR_GRID + ix]; }
 		const int8_t *cells() const { return _cells; }
-		/** Beam from (x0, y0) to (x1, y1), mm: cells along it free, the end cell occupied if hit. */
+		/** Beam from (x0, y0) to (x1, y1), mm: cells along it free, the end cell occupied if hit.
+		 *  A free space beam (hit false: nothing seen) stops at the first occupied cell. */
 		void addBeam(float x0, float y0, float x1, float y1, bool hit, int8_t hitStep, int8_t missStep, int8_t limit);
 		/**
 		 * Occupancy 0..1 at (x, y), bilinear between cell centres, and its
@@ -137,9 +138,12 @@ class LidarSlam {
 		/**
 		 * A scan collected some other way (the ToF room scan, TofScanBuilder):
 		 * n points (at most LR_LIDAR_BINS) already in the body frame of
-		 * odomEnd, mm; beams start at the body origin.
+		 * odomEnd, mm; beams start at the body origin. Optional free space
+		 * (fx, fy: nf beam ends where nothing was seen): the cells along those
+		 * beams become free, the end isn't marked occupied. Not used to match.
 		 */
-		LidarMatch addPoints(const float *x, const float *y, uint16_t n, const LR_pose2 &odomEnd);
+		LidarMatch addPoints(const float *x, const float *y, uint16_t n, const LR_pose2 &odomEnd,
+		                     const float *fx = nullptr, const float *fy = nullptr, uint16_t nf = 0);
 		/**
 		 * Something the scans can't see (too low, or the scan was thrown away)
 		 * stopped the robot at map point (x, y): make that cell occupied so the
@@ -183,6 +187,9 @@ class LidarSlam {
 		uint16_t _n = 0;
 		float    _dirX[LR_LIDAR_BINS];
 		float    _dirY[LR_LIDAR_BINS];
+		const float *_fx = nullptr;   // free space beam ends during addPoints (body frame), mm
+		const float *_fy = nullptr;
+		uint16_t _nf = 0;
 		float    _originX = 0;   // body frame start of the beams (the sensor), mm
 		float    _originY = 0;
 

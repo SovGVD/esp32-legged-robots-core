@@ -67,7 +67,10 @@ ap.add_argument("--nav", choices=("tof", "lidar"),
 ap.add_argument("--goal", nargs=2, type=float, metavar=("X", "Y"), help="with --nav: walk here first, mm")
 ap.add_argument("--mount", type=float, metavar="DEG", help="with --nav tof: ToF sensors DEG down (TOF_SENSORS)")
 ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --nav tof: nose up while scanning")
+ap.add_argument("--sensor-servo", type=float, metavar="DEG",
+                help="with --nav tof: a servo tilts the ToF sensors DEG up for a scan, the body stays level")
 ap.add_argument("--gyro-bias", type=float, default=1.0, help="with --nav: gyro drift, deg/s (default 1)")
+ap.add_argument("--mass", type=float, metavar="G", help="hexapod: total robot mass, g (default 815)")
 ap.add_argument("--floor", type=float, metavar="MM",
                 help="with --nav: rug, threshold, platform and tiles up to MM high (default 20 dog / 30 hexapod, 0 = none)")
 args = ap.parse_args()
@@ -101,6 +104,8 @@ if args.nav:
                 fw.set_tof_mount(i, args.mount)
         if args.scan_tilt is not None:
             fw.tune_tof_scan(tilt=math.radians(args.scan_tilt))
+        if args.sensor_servo is not None:
+            fw.tune_tof_scan(sensor_servo=1, tilt=math.radians(args.sensor_servo), tilt_rate=1.0)
         fw.set_tof_nav(True, subrays=2, latency=0.04)
     else:
         fw.set_lidar(True)
@@ -121,9 +126,11 @@ if args.nav:
 else:
     ground = scenario.scene(model, args.terrain, args.height)
 if model == "hexapod":
-    from legsim.hexapod import SimHexapod
-    dog = fw.place(SimHexapod(terrain=ground))
-    view_distance = 1.1
+    from legsim.hexapod import SimHexapod, HexapodParams
+    from legsim.hexapod.params import with_mass
+    hp = with_mass(HexapodParams(), args.mass) if args.mass else HexapodParams()
+    dog = fw.place(SimHexapod(params=hp, terrain=ground))
+    view_distance = 0.9
 else:
     dog = fw.place(SimDog(terrain=ground))
     view_distance = 0.7

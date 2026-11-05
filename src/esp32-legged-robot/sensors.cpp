@@ -137,8 +137,9 @@ class Mpu9250Imu : public Imu {
 				}
 				mag = magBody;
 			}
-			_yawRate = gyroBody[2];
-			_heading.update(dt, gyroBody[2], angle, mag);
+			_yawRate = lrHeadingRate(gyroBody, angle, _heading.gyroBias());   // also with the nose up
+			for (int i = 0; i < 3; i++) _gyro[i] = gyroBody[i];
+			_heading.update(dt, _yawRate, angle, mag);
 			return true;
 		}
 
@@ -153,6 +154,11 @@ class Mpu9250Imu : public Imu {
 
 		bool hasMagnetometer() const override { return _mag; }
 		float yawRate() const override { return _yawRate; }
+		bool gyro(float out[3]) const override
+		{
+			for (int i = 0; i < 3; i++) out[i] = _gyro[i];
+			return _ready;
+		}
 		float gyroBias() const override { return _heading.gyroBias(); }
 		bool headingAbsolute() const override { return _heading.absolute(); }
 
@@ -259,6 +265,7 @@ class Mpu9250Imu : public Imu {
 		uint32_t         _last  = 0;
 		uint8_t          _magTick = 0;
 		float            _yawRate = 0;
+		float            _gyro[3] = { 0, 0, 0 };
 		bool             _ready = false;
 		bool             _mag   = false;
 		volatile bool    _calibrating = false;

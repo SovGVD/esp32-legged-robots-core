@@ -8,10 +8,10 @@ Check that every hexapod servo turns the way the firmware expects.
 
 The robot hangs in the air. One leg at a time moves its foot up, out, forward
 and turns around its coxa, through the firmware's own IK and servo HAL (the
-inverse flags in model/hexapod/model_data.h), while the sim servos turn the
-way they are mounted on the real robot. A leg that moves the wrong way is
-reported with the joint and the inverse flag to flip. Edit model_data.h and
-run again: the firmware bridge rebuilds by itself.
+inverse flags in model/hexapod/model_data.h). The sim servos turn the way the
+flags say (the robot isn't built yet), so here it shows the moves to run on
+the real robot; a leg that moves the wrong way there points at the joint and
+the inverse flag to flip.
 """
 
 import argparse
@@ -54,7 +54,7 @@ if args.video:
         d = ImageDraw.Draw(img)
         color = (200, 0, 0) if label.endswith("WRONG") else (0, 120, 0) if label.endswith("OK") else (20, 20, 20)
         d.text((20, 16), label, fill=color, font=font)
-        d.text((20, 510), "front = +Y (camera board), view from front-right", fill=(60, 60, 60), font=font.font_variant(size=18) if hasattr(font, "font_variant") else font)
+        d.text((20, 510), "front = +Y (ToF sensors), view from front-right", fill=(60, 60, 60), font=font.font_variant(size=18) if hasattr(font, "font_variant") else font)
         frames.append(np.asarray(img))
 
 if args.view:

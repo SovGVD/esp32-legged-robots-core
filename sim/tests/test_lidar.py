@@ -196,3 +196,44 @@ def test_dog_walks_to_a_goal_with_terrain_sensing_on():
         fw.select_gait("default")
         fw.set_heading_sensors(None)
         fw.reset()
+
+
+@needs_cxx
+def test_tof_room_scan_with_a_sensor_tilt_servo():
+    """A servo tilts the hexapod's ToF sensors up for a scan (TofScanParams sensorServo)
+    instead of the body: both sensors 35 deg down for the ground while walking, 17 deg
+    for the walls. The body stays level and the scan sees the walls, not the floor."""
+    fw = scenario.core("hexapod")
+    try:
+        for i in range(len(fw.tof_sensors())):
+            fw.set_tof_mount(i, 35)
+        fw.tune_tof_scan(reset=True, sensor_servo=1, tilt=math.radians(18), tilt_rate=1.0)
+        fw.set_heading_sensors(gyro_bias_dps=1.0, magnetometer=False)
+        fw.set_tof_nav(True, subrays=2, latency=0.04)
+        robot = fw.place(scenario.make_robot("hexapod", terrain.rooms(scale=1.3)))
+        fw.drive(robot, duration=1.0)
+        fw.tof_scan()
+        t, lean, up = 0.0, [], 0.0
+        while t < 60:
+            fw.drive(robot)
+            t += fw.loop_dt
+            ns = fw.nav_state()
+            up = max(up, ns["sensor_tilt"])
+            if ns["phase"] == "turn":
+                o = robot.body_orientation()
+                lean.append(max(abs(o["roll"]), abs(o["pitch"])))
+            if t > 2 and ns["phase"] == "idle":
+                break
+        assert fw.nav_state()["phase"] == "idle" and fw.lidar_state()["scans"] == 1
+        assert up == pytest.approx(math.radians(18), abs=1e-3) and fw.nav_state()["sensor_tilt"] == 0
+        assert max(lean) < math.radians(3)                           # no nose up
+        pts = fw.lidar_points()
+        assert len(pts) > 200
+        assert np.hypot(pts[:, 0], pts[:, 1]).min() > 500          # no floor seen as walls
+    finally:
+        fw.set_tof_nav(False)
+        for i in range(len(fw.tof_sensors())):
+            fw.set_tof_mount(i, None)
+        fw.tune_tof_scan(reset=True)
+        fw.set_heading_sensors(None)
+        fw.reset()

@@ -121,25 +121,59 @@ def main():
     ap.add_argument("--mount", type=float, metavar="DEG",
                     help="with --tof: the ToF sensors look DEG down instead of their TOF_SENSORS angle")
     ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --tof: nose up while scanning (TOF_SCAN_PARAMS tilt)")
+    ap.add_argument("--sensor-servo", type=float, metavar="DEG",
+                    help="with --tof: a servo tilts the sensors DEG up for a scan, the body stays level "
+                         "(TOF_SCAN_PARAMS sensorServo; with --mount for the walking angle)")
+    ap.add_argument("--rescan", type=float, metavar="DEG",
+                    help="with --tof: later scans sweep DEG around the heading (TOF_SCAN_PARAMS rescanAngle; 0 = full turns)")
+    ap.add_argument("--floor", type=float, default=0, metavar="MM",
+                    help="rug, door threshold, platform and tiles up to MM high (drive.py's default: 20 dog / 30 hexapod)")
+    ap.add_argument("--sensing", choices=sorted(scenario.SENSING), default="none",
+                    help="rough ground sensing while walking (with the rough gait), like drive.py")
+    ap.add_argument("--obstacle", type=float, metavar="MM",
+                    help="with --tof: something this high ahead stops the walk (TOF_SCAN_PARAMS obstacleHeight)")
+    ap.add_argument("--stance-x", type=float, metavar="MM",
+                    help="feet MM out from the centre line (config.h LEG_POINT_X), an experiment")
+    ap.add_argument("--doubtful", type=float, metavar="L",
+                    help="map cells under L log-odds are doubtful walls: walk up and rescan (NAV_PARAMS doubtful)")
+    ap.add_argument("--log", action="store_true", help="with --tof: print every scan (match, pose error)")
+    ap.add_argument("--nav-speed", type=float, metavar="F",
+                    help="walking speed while navigating, 0..1 of the gait's max speed (NAV_PARAMS speed)")
     args = ap.parse_args()
 
     model = args.model
     goals = [tuple(g) for g in args.goal] if args.goal else GOALS[model]
     fw = FirmwareCore(model=model)
+    if args.stance_x is not None:
+        fw.set_stance(args.stance_x)
     fw.set_heading_sensors(gyro_bias_dps=args.gyro_bias, magnetometer=False, seed=args.seed)
+    if args.nav_speed is not None:
+        fw.tune_nav(speed=args.nav_speed)
+    if args.doubtful is not None:
+        fw.tune_nav(doubtful=args.doubtful)
     if args.tof:
         if args.mount is not None:
             for i in range(len(fw.tof_sensors())):
                 fw.set_tof_mount(i, args.mount)
         if args.scan_tilt is not None:
             fw.tune_tof_scan(tilt=math.radians(args.scan_tilt))
+        if args.sensor_servo is not None:
+            fw.tune_tof_scan(sensor_servo=1, tilt=math.radians(args.sensor_servo), tilt_rate=1.0)
+        if args.obstacle is not None:
+            fw.tune_tof_scan(obstacle_height=args.obstacle)
+        if args.rescan is not None:
+            fw.tune_tof_scan(rescan_angle=math.radians(args.rescan))
         # VL53L5CX: 8x8 at 15 Hz, closest target in each zone (2x2 rays), frames reach the firmware ~40 ms late
         fw.set_tof_nav(True, seed=args.seed, subrays=2, latency=0.04)
         sensor = "ToF room scans"
     else:
         fw.set_lidar(True, seed=args.seed)
         sensor = "LD06 lidar"
-    scene = terrain.rooms(scale=SCALE[model])
+    if args.sensing != "none":
+        fw.set_leveling(True)
+        fw.set_terrain(**scenario.SENSING[args.sensing])
+        fw.select_gait("rough")
+    scene = terrain.rooms(scale=SCALE[model], floor=args.floor)
     robot = fw.place(scenario.make_robot(model, scene))
     dt = fw.loop_dt
     view = (-2400 * SCALE[model], 2600 * SCALE[model], -1300 * SCALE[model], 5200 * SCALE[model])
@@ -156,12 +190,32 @@ def main():
     t = 0.0
     results = []
 
+    last_phase = ["idle", False]
+    phase_time = {}   # s in each scan phase, this scan (--log)
+
     def tick(goal):
         nonlocal t
         fw.drive(robot)
         t += dt
         p = robot.body_position_mm()
         mp, op = fw.lidar_pose()
+        if args.log and args.tof:
+            ns = fw.nav_state()
+            if ns["phase"] != "idle":
+                phase_time[ns["phase"]] = phase_time.get(ns["phase"], 0.0) + dt
+            if ns["phase"] == "idle" and last_phase[0] != "idle" and phase_time:
+                print("           phases: " + ", ".join(f"{k} {v:.1f} s" for k, v in phase_time.items()))
+                phase_time.clear()
+            if ns["phase"] == "turn" and last_phase[0] != "turn":
+                last_phase[1] = ns["partial"]
+            if ns["phase"] != "turn" and last_phase[0] == "turn":
+                ls = fw.lidar_state()
+                yaw = robot.body_orientation()["yaw"]
+                yerr = math.degrees(abs((mp[2] - yaw + math.pi) % (2 * math.pi) - math.pi))
+                print(f"  t {t:6.1f} s  {'partial' if last_phase[1] else 'full   '} scan: {ls['match']:9s} "
+                      f"score {ls['score']:.2f}, {ns['scan_points']:4d} points, pose error "
+                      f"{math.hypot(mp[0] - p[0], mp[1] - p[1]):4.0f} mm {yerr:4.1f} deg  at ({p[0]:5.0f}, {p[1]:5.0f})")
+            last_phase[0] = ns["phase"]
         if int(t / dt) % 10 == 0:
             true_path.append((p[0], p[1]))
             map_path.append((mp[0], mp[1]))

@@ -150,9 +150,14 @@ static void updateOdometry(float dt, float scanTilt)
 	if (gyro) {
 		tilt.pitch = IMU_DATA.pitch;
 		tilt.roll  = IMU_DATA.roll;
-		// the gyro's z axis tilts with the body (a ToF scan's nose up): a turn
-		// about the vertical shows on it as rate * cos(tilt)
-		yawRate = (imu().yawRate() - imu().gyroBias()) / (cosf(tilt.pitch) * cosf(tilt.roll));
+		// the heading rate, also with a ToF scan's nose up: both biases (the heading
+		// estimator's and the odometry's own) off the gyro's z first
+		float g[3];
+		if (imu().gyro(g)) {
+			yawRate = lrHeadingRate(g, tilt, imu().gyroBias() + odometry.bias()) - imu().gyroBias();
+		} else {
+			yawRate = imu().yawRate() - imu().gyroBias();
+		}
 	}
 	bool standing = gyro && !motion.gait().isActive();   // still: the odometry learns the gyro's bias
 	odometry.update(dt, motion.gait().velocity(), yawRate, standing);

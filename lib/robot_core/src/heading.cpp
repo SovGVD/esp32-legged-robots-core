@@ -26,6 +26,20 @@ float lrMagHeading(const float mag[3], const LR_angle &tilt)
 	return h < 0 ? h + TWO_PI_F : h;
 }
 
+float lrHeadingRate(const float gyro[3], const LR_angle &tilt, float bias)
+{
+	// the heading's rate (yaw of body = Rz(yaw) * Ry(pitch) * Rx(roll), as in
+	// BodyKinematics and lrMagHeading), not the rate about world up: the two
+	// differ while the tilt moves around (turning with the nose up wobbles), and
+	// the map wants the heading
+	float cp = cosf(tilt.pitch);
+	float cr = cosf(tilt.roll), sr = sinf(tilt.roll);
+	if (cp < 0.1f) {
+		cp = 0.1f;
+	}
+	return (gyro[1] * sr + (gyro[2] - bias) * cr) / cp + bias;
+}
+
 void MagCalibrator::reset()
 {
 	_n = 0;

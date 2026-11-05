@@ -190,7 +190,7 @@ const GaitParams GAIT_PARAMS_ROUGH = {
 // It holds its value during a trot (see BodyLeveler::update, hold).
 const LevelerParams LEVEL_PARAMS = {
 	0.0,   // kp
-	1.0,   // ki, 1/s
+	0.5,   // ki, 1/s
 	0.0,   // kd, s
 	0.25,  // limit, rad (~14 deg)
 	0.5,   // rate, rad/s
@@ -282,14 +282,16 @@ const LidarMapParams LIDAR_MAP_PARAMS = {
 
 const NavParams NAV_PARAMS = {
 	130,   // robot radius, mm: half the body length plus a little
-	100,   // + 100 mm that still costs more (doorways: walk in the middle)
+	200,   // + 200 mm that still costs more (doorways: walk in the middle)
 	350,   // lookahead, mm
 	120,   // arrived within 120 mm
 	0.8,   // forward command 0.8 of GAIT_PARAMS max speed
 	1.5,   // turn gain, 1/s
 	0.6,   // turn in place for heading errors over 35 deg
 	180,   // stop walking forward with something closer than 180 mm ahead
-	1.0    // replan every second
+	1.0,   // replan every second
+	40     // map cells under 40 log-odds (one scan's hit, from afar) are doubtful: the path may cross
+	       // them, and the ToF navigator walks up and looks again first (a doorway seen at a slant)
 };
 
 /**
@@ -314,7 +316,9 @@ const TofScanParams TOF_SCAN_PARAMS = {
 	1000,   // scan again after walking this far, mm
 	0.5,    // stand still 0.5 s before tilting up
 	40,     // walking: anything over 40 mm high ahead stops the robot
-	15      // body 15 mm lower while scanning: the legs reach a steeper tilt
+	15,     // body 15 mm lower while scanning: the legs reach a steeper tilt
+	0       // full turns every time. 2.6 = rescans sweep 150 deg (75 right, then left): in the sim that
+	        // wasn't faster overall (doubtful sweeps turn on all the way) and got lost more often
 };
 
 const LidarMapParams TOF_MAP_PARAMS = {
