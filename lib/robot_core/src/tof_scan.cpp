@@ -351,7 +351,11 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 		// stopped by something the map doesn't have (too low for the scan, or
 		// that scan was thrown away): put it in, the planner goes around
 		LR_pose2 pose = slam.pose(odom);
-		for (int k = -1; k <= 1; k++) {
+		// a strip as wide as the robot plus a cell each side: a low step or platform
+		// is wider than the point seen, and a few cells at a time sends the planner
+		// along its edge one cell further each time
+		int side = (int)(_nav.params().robotRadius / slam.grid().cellSize()) + 1;
+		for (int k = -side; k <= side; k++) {
 			float bx = _obstacle.x + k * slam.grid().cellSize(), by = _obstacle.y + slam.grid().cellSize() * 0.5f;
 			float mx, my;
 			lrPoseApply(pose, bx, by, mx, my);
@@ -361,6 +365,15 @@ LR_moveVector TofNavigator::update(float dt, LidarSlam &slam, const LR_pose2 &od
 		_nav.setGoal(_nav.goalX(), _nav.goalY());   // replan now
 	}
 	if (_walked >= _params.scanEvery) {
+		startScan();
+		return cmd;
+	}
+	float doubt = _nav.doubtDistance();
+	if (doubt > 300 && doubt < 700 && _walked > 250 && !blocked) {
+		// the path crosses a doubtful wall (seen once, from afar: often a doorway seen
+		// at a slant) just ahead: look again from here before walking into it. A wall
+		// gets hit again and the planner goes around, a doorway gets cleared
+		_wantFull = true;
 		startScan();
 		return cmd;
 	}

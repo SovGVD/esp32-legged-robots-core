@@ -322,7 +322,9 @@ const NavParams NAV_PARAMS = {
 	1.5,   // turn gain, 1/s
 	0.6,   // turn in place for heading errors over 35 deg
 	260,   // stop walking forward with something closer than 260 mm ahead
-	1.0    // replan every second
+	1.0,   // replan every second
+	40     // map cells under 40 log-odds (one scan's hit, from afar) are doubtful: the path may cross
+	       // them, and the ToF navigator walks up and looks again first (a doorway seen at a slant)
 };
 
 /**
@@ -345,9 +347,12 @@ const TofScanParams TOF_SCAN_PARAMS = {
 	40,     // hits lower than 40 mm above the floor are the floor
 	1200,   // scan again after walking this far, mm
 	0.5,    // stand still 0.5 s before tilting up
-	40,     // walking: anything over 40 mm high ahead stops the robot
+	25,     // walking: anything over 25 mm high ahead stops the robot (and goes into the map). Navigating
+	        // it walks open loop with a 30 mm step height: at 40 its feet caught on a 30 mm platform's
+	        // edge, it stood still while the odometry walked on, and the scans stopped fitting
 	15,     // body 15 mm lower while scanning: the legs reach a steeper tilt
-	0       // full turns every time: 150 deg partial rescans (2.6) got the hexapod lost in 1 of 2 sim runs
+	0,      // full turns every time: 150 deg partial rescans (2.6) got the hexapod lost in 1 of 2 sim runs
+	0       // no sensor servo (sim: drive.py --mount 35 --sensor-servo 18 tries one)
 };
 
 const LidarMapParams TOF_MAP_PARAMS = {

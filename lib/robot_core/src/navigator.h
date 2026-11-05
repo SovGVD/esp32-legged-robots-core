@@ -40,6 +40,9 @@ typedef struct {
 	float turnInPlace;    // rad, larger heading errors turn without walking
 	float stopDistance;   // mm, lidar points closer than this ahead stop the forward motion
 	float replanPeriod;   // s
+	float doubtful;       // log-odds: occupied cells under this (seen once, from afar) are doubtful, not walls:
+	                      // the path may cross them at a cost, and the ToF navigator walks up and looks
+	                      // again before it does (doubtDistance). 0 = every occupied cell blocks
 } NavParams;
 
 enum NavState : uint8_t {
@@ -83,6 +86,11 @@ class Navigator {
 		/** Path from the robot toward the goal at the last update, map frame mm. */
 		uint8_t path(const float *&x, const float *&y) const { x = _pathX; y = _pathY; return _pathLen; }
 
+		/**
+		 * mm along the planned path to its first cell with a doubtful wall
+		 * (NavParams::doubtful), -1 if none.
+		 */
+		float doubtDistance() const { return _doubtDist; }
 		/** Run the planner now (tests): false if the goal can't be reached from pose. */
 		bool plan(const OccupancyGrid &grid, const LR_pose2 &pose);
 
@@ -99,6 +107,8 @@ class Navigator {
 		float     _pathX[LR_NAV_PATH];
 		float     _pathY[LR_NAV_PATH];
 		uint8_t   _pathLen = 0;
+		float     _doubtDist = -1;
+		const int8_t *_fine = nullptr;   // the map cells the cost was built from
 		float     _cell = 100;        // planning cell, mm
 		int       _ox = 0, _oy = 0;   // window origin, planning cells from the map's corner
 		void placeWindow(const LR_pose2 &pose);
@@ -111,6 +121,7 @@ class Navigator {
 		bool startCell(const LR_pose2 &pose, int &ix, int &iy) const;
 		bool downhill(int &ix, int &iy) const;
 		void tracePath(const LR_pose2 &pose);
+		bool doubtfulCell(int x, int y) const;
 };
 
 #endif

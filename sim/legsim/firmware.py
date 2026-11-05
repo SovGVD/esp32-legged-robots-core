@@ -427,13 +427,13 @@ class FirmwareCore:
     def tune_nav(self, reset=False, **fields):
         """Override NAV_PARAMS fields (navigator.h) for experiments: robot_radius, margin, lookahead,
         goal_tolerance (mm), speed (0..1 of the gait's max), turn_gain, turn_in_place, stop_distance,
-        replan_period. Applies to the lidar and the ToF navigator from their next start."""
+        replan_period, doubtful (log-odds). Applies to the lidar and the ToF navigator from their next start."""
         keys = ("robot_radius", "margin", "lookahead", "goal_tolerance", "speed", "turn_gain", "turn_in_place",
-                "stop_distance", "replan_period")
+                "stop_distance", "replan_period", "doubtful")
         v = [float(fields.pop(k, -1)) for k in keys]
         if fields:
             raise TypeError(f"unknown fields {list(fields)}")
-        self.lib.rc_nav_tune((ctypes.c_float * 9)(*v), 1 if reset else 0)
+        self.lib.rc_nav_tune((ctypes.c_float * 10)(*v), 1 if reset else 0)
 
     def tune_terrain(self, reset=False, **fields):
         """Change TERRAIN_PARAMS fields for experiments (kept until tune_terrain(reset=True)),

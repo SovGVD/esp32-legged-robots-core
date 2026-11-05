@@ -486,6 +486,17 @@ all arrived, 0 rejected scans, heading error at the scans ~1.2 deg (2.8 with the
 tilt it would otherwise need, which the IMU's tilt estimate doesn't follow well while turning).
 Terrain tests about the same as the 35 / 22 mount (the 40 mm gap is still not crossed).
 
+**Doubtful walls** (`NAV_PARAMS` doubtful = 40 log-odds): a map cell hit by only one scan from
+afar (often a doorway seen at a slant) doesn't block the planner, it costs more. When the path
+crosses one 300-700 mm ahead, the robot stops and scans there first: a wall gets confirmed and
+the planner goes around, a doorway gets cleared. `lidar_nav.py --floor 30` puts drive.py's rug,
+threshold, platform and tiles in the rooms. With them the hexapod (walking open loop, 30 mm
+steps) caught its feet on the platform edge and got lost in about half the runs; it now stops at
+anything over 25 mm (`obstacleHeight`) and maps a strip as wide as itself: 0 rejected scans
+in 6 runs, 15 of 18 goals reached (the misses: ~0.2-1.9 m short of the goal behind the platform
+at timeout). The dog with the floor objects and ToF terrain sensing still gets lost in 2 of 3
+runs (not fixed yet).
+
 The legs can tilt the dog's nose up ~15 deg (with the crouch; 20 deg runs the legs out of reach)
 and the hexapod's ~10 deg (servo ranges). The sensors' top zone row looks 19.7 +- 2.8 deg above
 their axis, and a zone reports the floor under its lower edge before a wall further away, so the

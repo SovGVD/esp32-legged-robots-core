@@ -19,7 +19,8 @@
  * on until the goal. Once the map has a full scan, rescans on the way only
  * sweep rescanAngle around the heading (the matcher needs the map, not a
  * whole circle). A partial sweep that doesn't fit the map turns on all the
- * way round on the spot; scan() and a rejected full scan ask for a full turn again. While walking the sensors look down at the ground as
+ * way round on the spot; scan() and a rejected full scan ask for a full turn again. When the path
+ * crosses a doubtful wall (NavParams::doubtful) 300-700 mm ahead, it stops and scans there first. While walking the sensors look down at the ground as
  * usual and stop the robot in front of anything higher than obstacleHeight.
  *
  * With a sensor servo (sensorServo) the sensors tilt up instead of the body:

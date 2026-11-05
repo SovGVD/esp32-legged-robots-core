@@ -811,14 +811,14 @@ RC_API void rc_tofnav_tune(const float *v, int reset)
 }
 
 /** Override NAV_PARAMS fields (robot radius, margin, lookahead, goal tolerance, speed, turn gain,
- *  turn in place, stop distance, replan period; < 0 = keep; reset = 1 back to the model's) */
+ *  turn in place, stop distance, replan period, doubtful; < 0 = keep; reset = 1 back to the model's) */
 RC_API void rc_nav_tune(const float *v, int reset)
 {
 	if (reset) navParams = NAV_PARAMS;
 	float *f[] = { &navParams.robotRadius, &navParams.margin, &navParams.lookahead, &navParams.goalTolerance,
 	               &navParams.speed, &navParams.turnGain, &navParams.turnInPlace, &navParams.stopDistance,
-	               &navParams.replanPeriod };
-	for (int i = 0; i < 9; i++) if (v[i] >= 0) *f[i] = v[i];
+	               &navParams.replanPeriod, &navParams.doubtful };
+	for (int i = 0; i < 10; i++) if (v[i] >= 0) *f[i] = v[i];
 	if (tofNavOn) tofNav.begin(tofParams, navParams);
 }
 

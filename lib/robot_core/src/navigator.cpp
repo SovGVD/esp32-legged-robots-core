@@ -82,13 +82,16 @@ void Navigator::buildCost(const OccupancyGrid &grid)
 {
 	uint8_t *clr = _cost;
 	const int8_t *fine = grid.cells();
+	_fine = fine;
+	// doubtful (seen once, from afar) occupied cells don't block: they cost (below)
+	int sure = _params.doubtful > 1 ? (int)_params.doubtful : 1;
 	for (int y = 0; y < NAV_N; y++) {
 		for (int x = 0; x < NAV_N; x++) {
 			bool occ = false;
 			for (int fy = 0; fy < LR_NAV_FACTOR && !occ; fy++) {
 				const int8_t *row = fine + ((y + _oy) * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + (x + _ox) * LR_NAV_FACTOR;
 				for (int fx = 0; fx < LR_NAV_FACTOR; fx++) {
-					if (row[fx] > 0) {
+					if (row[fx] >= sure) {
 						occ = true;
 						break;
 					}
@@ -150,6 +153,9 @@ void Navigator::buildCost(const OccupancyGrid &grid)
 			}
 			if (unknown) {
 				cost += 15;
+			}
+			if (sure > 1 && doubtfulCell(x, y)) {
+				cost += 60;   // rather around, if there is a way that isn't much longer
 			}
 			clr[y * NAV_N + x] = (uint8_t)nmin(cost, 255);
 		}
@@ -269,9 +275,26 @@ bool Navigator::downhill(int &ix, int &iy) const
 	return true;
 }
 
+bool Navigator::doubtfulCell(int x, int y) const
+{
+	if (_fine == nullptr || _params.doubtful <= 1) {
+		return false;
+	}
+	for (int fy = 0; fy < LR_NAV_FACTOR; fy++) {
+		const int8_t *row = _fine + ((y + _oy) * LR_NAV_FACTOR + fy) * LR_LIDAR_GRID + (x + _ox) * LR_NAV_FACTOR;
+		for (int fx = 0; fx < LR_NAV_FACTOR; fx++) {
+			if (row[fx] > 0 && row[fx] < _params.doubtful) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void Navigator::tracePath(const LR_pose2 &pose)
 {
 	_pathLen = 0;
+	_doubtDist = -1;
 	int x, y;
 	if (_dist == nullptr || !startCell(pose, x, y)) {
 		return;
@@ -279,9 +302,20 @@ void Navigator::tracePath(const LR_pose2 &pose)
 	_pathX[0] = pose.x;
 	_pathY[0] = pose.y;
 	_pathLen = 1;
+	float along = 0, lx = pose.x, ly = pose.y;
 	for (int step = 0; step < 4 * NAV_N; step++) {
 		if (!downhill(x, y)) {
 			break;
+		}
+		if (_doubtDist < 0) {
+			float cx, cy;
+			centre(x, y, cx, cy);
+			along += hypotf(cx - lx, cy - ly);
+			lx = cx;
+			ly = cy;
+			if (doubtfulCell(x, y)) {
+				_doubtDist = along;
+			}
 		}
 		if (step % 2 == 1 && _pathLen < LR_NAV_PATH - 1) {
 			centre(x, y, _pathX[_pathLen], _pathY[_pathLen]);

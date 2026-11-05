@@ -289,7 +289,9 @@ const NavParams NAV_PARAMS = {
 	1.5,   // turn gain, 1/s
 	0.6,   // turn in place for heading errors over 35 deg
 	180,   // stop walking forward with something closer than 180 mm ahead
-	1.0    // replan every second
+	1.0,   // replan every second
+	40     // map cells under 40 log-odds (one scan's hit, from afar) are doubtful: the path may cross
+	       // them, and the ToF navigator walks up and looks again first (a doorway seen at a slant)
 };
 
 /**

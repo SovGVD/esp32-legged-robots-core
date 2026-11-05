@@ -273,6 +273,36 @@ void test_planner_no_path_when_closed()
 	TEST_ASSERT_FALSE(nav.plan(slam.grid(), { -1200, 0, 0 }));
 }
 
+void test_planner_crosses_a_doubtful_wall_and_says_where()
+{
+	// the door seen once at a slant: one weak hit (20) in the doorway, the wall around it sure (60)
+	buildMap();
+	OccupancyGrid &g = const_cast<OccupancyGrid &>(slam.grid());
+	drawWalls(g);
+	for (float x = -2000; x < 2000; x += 25) {
+		if (x > 1000 && x < 1600) continue;
+		for (int k = 0; k < 3; k++) g.addBeam(x, 1100, x, 1200, true, 20, 0, 100);
+	}
+	for (float x = 1025; x < 1600; x += 50) {   // one hit per 50 mm cell
+		g.addBeam(x, 1100, x, 1200, true, 20, 0, 100);
+	}
+	NavParams p = NAV;
+	nav.begin(p);
+	nav.setGoal(-1200, 1700);
+	TEST_ASSERT_FALSE(nav.plan(slam.grid(), { -1200, 0, 0 }));   // every occupied cell blocks
+	p.doubtful = 40;
+	nav.begin(p);
+	nav.setGoal(-1200, 1700);
+	TEST_ASSERT_TRUE(nav.plan(slam.grid(), { -1200, 0, 0 }));
+	const float *x, *y;
+	uint8_t n = nav.path(x, y);
+	for (uint8_t i = 0; i < n; i++) {
+		if (y[i] > 1050 && y[i] < 1250) TEST_ASSERT_TRUE(x[i] > 1000 && x[i] < 1600);   // the doorway only
+	}
+	// the doubtful cells are ~2.6 m along the path (right to the door, then up)
+	TEST_ASSERT_TRUE(nav.doubtDistance() > 1500 && nav.doubtDistance() < 3500);
+}
+
 int main(int argc, char **argv)
 {
 	UNITY_BEGIN();
@@ -286,5 +316,6 @@ int main(int argc, char **argv)
 	RUN_TEST(test_slam_rejects_a_bad_fit);
 	RUN_TEST(test_planner_goes_through_the_door);
 	RUN_TEST(test_planner_no_path_when_closed);
+	RUN_TEST(test_planner_crosses_a_doubtful_wall_and_says_where);
 	return UNITY_END();
 }
