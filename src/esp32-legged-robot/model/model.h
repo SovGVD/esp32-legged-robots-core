@@ -13,6 +13,8 @@
 	#include "tank/config.h"
 #elif ROBOT_MODEL == MODEL_HEXAPOD
 	#include "hexapod/config.h"
+#elif ROBOT_MODEL == MODEL_HEXAPOD2
+	#include "hexapod2/config.h"
 #else
 	#error "Unknown ROBOT_MODEL"
 #endif

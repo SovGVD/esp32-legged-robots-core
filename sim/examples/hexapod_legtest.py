@@ -5,6 +5,7 @@ Check that every hexapod servo turns the way the firmware expects.
   python examples/hexapod_legtest.py --leg RF        # one leg
   python examples/hexapod_legtest.py --video legtest.mp4
   python examples/hexapod_legtest.py --view          # watch it in the MuJoCo viewer (needs a display)
+  python examples/hexapod_legtest.py --hexapod2      # the new hexapod (model/hexapod2)
 
 The robot hangs in the air. One leg at a time moves its foot up, out, forward
 and turns around its coxa, through the firmware's own IK and servo HAL (the
@@ -28,10 +29,18 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--leg", action="append", help="LF, LM, LR, RF, RM or RR (repeat for several); default all")
 ap.add_argument("--video")
 ap.add_argument("--view", action="store_true")
+ap.add_argument("--hexapod2", action="store_true", help="the new hexapod (MG90S direct drive)")
 args = ap.parse_args()
 
-fw = FirmwareCore(model="hexapod")
-robot = SimHexapod(fixed_base=True)
+if args.hexapod2:
+    # its servos turn the way the flags say (nothing mounted yet), so this checks the
+    # moves themselves; the short rear legs reach ~12 mm forward, so 15 mm moves
+    from legsim.hexapod import new_body
+    fw = FirmwareCore(model="hexapod2")
+    robot = SimHexapod(params=new_body.params(), fixed_base=True)
+else:
+    fw = FirmwareCore(model="hexapod")
+    robot = SimHexapod(fixed_base=True)
 on_frame = None
 frames = []
 
@@ -72,7 +81,7 @@ if args.view:
         if lag > 0:
             time.sleep(lag)
 
-results = legtest.run(fw, robot, legs=args.leg, on_frame=on_frame)
+results = legtest.run(fw, robot, legs=args.leg, on_frame=on_frame, move=15.0 if args.hexapod2 else legtest.MOVE)
 print("inverse flags (alpha, beta, gamma) in model_data.h:")
 for i, leg in enumerate(robot.p.legs):
     print(f"  {leg.name}: {fw.leg_inverse(i)}")

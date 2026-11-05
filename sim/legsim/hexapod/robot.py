@@ -11,7 +11,8 @@ plus set_leg_angles(), set_feet(), set_joint_targets() and ground truth, like Si
 Pulses turn the joints the way the real servos would (assembly.servo_direction:
 shaft side, gear reversal, servo turning direction), not the way the firmware's
 inverse flags say. So a wrong flag in model_data.h makes a leg move the wrong
-way here too; `hal_mapping=True` gives the old behaviour (the sim follows the flags).
+way here too; `hal_mapping=True` gives the old behaviour (the sim follows the flags),
+the default for the new hexapod (new_body.py), which has no servo mounting yet.
 """
 
 import math
@@ -31,10 +32,11 @@ JOINT_NAMES = ("coxa", "femur", "tibia")
 
 
 class SimHexapod(SimDog):
-    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False, hal_mapping=False, terrain=None):
+    def __init__(self, params: HexapodParams = None, trim=None, fixed_base=False, hal_mapping=None, terrain=None):
         self.p = params or HexapodParams()
         self.terrain = terrain
-        self.hal_mapping = hal_mapping
+        # a robot without CAD parts (new_body.py) has no servo mounting to follow: use the flags
+        self.hal_mapping = (self.p.parts == "simple") if hal_mapping is None else hal_mapping
         self.direction = np.array([[servo_direction(leg, j) for j in range(3)] for leg in self.p.legs])
         self.fixed_base = fixed_base
         self.xml = build_xml(self.p, fixed_base=fixed_base)

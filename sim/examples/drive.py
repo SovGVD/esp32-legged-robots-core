@@ -9,6 +9,7 @@ Drive the simulated dog by hand with the real firmware motion code.
   python examples/drive.py --nav tof                         # two rooms: ToF room scans, click the map to walk there
   python examples/drive.py --hexapod --nav lidar             # the same with the LD06 lidar
   python examples/drive.py --hexapod --servos mg90s-direct   # what-if: MG90S without the printed gears
+  python examples/drive.py --hexapod2                        # the new hexapod (MG90S direct drive, model/hexapod2)
 
 --terrain: flat, bumps, rocks, rubble, bars, step, drop, gaps, bridge, course
 (legsim/terrain.py, sized for the robot). With a terrain the gait is the slower
@@ -58,6 +59,7 @@ from legsim import scenario, terrain as terrains  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--hexapod", action="store_true")
+ap.add_argument("--hexapod2", action="store_true", help="the new hexapod design (MG90S direct drive, not built yet)")
 ap.add_argument("--terrain", default="flat", choices=sorted(terrains.SCENES))
 ap.add_argument("--height", type=float, help="obstacle / deck height, mm (default: per robot)")
 ap.add_argument("--sensing", choices=sorted(scenario.SENSING),
@@ -71,12 +73,12 @@ ap.add_argument("--scan-tilt", type=float, metavar="DEG", help="with --nav tof: 
 ap.add_argument("--gyro-bias", type=float, default=1.0, help="with --nav: gyro drift, deg/s (default 1)")
 ap.add_argument("--servos", default="geared", choices=("geared", "mg90s-direct", "mg90s-direct-6v"),
                 help="hexapod: MG90S + printed gears (now), or MG90S driving the joints directly at 5 / 6 V")
-ap.add_argument("--mass", type=float, metavar="G", help="hexapod: total robot mass, g (default ~892, min ~840)")
+ap.add_argument("--mass", type=float, metavar="G", help="hexapod: total robot mass, g (default ~892, min ~840); hexapod2: default 815")
 ap.add_argument("--floor", type=float, metavar="MM",
                 help="with --nav: rug, threshold, platform and tiles up to MM high (default 20 dog / 30 hexapod, 0 = none)")
 args = ap.parse_args()
 
-model = "hexapod" if args.hexapod else "dog"
+model = "hexapod2" if args.hexapod2 else "hexapod" if args.hexapod else "dog"
 if args.nav:
     # nav + ToF terrain sensing together (sim/README "Nav with terrain sensing"): the dog
     # walks to goals with it; the hexapod loses its place with the rough gait, off for now
@@ -136,6 +138,11 @@ if model == "hexapod":
         hp = with_mass(hp, args.mass)
     dog = fw.place(SimHexapod(params=hp, terrain=ground))
     view_distance = 1.1
+elif model == "hexapod2":
+    from legsim.hexapod import SimHexapod, new_body
+    hp = new_body.params(total_g=args.mass or 815.0)
+    dog = fw.place(SimHexapod(params=hp, terrain=ground))
+    view_distance = 0.9
 else:
     dog = fw.place(SimDog(terrain=ground))
     view_distance = 0.7

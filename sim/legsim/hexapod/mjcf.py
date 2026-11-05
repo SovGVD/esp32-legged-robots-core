@@ -12,7 +12,9 @@ Per leg (coxa link at leg.body, its X along the leg's neutral direction):
 See kinematics.py for the mapping to firmware leg angles.
 
 Visuals and mass come from Gleb's printed parts (STL meshes, placed by
-assembly.py) plus boxes for the servos, battery and electronics. Collisions use
+assembly.py) plus boxes for the servos, battery and electronics; for a robot
+without CAD parts yet (params.parts == "simple", new_body.py) from
+simple_parts.py. Collisions use
 simple shapes (body box, leg capsules, foot spheres); only the floor collides
 with the robot.
 """
@@ -98,14 +100,9 @@ class _Geoms:
         return "\n".join(self.xml)
 
 
-def build_xml(p: HexapodParams = None, fixed_base: bool = False, meshdir: str = None) -> str:
-    """fixed_base: body welded in the air 0.3 m up (bench tests of the servos).
-    meshdir: where the STL meshes are; default is the absolute path of models/meshes/hexapod."""
-    p = p or HexapodParams()
-    geo, m, sv, env = p.geometry, p.masses, p.servo, p.env
-    meshdir = meshdir or MESH_DIR
-
-    # ---- body: printed halves, coxa servos, battery, electronics
+def _stl_torso(p):
+    """Body from Gleb's printed parts: halves, coxa servos, battery, electronics."""
+    m = p.masses
     torso = _Geoms(np.eye(3), "")
     for it in assembly.torso_parts():
         torso.add(it)
@@ -123,12 +120,50 @@ def build_xml(p: HexapodParams = None, fixed_base: bool = False, meshdir: str = 
     torso.add(("box", "esp32cam", np.eye(3), (0, 91, -12), (13.5, 2.5, 20)), mass=10.0, rgba="0.05 0.05 0.05 1")
     torso.add(("box", "electronics", np.eye(3), (0, 0, 2), (25, 15, 3)), mass=m.electronics - 28.0, rgba="0.1 0.4 0.2 1")
     torso.lump(m.torso, (0, 0, 0), "torso_misc")
+    return torso
+
+
+def _stl_leg(p, leg):
+    """Coxa, femur and tibia link parts from the printed parts."""
+    geo, m, n = p.geometry, p.masses, leg.name
+    mir = assembly.leg_mirror(leg)
+    cx = _Geoms(mir, n + "_")
+    for it in assembly.coxa_parts():
+        cx.add(it)
+    cx.lump(m.coxa, (20, 0, 0), "coxa_misc")
+    fe = _Geoms(mir, n + "_")
+    for it in assembly.femur_parts():
+        fe.add(it)
+    fe.lump(m.femur, (geo.femur / 2, 0, 0), "femur_misc")
+    ti = _Geoms(mir, n + "_")
+    for it in assembly.tibia_parts(geo.femur):
+        ti.add(it)
+    ti.lump(m.tibia, (0, 0, -geo.tibia / 2), "tibia_misc")
+    return cx, fe, ti
+
+
+def build_xml(p: HexapodParams = None, fixed_base: bool = False, meshdir: str = None) -> str:
+    """fixed_base: body welded in the air 0.3 m up (bench tests of the servos).
+    meshdir: where the STL meshes are; default is the absolute path of models/meshes/hexapod."""
+    p = p or HexapodParams()
+    geo, m, sv, env = p.geometry, p.masses, p.servo, p.env
+    meshdir = meshdir or MESH_DIR
+
+    simple = p.parts == "simple"
+    if simple:
+        from . import simple_parts
+        torso = simple_parts.torso(p)
+    else:
+        torso = _stl_torso(p)
 
     legs_xml, actuators, sensors = [], [], []
     margin = math.radians(10)
     for leg in p.legs:
         n = leg.name
-        mir = assembly.leg_mirror(leg)
+        if simple:
+            cx, fe, ti = simple_parts.leg(p, leg)
+        else:
+            cx, fe, ti = _stl_leg(p, leg)
 
         def joint(name, axis, j):
             rng = servo_joint_range(p, j)
@@ -137,19 +172,6 @@ def build_xml(p: HexapodParams = None, fixed_base: bool = False, meshdir: str = 
                     f'range="{_f(rng[0] - margin, rng[1] + margin)}" '
                     f'armature="{sv.armature * ratio * ratio:.6g}" '
                     f'frictionloss="{sv.friction * ratio:.6g}" damping="0.0005"/>')
-
-        cx = _Geoms(mir, n + "_")
-        for it in assembly.coxa_parts():
-            cx.add(it)
-        cx.lump(m.coxa, (20, 0, 0), "coxa_misc")
-        fe = _Geoms(mir, n + "_")
-        for it in assembly.femur_parts():
-            fe.add(it)
-        fe.lump(m.femur, (geo.femur / 2, 0, 0), "femur_misc")
-        ti = _Geoms(mir, n + "_")
-        for it in assembly.tibia_parts(geo.femur):
-            ti.add(it)
-        ti.lump(m.tibia, (0, 0, -geo.tibia / 2), "tibia_misc")
 
         L = geo.tibia
         foot_z = -(L - geo.foot_radius)
@@ -176,8 +198,8 @@ def build_xml(p: HexapodParams = None, fixed_base: bool = False, meshdir: str = 
             actuators.append(f'<motor name="{n}_{jn}" joint="{n}_{jn}" gear="1" ctrllimited="true" ctrlrange="{_f(-lim, lim)}"/>')
         sensors.append(f'<touch name="{n}_contact" site="{n}_foot_site"/>')
 
-    meshes = []
-    for name in MESHES:
+    meshes = simple_parts.meshes(p) if simple else []
+    for name in () if simple else MESHES:
         for suffix, sx in (("", 1), ("_m", -1)):
             meshes.append(f'<mesh name="hx_{name}{suffix}" file="{name}.stl" scale="{_f(sx * MM, MM, MM)}" inertia="shell"/>')
 

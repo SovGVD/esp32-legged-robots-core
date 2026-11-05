@@ -6,7 +6,7 @@
  * firmware's own code: MotionController (gait engine, body kinematics, IK)
  * and the servo HAL from lib/robot_core, with the dog's legs, servo profile
  * and gait parameters from src/esp32-legged-robot/model/<model>/model_data.h
- * (ROBOT_MODEL: MODEL_DOG or MODEL_HEXAPOD).
+ * (ROBOT_MODEL: MODEL_DOG, MODEL_HEXAPOD or MODEL_HEXAPOD2).
  * Only the hardware is replaced: pulses go to SimDog.write_pulses() and the
  * IMU angles come from the sim.
  */
@@ -25,6 +25,10 @@
 #elif ROBOT_MODEL == MODEL_HEXAPOD
 	#include "model/hexapod/config.h"
 	#include "model/hexapod/model_data.h"
+	static HexapodLegIK modelIK;
+#elif ROBOT_MODEL == MODEL_HEXAPOD2
+	#include "model/hexapod2/config.h"
+	#include "model/hexapod2/model_data.h"
 	static HexapodLegIK modelIK;
 #else
 	#error "The simulator bridge supports the dog and hexapod models only"

@@ -27,7 +27,7 @@ FW_SRC = os.path.join(REPO_DIR, "src", "esp32-legged-robot")
 BRIDGE = os.path.join(SIM_DIR, "bridge", "robot_core_bridge.cpp")
 BUILD_DIR = os.path.join(SIM_DIR, "build")
 # ROBOT_MODEL values from def/def.h
-MODELS = {"dog": 100, "hexapod": 103}
+MODELS = {"dog": 100, "hexapod": 103, "hexapod2": 104}
 LIB_PATH = os.path.join(BUILD_DIR, "librobot_core_bridge.so")
 
 

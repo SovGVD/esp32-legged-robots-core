@@ -29,6 +29,7 @@ SENSING = {
 DEFAULTS = {
     "dog": {"gait": "rough", "speed": 1.0, "scale": 1.0},
     "hexapod": {"gait": "rough", "speed": 1.0, "scale": 1.5},   # higher than ~30 mm: femur servo range
+    "hexapod2": {"gait": "rough", "speed": 1.0, "scale": 1.5},  # the new hexapod (new_body.py)
 }
 
 
@@ -77,6 +78,9 @@ def make_robot(model, terrain):
     if model == "hexapod":
         from .hexapod import SimHexapod
         return SimHexapod(terrain=terrain)
+    if model == "hexapod2":
+        from .hexapod import SimHexapod, new_body
+        return SimHexapod(params=new_body.params(), terrain=terrain)
     return SimDog(terrain=terrain)
 
 

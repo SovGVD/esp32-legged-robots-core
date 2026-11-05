@@ -145,6 +145,7 @@ class HexapodParams:
     legs: tuple = LEGS
     imu_pos: tuple = (0.0, 0.0, 0.0)    # mm, MPU9250 position unknown: body centre [est]
     profile: tuple = SERVO_PROFILE
+    parts: str = "stl"                  # "stl": Gleb's printed parts (meshes); "simple": boxes (new_body.py)
 
 
 # ------------------------------------------------------------ other servos

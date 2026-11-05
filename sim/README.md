@@ -570,6 +570,35 @@ what the sim reads on a grippy floor.
 
     python tools/hexapod_leg_sizing.py --mass 800 --shape 60 40 90 18 75
 
+### The new hexapod (MG90S direct drive)
+
+The "Recommended" design from the body study: hexagon body, coxa / femur /
+tibia 60 / 50 / 60 mm, MG90S straight on every joint (no printed gears), front
+legs opened 20 deg wider so the ToFs (+-20 deg) see past them, ~815 g. Not
+built yet. Firmware: `src/esp32-legged-robot/model/hexapod2` (`pio run -e
+robot-hexapod2`); sim: `legsim/hexapod/new_body.py` (boxes instead of CAD
+parts, `simple_parts.py`). The servos turn the way the inverse flags say,
+since there is no mounting to check yet.
+
+    python examples/drive.py --hexapod2                      # drive it live
+    python examples/drive.py --hexapod2 --terrain rubble
+    python examples/drive.py --hexapod2 --nav tof            # rooms, click the map
+    python examples/hexapod_legtest.py --hexapod2
+
+What the sim says (MG90S datasheet at 5 V, 815 g, `tests/test_hexapod2.py`):
+
+* Standing: femur servos at ~5 % of stall, tibia ~12 % (the feet stand
+  nearly under the femur axis; the current geared robot: 30 % femur).
+* Tripod, 0.3 s cycle: ~250 mm/s forward with the servos at their torque limit
+  ~2 % of the time; ~130 mm/s sideways; ~0.7 rad/s turning. Faster (400 mm/s
+  asked, ~380 walked) works but the femur servos saturate 38 % of the time.
+* Rough ground (`scenario.run("hexapod2", ...)`): crosses the course and
+  rubble like the current hexapod, but some of the terrain code's foot targets
+  are out of the short legs' reach (`reach` rejects, a few hundred per walk);
+  worth tuning once it is built.
+* Room scans: the right ToF looks 22 deg down like the current hexapod's. With
+  both at 35 deg the scan needs the nose ~18 deg up and the legs only give ~11.
+
 ### Nav with terrain sensing
 
 The same ToF sensors can feed the terrain map and the room scans at once (`terrain on` plus a
