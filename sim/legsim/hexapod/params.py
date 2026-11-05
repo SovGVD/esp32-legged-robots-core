@@ -90,24 +90,23 @@ class HexGeometry:
     femur_axis_z: float = -BOTTOM_Z  # body origin above the bottom of the body [design]
     torso_size: tuple = (110.0, 150.0, TOP_Z + 3 - BOTTOM_Z)   # collision box [design]
     torso_z: float = (TOP_Z + 3 + BOTTOM_Z) / 2                # box centre relative to the body origin
-    foot_radius: float = 5.0        # lever switch pad [est]
+    foot_radius: float = 6.0        # half-sphere foot [CAD]
     femur_width: float = 7.0        # collision capsule radius, only the floor collides [est]
     tibia_width: float = 5.0
 
 
 @dataclass
 class HexMasses:
-    """Grams, ~900 g in all. Legs: coxa prints 14.3 + femur servo 13.4; femur
-    prints 11.5 + tibia servo 13.4; tibia prints 9.4 + foot switch 2 [CAD,
-    cad/hexapod, solid PLA: real prints with infill come out somewhat lighter].
-    Body: the rest (6 coxa servos, cells, boards, plates, wires) [design], not
-    yet from CAD."""
-    torso: float = 516.2
+    """Grams, ~1065 g in all. Legs: coxa print 24.7 + its servo 13.4; femur print
+    18.8 + 2 servos; tibia prints 13.8 + foot switch 2 [CAD, cad/hexapod, solid PLA:
+    real prints with infill come out somewhat lighter]. Body: plates 147.5 [CAD], cells,
+    boards, screws, wires [design]."""
+    torso: float = 468.3
     battery: float = 100.0      # 2x 18650 (~47 g each) + holder [ds, est]
     electronics: float = 55.0   # ESP32, 2x PCA9685, 7x Mini360, GY-91, 2x VL53L5CX, fuse, switch [est]
-    coxa: float = 27.7
-    femur: float = 24.9
-    tibia: float = 11.4
+    coxa: float = 38.1
+    femur: float = 45.6
+    tibia: float = 15.8
 
     def total(self) -> float:
         return self.torso + 6 * (self.coxa + self.femur + self.tibia)
@@ -165,7 +164,7 @@ class HexapodParams:
     hal: HexHalParams = field(default_factory=HexHalParams)
     env: Environment = field(default_factory=Environment)
     legs: tuple = LEGS
-    imu_pos: tuple = (0.0, 0.0, TOP_Z - 3.0)    # GY-91 under the top cover, body centre [design]
+    imu_pos: tuple = (0.0, 0.0, 11.0)    # GY-91 under the top plate, body centre [CAD]
     profile: tuple = SERVO_PROFILE
 
 

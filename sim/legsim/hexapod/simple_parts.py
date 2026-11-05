@@ -73,19 +73,13 @@ def torso(p):
     t = _Parts("")
     # bottom plate and the (see-through) top cover
     t.raw(f'<geom name="body_bottom" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, BOTTOM_Z * MM)}" '
-          f'mass="{30 * G:.6g}" rgba="{PLA_LIGHT}"/>', 30.0)
+          f'mass="{92.7 * G:.6g}" rgba="{PLA_LIGHT}"/>', 92.7)
     t.raw(f'<geom name="body_top" type="mesh" mesh="hx2_plate" class="part" pos="{_f(0, 0, TOP_Z * MM)}" '
-          f'mass="{22 * G:.6g}" rgba="0.85 0.82 0.77 0.35"/>', 22.0)
-    # coxa servos upright, shaft on the coxa axis, body towards the centre
-    for leg in p.legs:
-        c, s = math.cos(leg.yaw), math.sin(leg.yaw)
-        off = SERVO_LEN / 2 - SHAFT_FROM_END
-        pos = (leg.body[0] - c * off, leg.body[1] - s * off, -6.0)
-        t.box(f"{leg.name}_coxa_servo", pos, (SERVO_LEN / 2, SERVO_WID / 2, SERVO_HGT / 2), SERVO_MASS, SERVO, leg.yaw)
+          f'mass="{54.8 * G:.6g}" rgba="0.85 0.82 0.77 0.35"/>', 54.8)
     # 2x 18650 at the bottom centre, along the body
-    for x in (-9.5, 9.5):
+    for x in (-9.9, 9.9):
         t.raw(f'<geom name="cell_{"l" if x < 0 else "r"}" type="cylinder" class="part" size="{_f(9 * MM, 32.5 * MM)}" '
-              f'pos="{_f(x * MM, 0, -17 * MM)}" euler="1.5708 0 0" mass="{m.battery / 2 * G:.6g}" rgba="{CELL}"/>',
+              f'pos="{_f(x * MM, -3.5 * MM, -14.8 * MM)}" euler="1.5708 0 0" mass="{m.battery / 2 * G:.6g}" rgba="{CELL}"/>',
               m.battery / 2)
     e0 = t.used
     # a PCA9685 + 3 Mini360 board standing along each side
@@ -107,24 +101,26 @@ def torso(p):
 
 
 def leg(p, leg):
-    """Coxa, femur and tibia link parts: printed brackets + the servo at the far end of each."""
+    """Coxa, femur and tibia link parts: the servos are in the links (cad/hexapod): the
+    coxa carries its own servo, the femur both the femur and the tibia servo."""
     geo, m, n = p.geometry, p.masses, leg.name
     servo_half = (SERVO_LEN / 2, SERVO_HGT / 2, SERVO_WID / 2)     # shaft along the link Y (the joint axis)
     off = SERVO_LEN / 2 - SHAFT_FROM_END
 
     cx = _Parts(n + "_")
-    cx.box("coxa_bracket", (geo.coxa / 2, 0, -9), (geo.coxa / 2 - 4, 7, 2), 14.3, PLA)
-    cx.box("femur_servo", (geo.coxa - off, 0, 0), servo_half, SERVO_MASS, SERVO)
+    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 24.7, PLA)
+    cx.box("coxa_servo", (off, 0, -8), (SERVO_LEN / 2, SERVO_WID / 2, SERVO_HGT / 2), SERVO_MASS, SERVO)
     cx.lump(m.coxa, (geo.coxa / 2, 0, -5), "coxa_misc")
 
     fe = _Parts(n + "_")
-    fe.box("femur_arm", (geo.femur / 2, 0, 0), (geo.femur / 2, 2, 6), 11.5, PLA)
+    fe.box("femur_arm", (geo.femur / 2, 0, 0), (geo.femur / 2, 2, 6), 18.8, PLA)
+    fe.box("femur_servo", (off, 0, 0), servo_half, SERVO_MASS, SERVO)
     fe.box("tibia_servo", (geo.femur - off, 0, 0), servo_half, SERVO_MASS, SERVO)
     fe.lump(m.femur, (geo.femur / 2, 0, 0), "femur_misc")
 
     ti = _Parts(n + "_")
     L = geo.tibia
-    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 9.4, PLA)
-    ti.box("foot_switch", (5, 0, -L + 12), (3, 3, 6), 2.0, "0.76 0.23 0.23 1")   # lever switch on the tibia tip
+    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 13.8, PLA)
+    ti.box("foot_switch", (5, 0, -L + 12), (3, 3, 6), 2.0, "0.76 0.23 0.23 1")   # switch in the tibia tip
     ti.lump(m.tibia, (0, 0, -L / 2), "tibia_misc")
     return str(cx), str(fe), str(ti)
