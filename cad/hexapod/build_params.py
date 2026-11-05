@@ -7,7 +7,8 @@ Columns: A alias, B value, C source, D note.
 Source says how far to trust a value:
   config.h / params.py / model_data.h / simple_parts.py   the robot design, CAD must match
   hexapodv2 / hexapod.FCStd   taken from the old models in Dropbox/robots/hexapod
-  photo / drawing / web   from a picture or seller page, nothing measured yet
+  caliper        measured on the real part
+  photo / drawing / web   from a picture or seller page, not measured
   not critical   a guess, but its exact size doesn't matter
   derived        formula from other cells
   TODO measure   a guess: replace it with a caliper value
@@ -23,7 +24,7 @@ common = runpy.run_path(os.path.join(HERE, "common.py"))
 CFG, SIM, FW, SP = "config.h", "params.py", "model_data.h", "simple_parts.py"
 OLD2, OLD1 = "hexapodv2", "hexapod.FCStd"
 TODO, CALC = "TODO measure", "derived"
-PHOTO, DRAWING, WEB, STD, LOOSE = "photo", "drawing", "web", "standard", "not critical"
+CAL, PHOTO, DRAWING, WEB, STD, LOOSE = "caliper", "photo", "drawing", "web", "standard", "not critical"
 
 TABLE = [
     "Robot: links and leg geometry (origin: body centre at femur axis height; X right, Y forward, Z up)",
@@ -126,19 +127,21 @@ TABLE = [
     ("mini_comp_h", "3 mm", LOOSE, "tallest part above the PCB"),
 
     "ESP32 devkit, 38 pins, USB-C (part origin: PCB centre, lying flat; long side along X; +Z = module side; USB at -X)",
-    ("esp_len", "54.8 mm", PHOTO, "seller photo"),
-    ("esp_w", "28 mm", PHOTO, "seller photo"),
+    ("esp_len", "51.57 mm", CAL, "PCB; if the jaw sat on the USB socket, the PCB is ~1 shorter"),
+    ("esp_w", "25.75 mm", CAL, "PCB"),
     ("esp_t", "1.6 mm", TODO, "PCB"),
     ("esp_mod_len", "25.5 mm", TODO, "WROOM module"),
     ("esp_mod_w", "18 mm", TODO, "WROOM module"),
     ("esp_mod_h", "3.2 mm", TODO, "WROOM module above the PCB"),
-    ("esp_usb_len", "7.4 mm", TODO, "USB-C socket"),
-    ("esp_usb_w", "9 mm", TODO, "USB-C socket"),
+    ("esp_usb_len", "9 mm", TODO, "USB-C socket, scaled from the caliper photo"),
+    ("esp_usb_w", "9 mm", TODO, "USB-C socket, scaled from the caliper photo"),
     ("esp_usb_h", "3.2 mm", TODO, "USB-C socket above the PCB"),
-    ("esp_hdr_len", "48.26 mm", PHOTO, "19 pins x 2.54 per side"),
+    ("esp_usb_over", "1 mm", TODO, "socket past the PCB end, scaled from the caliper photo"),
+    ("esp_hdr_len", "48.23 mm", CAL, "19 pins per side"),
     ("esp_hdr_w", "2.54 mm", STD, "pin header"),
+    ("esp_hdr_margin", "0.6 mm", TODO, "pin row from the antenna end of the PCB, scaled from the caliper photo"),
     ("esp_hdr_h", "11 mm", TODO, "pins below the PCB"),
-    ("esp_hdr_pitch", "25.4 mm", TODO, "between the two pin rows; hexapod.FCStd esp32ConnectorWidth"),
+    ("esp_hdr_pitch", "22.86 mm", PHOTO, "between the two pin rows: ~23.2 in the caliper photo, nearest 2.54 multiple"),
 
     "GY-91, no pins, lies flat (part origin: PCB centre, lying flat; long side along Y; +Z = chip side)",
     ("gy91_w", "14.3 mm", WEB, "seller listings; a few differ"),

@@ -123,11 +123,12 @@ def esp32(i):
     d.cbox("module", p("esp_mod_len"), p("esp_mod_w"), p("esp_mod_h"),
            "%s / 2 - %s / 2" % (p("esp_len"), p("esp_mod_len")), "0 mm", "0 mm", SILVER)
     d.cbox("usb", p("esp_usb_len"), p("esp_usb_w"), p("esp_usb_h"),
-           "-(%s / 2 - %s / 2)" % (p("esp_len"), p("esp_usb_len")), "0 mm", "0 mm", SILVER)
+           "-(%s / 2 + %s - %s / 2)" % (p("esp_len"), p("esp_usb_over"), p("esp_usb_len")), "0 mm", "0 mm", SILVER)
     hz = "-(%s + %s)" % (t, p("esp_hdr_h"))
     for sub, sign in (("header_a", ""), ("header_b", "-")):
         d.cbox(sub, p("esp_hdr_len"), p("esp_hdr_w"), p("esp_hdr_h"),
-               "0 mm", "%s(%s / 2)" % (sign, p("esp_hdr_pitch")), hz, GOLD)
+               "%s / 2 - %s - %s / 2" % (p("esp_len"), p("esp_hdr_margin"), p("esp_hdr_len")),
+               "%s(%s / 2)" % (sign, p("esp_hdr_pitch")), hz, GOLD)
 
 
 def gy91(i):
