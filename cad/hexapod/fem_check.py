@@ -128,7 +128,7 @@ def build(case, twist=False, no_top=False, both=False):
         pad_z = val("coxa_wall_top_z")
         if both:
             # the horn holds the top plate: its screws and the hub pocket
-            faces = cyl_faces(val("horn_screw_d") / 2, val("horn_screw_r")) + cyl_faces(val("horn_screw_d") / 2, -val("horn_screw_r"))
+            faces = cyl_faces(val("horn_screw_d") / 2, val("horn_screw_r1")) + cyl_faces(val("horn_screw_d") / 2, val("horn_screw_r2"))
             fix("Horn", faces + cyl_faces(val("horn_hub_d") / 2, 0))
         elif not no_top:
             fix("TopPlateBosses", plane_faces("z", pad_z))

@@ -103,31 +103,37 @@ for name, sign in (("tab_hole_a", "-"), ("tab_hole_b", "+")):
 pilot_y = "%s - %s" % (beam_y, p("coxa_boss_h"))
 for name, z in (("pilot_a", p("femur_screw_z")), ("pilot_b", "-" + p("femur_screw_z"))):
     main_cut.append(cyl(name, p("mg90_screw_pilot_d"), p("coxa_boss_h"), p("femur_screw_x"), pilot_y, z, along_y=True))
+# lattice: the pin arm, and the flanges on the cap side of the wall
+lat_w = "%s - 2 * %s" % (W, p("lattice_rib"))
+main_cut += P.lattice("lat_arm", "x", "%s / 2 + 1 mm" % hub, "(%s - %s / 2 - 2 mm) / 2" % (web0, hub),
+                      2, "z", "-(%s) / 2" % lat_w, lat_w, "y", arm_y0, p("joint_arm_t"))
+fl_y0 = "%s + %s" % (cap_y1, p("lattice_rib"))
+fl_w = "%s - %s - (%s)" % (wall_y, p("lattice_rib"), fl_y0)
+for tag, z0 in (("top", inner_z), ("low", half_h)):
+    main_cut += P.lattice("lat_" + tag, "x", "%s + %s" % (web1, ch), "(%s - %s - (%s)) / 3" % (rib_x0, ch, web1),
+                          3, "y", fl_y0, fl_w, "z", z0, flange_t)
 main = P.cut("Femur_Main", main_solid, main_cut, PLA)
 
 # ------------------------------------------------------------ horn arm print
-tail = p("coxa_tail_c")
+block_end = p("coxa_block_end")
 low_y = p("joint_horn_low_y")
 block_t = "%s - %s" % (top_y, low_y)
 beam_t = p("coxa_beam_t")
 horn_solid = [
     box("h_beam", web1, beam_t, W, "0 mm", beam_y, half_w),
-    box("h_block", "2 * %s + %s / 2" % (tail, W), block_t, W, "-" + tail, low_y, half_w),
-    cyl("h_tail", W, block_t, "-" + tail, low_y, "0 mm", along_y=True),
+    box("h_block", block_end, block_t, W, "0 mm", low_y, half_w),
+    cyl("h_round", W, block_t, "0 mm", low_y, "0 mm", along_y=True),
 ]
-arm = "%s - %s" % (p("horn_span"), p("horn_tip_w"))
+arm = "%s - %s / 2" % (p("horn_reach"), p("horn_tip_w"))
 pocket = p("coxa_horn_pocket")
 through = "%s + 1 mm" % block_t
 horn_cut = [
-    box("pk_long", arm, pocket, p("horn_tip_w"), "-(%s) / 2" % arm, low_y, "-%s / 2" % p("horn_tip_w")),
-    cyl("pk_tip_a", p("horn_tip_w"), pocket, "(%s) / 2" % arm, low_y, "0 mm", along_y=True),
-    cyl("pk_tip_b", p("horn_tip_w"), pocket, "-(%s) / 2" % arm, low_y, "0 mm", along_y=True),
-    box("pk_short", p("horn_short_w"), pocket, p("horn_short_span"), "-%s / 2" % p("horn_short_w"), low_y,
-        "-%s / 2" % p("horn_short_span")),
+    box("pk_arm", arm, pocket, p("horn_tip_w"), "0 mm", low_y, "-%s / 2" % p("horn_tip_w")),
+    cyl("pk_tip", p("horn_tip_w"), pocket, arm, low_y, "0 mm", along_y=True),
     cyl("pk_hub", p("horn_hub_d"), pocket, "0 mm", low_y, "0 mm", along_y=True),
     cyl("access", p("coxa_access_d"), through, "0 mm", low_y, "0 mm", along_y=True),
-    cyl("horn_screw_a", p("horn_screw_d"), through, p("horn_screw_r"), low_y, "0 mm", along_y=True),
-    cyl("horn_screw_b", p("horn_screw_d"), through, "-" + p("horn_screw_r"), low_y, "0 mm", along_y=True),
+    cyl("horn_screw_a", p("horn_screw_d"), through, p("horn_screw_r1"), low_y, "0 mm", along_y=True),
+    cyl("horn_screw_b", p("horn_screw_d"), through, p("horn_screw_r2"), low_y, "0 mm", along_y=True),
 ]
 for name, z in (("arm_screw_a", p("femur_screw_z")), ("arm_screw_b", "-" + p("femur_screw_z"))):
     horn_cut.append(cyl(name, p("coxa_plate_screw_d"), "%s + 1 mm" % beam_t, p("femur_screw_x"), beam_y, z, along_y=True))
@@ -156,7 +162,8 @@ HORN_90 = SERVO_IN_LEG.multiply(App.Rotation(App.Vector(0, 0, 1), 90))
 link("femur_servo", doc.getObject("Dummy_MG90S"), ("0 mm", seat_y, "0 mm"), SERVO_IN_LEG)
 link("femur_horn", doc.getObject("Dummy_Horn"), ("0 mm", seat_y, "0 mm"), HORN_90)
 link("tibia_servo", doc.getObject("Dummy_MG90S"), (axis_x, seat_y, "0 mm"), SERVO_IN_LEG)
-link("tibia_horn", doc.getObject("Dummy_Horn"), (axis_x, seat_y, "0 mm"), SERVO_IN_LEG)
+HORN_DOWN = SERVO_IN_LEG.multiply(App.Rotation(App.Vector(0, 0, 1), 180))
+link("tibia_horn", doc.getObject("Dummy_Horn"), (axis_x, seat_y, "0 mm"), HORN_DOWN)
 link("hip_bearing", doc.getObject("Dummy_Bearing"), ("0 mm", cap_y0, "0 mm"), BEARING_IN_CAP)
 link("knee_bearing", doc.getObject("Dummy_Bearing"), (axis_x, cap_y0, "0 mm"), BEARING_IN_CAP)
 common["save"](doc)
@@ -171,7 +178,7 @@ def val(alias):
 
 
 SERVO = ["MG90S_body", "MG90S_tabs", "MG90S_turret", "MG90S_shaft"]
-HORN = ["Horn_hub", "Horn_arm", "Horn_short_arm", "Horn_tip_a", "Horn_tip_b"]
+HORN = ["Horn_hub", "Horn_arm", "Horn_tip"]
 solids_of, clash = common["solids_of"], common["clash"]
 seat, cap, fl, cl = val("coxa_seat_y"), val("joint_cap_y0"), val("femur_len"), val("coxa_len")
 turn_90 = App.Placement(App.Vector(), App.Rotation(App.Vector(0, 0, 1), 90))
@@ -183,7 +190,7 @@ print("main %.1f g solid, horn %.1f g solid; valid %s %s; solids %d %d" % (
     main.Shape.isValid(), horn.Shape.isValid(), len(main.Shape.Solids), len(horn.Shape.Solids)))
 print("overlap mm3: tibia servo %.3f, tibia horn with main %.3f, femur horn %.3f, knee bearing %.3f, hip bearing %.3f, main with horn arm %.3f" % (
     clash(solids_of(doc, SERVO, knee_place), main_s + horn_s),
-    clash(solids_of(doc, HORN, knee_place), main_s),
+    clash(solids_of(doc, HORN, App.Placement(App.Vector(fl, seat, 0), HORN_DOWN)), main_s),
     clash(solids_of(doc, HORN, hip_place.multiply(turn_90)), main_s + horn_s),
     clash(solids_of(doc, ["Bearing_body"], App.Placement(App.Vector(fl, cap, 0), BEARING_IN_CAP)), main_s),
     clash(solids_of(doc, ["Bearing_body"], App.Placement(App.Vector(0, cap, 0), BEARING_IN_CAP)), main_s),

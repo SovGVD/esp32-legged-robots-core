@@ -86,11 +86,10 @@ def horn(i):
     hub_z = "%s + %s" % (p("mg90_turret_top"), p("horn_gap"))
     d.cyl("hub", p("horn_hub_d"), p("horn_hub_h"), "0 mm", "0 mm", hub_z, WHITE)
     arm_z = "%s - %s" % (p("horn_top"), p("horn_arm_t"))
-    arm = "%s - %s" % (p("horn_span"), p("horn_tip_w"))
-    d.cbox("arm", arm, p("horn_tip_w"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
-    d.cbox("short_arm", p("horn_short_w"), p("horn_short_span"), p("horn_arm_t"), "0 mm", "0 mm", arm_z, WHITE)
-    for sub, sign in (("tip_a", ""), ("tip_b", "-")):
-        d.cyl(sub, p("horn_tip_w"), p("horn_arm_t"), "%s(%s) / 2" % (sign, arm), "0 mm", arm_z, WHITE)
+    # single arm along +X
+    arm = "%s - %s / 2" % (p("horn_reach"), p("horn_tip_w"))
+    d.box("arm", arm, p("horn_tip_w"), p("horn_arm_t"), "0 mm", "-%s / 2" % p("horn_tip_w"), arm_z, WHITE)
+    d.cyl("tip", p("horn_tip_w"), p("horn_arm_t"), arm, "0 mm", arm_z, WHITE)
 
 
 def cells(i):

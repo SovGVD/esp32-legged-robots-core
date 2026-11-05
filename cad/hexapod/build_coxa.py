@@ -103,32 +103,31 @@ for name, sign in (("tab_hole_a", "-"), ("tab_hole_b", "+")):
                          "%s - 1 mm" % wall_y, "0 mm", along_y=True))
 for n in "12":
     lower_cut.append(cyl("pilot" + n, p("mg90_screw_pilot_d"), p("coxa_boss_h"), p("coxa_boss_x" + n), wall_mid, boss_z))
+# No lattice in these plates: they carry the twist. FEA with holes: 11.9 MPa over most of the part
+# and 0.67 mm against 8.0 and 0.48, to save about 0.3 g.
 lower = P.cut("CoxaLink_Lower", lower_solid, lower_cut, PLA)
 
 # ------------------------------------------------------------ top print
 top_z = p("coxa_top_z")
-tail = p("coxa_tail_c")
+block_end = p("coxa_block_end")
 pocket_z = p("coxa_top_low_z")
 block_h = "%s - %s" % (top_z, pocket_z)
 top_solid = [
     box("top_beam", end, W, beam_t, "0 mm", half_w, wall_top),
-    box("top_block", "2 * %s + %s / 2" % (tail, W), W, block_h, "-" + tail, half_w, pocket_z),
-    cyl("top_tail", W, block_h, "-" + tail, "0 mm", pocket_z),
+    box("top_block", block_end, W, block_h, "0 mm", half_w, pocket_z),
+    cyl("top_round", W, block_h, "0 mm", "0 mm", pocket_z),
     # thick horn block tapering into the plate
-    P.gusset("top_taper", ("%s + %s / 2" % (tail, W), half_w, wall_top), ("x", 1), ("z", -1), p("arm_taper_len"), "%s - %s" % (wall_top, pocket_z), "y", W),
+    P.gusset("top_taper", (block_end, half_w, wall_top), ("x", 1), ("z", -1), p("arm_taper_len"), "%s - %s" % (wall_top, pocket_z), "y", W),
 ]
-arm = "%s - %s" % (p("horn_span"), p("horn_tip_w"))
+arm = "%s - %s / 2" % (p("horn_reach"), p("horn_tip_w"))
 through = "%s + 1 mm" % block_h
 top_cut = [
-    box("pk_long", arm, p("horn_tip_w"), p("coxa_horn_pocket"), "-(%s) / 2" % arm, "-%s / 2" % p("horn_tip_w"), pocket_z),
-    cyl("pk_tip_a", p("horn_tip_w"), p("coxa_horn_pocket"), "(%s) / 2" % arm, "0 mm", pocket_z),
-    cyl("pk_tip_b", p("horn_tip_w"), p("coxa_horn_pocket"), "-(%s) / 2" % arm, "0 mm", pocket_z),
-    box("pk_short", p("horn_short_w"), p("horn_short_span"), p("coxa_horn_pocket"),
-        "-%s / 2" % p("horn_short_w"), "-%s / 2" % p("horn_short_span"), pocket_z),
+    box("pk_arm", arm, p("horn_tip_w"), p("coxa_horn_pocket"), "0 mm", "-%s / 2" % p("horn_tip_w"), pocket_z),
+    cyl("pk_tip", p("horn_tip_w"), p("coxa_horn_pocket"), arm, "0 mm", pocket_z),
     cyl("pk_hub", p("horn_hub_d"), p("coxa_horn_pocket"), "0 mm", "0 mm", pocket_z),
     cyl("access", p("coxa_access_d"), through, "0 mm", "0 mm", pocket_z),
-    cyl("horn_screw_a", p("horn_screw_d"), through, p("horn_screw_r"), "0 mm", pocket_z),
-    cyl("horn_screw_b", p("horn_screw_d"), through, "-" + p("horn_screw_r"), "0 mm", pocket_z),
+    cyl("horn_screw_a", p("horn_screw_d"), through, p("horn_screw_r1"), "0 mm", pocket_z),
+    cyl("horn_screw_b", p("horn_screw_d"), through, p("horn_screw_r2"), "0 mm", pocket_z),
 ]
 for n in "12":
     top_cut.append(cyl("plate_screw" + n, p("coxa_plate_screw_d"), "%s + 1 mm" % beam_t, p("coxa_boss_x" + n), wall_mid, wall_top))
@@ -169,7 +168,7 @@ def val(alias):
 
 
 SERVO = ["MG90S_body", "MG90S_tabs", "MG90S_turret", "MG90S_shaft"]
-HORN = ["Horn_hub", "Horn_arm", "Horn_short_arm", "Horn_tip_a", "Horn_tip_b"]
+HORN = ["Horn_hub", "Horn_arm", "Horn_tip"]
 solids_of, clash = common["solids_of"], common["clash"]
 link_lower, link_top = solids_of(doc, ["CoxaLink_Lower"]), solids_of(doc, ["CoxaLink_Top"])
 coxa_seat = App.Placement(App.Vector(0, 0, val("coxa_servo_seat_z")), App.Rotation())
