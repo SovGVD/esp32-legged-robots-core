@@ -35,7 +35,7 @@ def v(alias):
     return float(getattr(x, "Value", x))
 
 
-common["remove_built"](doc, ("BodyCheck", "BodyPrim", "Body"))
+common["remove_built"](doc, ("BodyCheck", "BodyPrim", "Body", "Battery"))
 part = doc.addObject("App::Part", "Body")
 part.setExpression("Placement.Base.y", "Params.catalog_row2_y * 5")
 check = doc.addObject("App::Part", "Body_Check")
@@ -122,31 +122,24 @@ cfit, cwall = v("cart_fit"), v("cart_wall_t")
 c_half = hw / 2 + cfit + cwall                    # floor half width
 c_front = hy + hl / 2 + htab + cfit               # the floor reaches past the holder's solder tabs
 c_rear = hy - hl / 2 - htab - cfit
-t_half, t_end = v("cart_tongue_w") / 2, v("cart_tongue_y1")
+xw, xt_ = v("xt30_w"), v("xt30_t")
 
 
 def cart_outline(g):
-    """The cartridge's floor seen from below, grown by g: the holder's footprint and the tongue behind it."""
-    return [(-c_half - g, c_front + g, 3 + g), (c_half + g, c_front + g, 3 + g), (c_half + g, c_rear - g, 3 + g),
-            (t_half + g, c_rear - g, max(1.5 - g, 0)), (t_half + g, t_end - g, 1 + g), (-t_half - g, t_end - g, 1 + g),
-            (-t_half - g, c_rear - g, max(1.5 - g, 0)), (-c_half - g, c_rear - g, 3 + g)]
+    """The cartridge's floor seen from below, grown by g: the holder's footprint and its solder tabs."""
+    return [(-c_half - g, c_front + g, 3 + g), (c_half + g, c_front + g, 3 + g), (c_half + g, c_rear - g, 3 + g), (-c_half - g, c_rear - g, 3 + g)]
 
 
 lw, lt, llen = v("latch_w"), v("latch_t"), v("latch_len")
-LATCH_FRONT = (0.0, c_front - v("latch_overlap") + lw / 2 + llen)      # pivots; the closed latch points at the cartridge
-LATCH_REAR = (0.0, t_end + v("latch_overlap") - lw / 2 - llen)
-xw, xt_, xp = v("xt30_w"), v("xt30_t"), v("xt30_pocket_wall")
-x_y, x_z0 = v("xt30_y"), top_bot + v("xt30_lift")
-fem_z0, fem_z1 = x_z0 + v("xt30_male_h"), x_z0 + v("xt30_mated_h")
+# turn latches: pivot (x, y) and turn; the closed latch (built along +Y) points at its lug on the cartridge
+LATCHES = {"f": (0.0, c_front - v("latch_overlap") + lw / 2 + llen, Z180),
+           "r": (0.0, c_rear + v("latch_overlap") - lw / 2 - llen, App.Rotation())}
+cells_top = v("cell_z") + v("cell_d") / 2
+XT30_AT = App.Placement(App.Vector(v("xt30_x"), hy - hl / 2 + 2, cells_top + xt_ / 2 + 0.2), App.Rotation(App.Vector(1, 0, 0), -90))   # on the cell, male end at the rear tabs
 bot_parts.append(prism(cart_outline(cfit + v("cart_band_w")), "xy", z_bot, top_bot))
-for px, py in (LATCH_FRONT, LATCH_REAR):
-    bot_parts.append(rod(v("latch_boss_d") if False else 7.0, top_bot - z_bot, (px, py, z_bot), "z"))
-bot_parts.append(rod(7.0, 4.0, (LATCH_REAR[0], LATCH_REAR[1], top_bot), "z"))      # thread for the rear latch's screw
-post_x = t_half + cfit + 0.5 + 1.5
-for sx in (1, -1):
-    bot_parts.append(block(sx * post_x - 1.5, sx * post_x + 1.5, x_y - 2.5, x_y + 2.5, top_bot, fem_z1 + v("xt30_bridge_t")))
-bot_parts.append(block(-post_x - 1.5, post_x + 1.5, x_y - 2.5, x_y + 2.5, fem_z1, fem_z1 + v("xt30_bridge_t")))
-bot_parts.append(block(-xw / 2 - xp, xw / 2 + xp, x_y - xt_ / 2 - xp, x_y + xt_ / 2 + xp, fem_z0 + 2, fem_z1))
+for lx, ly, _ in LATCHES.values():
+    bot_parts.append(rod(7.0, top_bot - z_bot, (lx, ly, z_bot), "z"))
+bot_parts.append(rod(7.0, 3.0, (LATCHES["r"][0], LATCHES["r"][1], top_bot), "z"))   # thread for the rear latch's screw (the front one's goes into the ESP32's slot rail)
 bottom_solid = plate_prism(skin, top_bot).fuse(bot_parts).removeSplitter()
 
 bot_cuts = []
@@ -166,10 +159,8 @@ for sign in (1, -1):
         half = v("pca_grp_w") / 2 + 0.8
         bot_cuts.append(block(min(sign * x0, sign * x1), max(sign * x0, sign * x1), gy - half, gy + half, top_bot, top_bot + v("rib_bot_h") + 1))
 bot_cuts.append(prism(cart_outline(cfit), "xy", z_bot - 1, top_bot + 1))
-for px, py in (LATCH_FRONT, LATCH_REAR):
-    bot_cuts.append(rod(v("mg90_screw_pilot_d"), 10, (px, py, z_bot - 1), "z"))
-bot_cuts.append(block(-xw / 2 - 0.15, xw / 2 + 0.15, x_y - xt_ / 2 - 0.15, x_y + xt_ / 2 + 0.15, fem_z0, fem_z1))   # female XT30, glued
-bot_cuts.append(rod(4.0, 10, (0, x_y, fem_z1 - 1), "z"))                                                            # its wires, up
+for lx, ly, _ in LATCHES.values():
+    bot_cuts.append(rod(v("mg90_screw_pilot_d"), 10, (lx, ly, z_bot - 1), "z"))
 bottom_shape = bottom_solid.cut(Part.makeCompound(bot_cuts)).removeSplitter()
 
 # ------------------------------------------------------------ top print
@@ -301,22 +292,19 @@ walls = block(-c_half, c_half, hy - h_in[1] - cwall, hy + h_in[1] + cwall, top_b
 walls = walls.cut(Part.makeCompound([block(-c_half - 1, c_half + 1, hy + hl / 2, hy + hl, top_bot + v("cart_end_h"), top_bot + 20),
                                     block(-c_half - 1, c_half + 1, hy - hl, hy - hl / 2, top_bot + v("cart_end_h"), top_bot + 20)]))
 lug_w, lug_l = v("cart_lug_w") / 2, v("cart_lug_len")
-pillar = block(-xw / 2 - xp, xw / 2 + xp, x_y - xt_ / 2 - xp, x_y + xt_ / 2 + xp, top_bot, fem_z0 - 2)
-cart = cart.fuse([walls, pillar,
+cart = cart.fuse([walls,
                   block(-lug_w, lug_w, c_front - lug_l, c_front, z_bot, skin),
-                  block(-lug_w, lug_w, t_end, t_end + lug_l, z_bot, skin)] +
+                  block(-lug_w, lug_w, c_rear, c_rear + lug_l, z_bot, skin)] +
                  [rod(v("holder_boss_d"), skin - z_bot, (0, hy + sg * v("holder_hole_span") / 2, z_bot), "z") for sg in (1, -1)]).removeSplitter()
 cart = cart.cut(Part.makeCompound(
-    [block(-xw / 2 - 0.15, xw / 2 + 0.15, x_y - xt_ / 2 - 0.15, x_y + xt_ / 2 + 0.15, x_z0, fem_z0),            # male XT30, glued
-     block(-3, 3, x_y, x_y + xt_ / 2 + xp + 1, x_z0, x_z0 + 4)] +                                           # its solder cups' wires, toward the holder
-    [rod(v("holder_screw_d"), 20, (0, hy + sg * v("holder_hole_span") / 2, z_bot - 1), "z") for sg in (1, -1)])).removeSplitter()
+    []+    [rod(v("holder_screw_d"), 20, (0, hy + sg * v("holder_hole_span") / 2, z_bot - 1), "z") for sg in (1, -1)])).removeSplitter()
 cartridge = common["as_part"](doc, part, "Battery_Cartridge", cart, COL_BOT)
 latch_raw = prism([(-lw / 2, 0, lw / 2 - 0.01), (lw / 2, 0, lw / 2 - 0.01), (lw / 2, llen, lw / 2 - 0.01), (-lw / 2, llen, lw / 2 - 0.01)], "xy", -lt, 0).fuse(
     rod(lw, lt, (0, 0, -lt), "z")).fuse(rod(lw, lt, (0, llen, -lt), "z")).removeSplitter().cut(rod(2.2, lt + 2, (0, 0, -lt - 1), "z"))
 latch = common["as_part"](doc, part, "Battery_Latch", latch_raw, COL_BOT)
 print("cartridge %.1f g, latch %.1f g; valid %s %s; opening %.1f x %.1f, y %.1f to %.1f" % (
     cart.Volume / 1000 * v("pla_density"), latch_raw.Volume / 1000 * v("pla_density"), cart.isValid(), latch_raw.isValid(),
-    2 * (c_half + cfit), c_front - t_end + 2 * cfit, t_end - cfit, c_front + cfit))
+    2 * (c_half + cfit), c_front - c_rear + 2 * cfit, c_rear - cfit, c_front + cfit))
 common["save"](doc)
 
 
@@ -350,9 +338,9 @@ link("esp32", "Dummy_ESP32_devkit", (0, esp_y, v("esp_z")), ESP_FRONT)
 link("gy91", "Dummy_GY91", (0, 0, v("gy91_z")))
 link("tof_mount", "Body_ToF_Mount", (0, 0, 0))
 link("cartridge", "Battery_Cartridge", (0, 0, 0))
-link("xt30", "Dummy_XT30", (0, x_y, x_z0))
-link("latch_f", "Battery_Latch", (LATCH_FRONT[0], LATCH_FRONT[1], z_bot), Z180)
-link("latch_r", "Battery_Latch", (LATCH_REAR[0], LATCH_REAR[1], z_bot))
+link("xt30", "Dummy_XT30", (0, 0, 0)).Placement = XT30_AT
+for key, (lx, ly, turn) in LATCHES.items():
+    link("latch_" + key, "Battery_Latch", (lx, ly, z_bot), turn)
 link("rocker", "Dummy_Rocker", (v("pwr_x"), v("pwr_y"), top1))
 for side in (-1, 1):
     tl = link("tof_%s" % ("l" if side < 0 else "r"), "Dummy_VL53L5CX", (0, 0, 0))
@@ -382,8 +370,8 @@ inside = {
     "rocker": solids_of(doc, names("Dummy_Rocker"), Pl((v("pwr_x"), v("pwr_y"), top1))),
     "tof mount": solids_of(doc, ["Body_ToF_Mount"]),
     "cartridge": solids_of(doc, ["Battery_Cartridge"]),
-    "xt30": solids_of(doc, names("Dummy_XT30"), Pl((0, x_y, x_z0))),
-    "latches": solids_of(doc, ["Battery_Latch"], Pl((LATCH_FRONT[0], LATCH_FRONT[1], z_bot), Z180)) + solids_of(doc, ["Battery_Latch"], Pl((LATCH_REAR[0], LATCH_REAR[1], z_bot))),
+    "xt30": solids_of(doc, names("Dummy_XT30"), XT30_AT),
+    "latches": sum((solids_of(doc, ["Battery_Latch"], Pl((lx, ly, z_bot), turn)) for lx, ly, turn in LATCHES.values()), []),
     "tof l": solids_of(doc, names("Dummy_VL53L5CX"), tof_frame(-1)),
     "tof r": solids_of(doc, names("Dummy_VL53L5CX"), tof_frame(1)),
 }
@@ -417,13 +405,12 @@ for tag, x, y, yaw, side in AXES:
 print("horn and bearing fits mm3: %s" % {k: round(x_, 3) for k, x_ in fits.items()})
 print("coxa sweep +-40 deg: %s" % (sweep or "no collisions"))
 
-# the cartridge comes out straight down with the latches turned 90 deg; the female XT30 stays in the body
+# the cartridge comes out straight down with the latches turned 90 deg, the XT30 pair still plugged (lead slack)
 R90 = App.Rotation(App.Vector(0, 0, 1), 90)
-open_latches = solids_of(doc, ["Battery_Latch"], Pl((LATCH_FRONT[0], LATCH_FRONT[1], z_bot), Z180.multiply(R90))) + \
-    solids_of(doc, ["Battery_Latch"], Pl((LATCH_REAR[0], LATCH_REAR[1], z_bot), R90))
-moving = inside["cartridge"] + inside["cells"] + solids_of(doc, ["XT30_male"], Pl((0, x_y, x_z0)))
+open_latches = sum((solids_of(doc, ["Battery_Latch"], Pl((lx, ly, z_bot), turn.multiply(R90))) for lx, ly, turn in LATCHES.values()), [])
+moving = inside["cartridge"] + inside["cells"] + inside["xt30"]
 stay = {"bottom": bot_s, "columns": col_s, "pca r": inside["pca r"], "pca l": inside["pca l"], "esp32": inside["esp32"],
-        "open latches": open_latches, "female xt30": solids_of(doc, ["XT30_female"], Pl((0, x_y, x_z0)))}
+        "open latches": open_latches}
 path = {}
 for dz in [0.5 * k for k in range(1, 9)] + list(range(5, 46, 3)):
     shifted = []

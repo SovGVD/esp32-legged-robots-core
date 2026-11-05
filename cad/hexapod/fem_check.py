@@ -215,15 +215,15 @@ def build(case, load, bonded):
         # the robot's weight hangs on the battery cartridge's 2 turn latches, under the bottom plate
         weight = 1.132 * 9.81
         zb = val("body_bottom_z")
-        cart = src.getObject("BodyCheck_latch_f").Placement.Base, src.getObject("BodyCheck_latch_r").Placement.Base
-        pads = [("box", p.x - 3.4, p.x + 3.4, p.y - 3.4, p.y + 3.4, zb) for p in cart]
+        pivots = [o.Placement.Base for o in src.getObject("Body_Check").Group if o.Name.startswith("BodyCheck_latch_")]
+        pads = [("box", p.x - 3.4, p.x + 3.4, p.y - 3.4, p.y + 3.4, zb) for p in pivots]
         down, sideways = (30.0, 15.0) if load == "fall" else (3 * weight, weight if load == "twist" else 0.0)
         held = joint_faces("RF") if load == "fall" else joint_faces("RF") + joint_faces("LM") + joint_faces("RR")
         loads = []
-        for pad_name, pad in zip(("front latch", "rear latch"), pads):
-            loads.append((pad_name + " down", pad, -down / 2, Z))
+        for k, pad in enumerate(pads):
+            loads.append(("latch %d down" % (k + 1), pad, -down / len(pads), Z))
             if sideways:
-                loads.append((pad_name + " sideways", pad, -sideways / 2, X))
+                loads.append(("latch %d sideways" % (k + 1), pad, -sideways / len(pads), X))
         probe = None
     elif case == "femur":
         fl = val("femur_len")
@@ -391,7 +391,7 @@ def report(frd, case, load, bonded, totals, held, arrows, probe, volume):
         foot = abs(mean(ring, 1) + tip * lever * 1000)
     else:
         foot = max(sum(u * u for u in disp[n]) ** 0.5 for n in disp)
-    label = "%s, %s, %s" % (case, load, "assembled, joints glued" if case == "frame" else "servos bonded in" if bonded else ("print alone" if case != "tibia" else "halves joined"))
+    label = "%s, %s, %s" % (case, load, "assembled, joints glued" if case == "frame" else  "servos bonded in" if bonded else ("print alone" if case != "tibia" else "halves joined"))
     moved = "foot moves sideways" if probe else "moves at most"
     summary = "%s: peak %.1f MPa, 99.9%% under %.1f MPa, %s %.2f mm" % (label, vm[ranked[0]], vm[ranked[len(ranked) // 1000]], moved, foot)
     print(summary + " (peak at %s; forces %s)" % ([round(c, 1) for c in coords[ranked[0]]], {k: round(v, 1) for k, v in totals.items()}))
