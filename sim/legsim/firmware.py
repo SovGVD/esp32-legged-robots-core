@@ -470,6 +470,8 @@ class FirmwareCore:
         if self.tof is not None:
             if self.tof_nav:
                 # a sensor servo (TOF_SCAN_PARAMS sensorServo) tilts the sensors up for a room scan
+                if self.tof.servo is None and self.tof_scan_params()["sensor_servo"] > 0:
+                    self.tof.servo = {"pivot": np.mean([s["position"] for s in self.tof.sensors], axis=0)}
                 up = self.nav_state()["sensor_tilt"]
                 if up != self._sensor_tilt:
                     self._sensor_tilt = up
