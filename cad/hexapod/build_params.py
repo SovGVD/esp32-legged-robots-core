@@ -7,6 +7,7 @@ Columns: A alias, B value, C source, D note.
 Source says how far to trust a value:
   config.h / params.py / model_data.h / simple_parts.py   the robot design, CAD must match
   hexapodv2 / hexapod.FCStd   taken from the old models in Dropbox/robots/hexapod
+  design         a choice made for this CAD
   caliper        measured on the real part
   photo / drawing / web   from a picture or seller page, not measured
   not critical   a guess, but its exact size doesn't matter
@@ -25,6 +26,7 @@ CFG, SIM, FW, SP = "config.h", "params.py", "model_data.h", "simple_parts.py"
 OLD2, OLD1 = "hexapodv2", "hexapod.FCStd"
 TODO, CALC = "TODO measure", "derived"
 CAL, PHOTO, DRAWING, WEB, STD, LOOSE = "caliper", "photo", "drawing", "web", "standard", "not critical"
+DESIGN = "design"
 
 TABLE = [
     "Robot: links and leg geometry (origin: body centre at femur axis height; X right, Y forward, Z up)",
@@ -53,11 +55,12 @@ TABLE = [
     ("body_bottom_z", "-28 mm", SIM, "BOTTOM_Z, bottom plate"),
     ("body_top_z", "16 mm", SIM, "TOP_Z, top cover"),
     ("top_cover_t", "3 mm", SIM, "torso_size: TOP_Z + 3"),
+    ("body_plate_t", "3 mm", SIM, "bottom plate thickness, concept"),
 
     "Layout of the bought parts in the body",
     ("cell_x", "9.5 mm", SP, "cell axes at +-x"),
     ("cell_z", "-17 mm", SP, "cell axis height"),
-    ("pca_x", "23 mm", SP, "standing board at +-x"),
+    ("pca_x", "25 mm", DESIGN, "standing board at +-x; simple_parts.py has 23. Pins outward with the bends down, Mini360 inward"),
     ("pca_z", "-12 mm", SP, "standing board centre"),
     ("logic_mini_y", "-44 mm", SP, "7th Mini360 (logic) at the rear"),
     ("esp_y", "45 mm", SP, "ESP32 across the front"),
@@ -107,7 +110,7 @@ TABLE = [
     ("cell_d", "18 mm", STD, "18650"),
     ("cell_len", "65 mm", STD, "18650"),
 
-    "PCA9685 node, HW-052 with bent pins on top and 3 Mini360 glued on the back (part origin: PCB centre, lying flat; long side along X; +Z = pin side; pin bends at -Y)",
+    "PCA9685 node, HW-052 with bent pins on top and 3 Mini360 glued on the back; the power cable is not modelled (part origin: PCB centre, lying flat; long side along X; +Z = pin side; pin bends at -Y)",
     ("pca_len", "62.41 mm", CAL, "PCB"),
     ("pca_w", "25.22 mm", CAL, "PCB"),
     ("pca_t", "1.66 mm", OLD2, "pcaPcb"),
@@ -121,11 +124,6 @@ TABLE = [
     ("pca_grp_x1", "-22.5 mm", PHOTO, "1st pin group centre from the PCB centre"),
     ("pca_grp_x2", "-9.5 mm", PHOTO, "2nd pin group"),
     ("pca_grp_x3", "21.7 mm", PHOTO, "3rd pin group; the space around +7.4 has no pins"),
-    ("pca_plug_len", "13.6 mm", PHOTO, "2-pin power plug, lying flat along the board"),
-    ("pca_plug_w", "5.08 mm", STD, "2 x 2.54"),
-    ("pca_plug_h", "2.54 mm", STD, "plug"),
-    ("pca_plug_x", "-3 mm", PHOTO, "plug centre along the board"),
-    ("pca_plug_y", "12.6 mm", PHOTO, "plug centre: on the long edge, half of it sticks out"),
     ("pca_sock_len", "15.24 mm", STD, "6-pin socket on the back, 6 x 2.54"),
     ("pca_sock_w", "2.54 mm", STD, "socket"),
     ("pca_sock_h", "8.5 mm", TODO, "socket height from the back of the PCB"),
@@ -160,8 +158,8 @@ TABLE = [
     ("esp_hdr_pitch", "22.86 mm", PHOTO, "between the two pin rows: ~23.2 in the caliper photo, nearest 2.54 multiple"),
 
     "GY-91, no pins, lies flat (part origin: PCB centre, lying flat; long side along Y; +Z = chip side)",
-    ("gy91_w", "14.3 mm", WEB, "seller listings; a few differ"),
-    ("gy91_len", "20.5 mm", WEB, "seller listings; a few differ"),
+    ("gy91_w", "14.3 mm", WEB, "seller spec 2.05 x 1.43 cm"),
+    ("gy91_len", "20.5 mm", WEB, "seller spec 2.05 x 1.43 cm"),
     ("gy91_t", "1.6 mm", TODO, "PCB"),
     ("gy91_chip", "3 mm", TODO, "MPU9250, marks the IMU centre"),
     ("gy91_chip_h", "1 mm", TODO, "MPU9250 above the PCB"),
@@ -193,8 +191,46 @@ TABLE = [
     ("sw_lead_t", "0.3 mm", DRAWING, "lead"),
     ("sw_lead_z", "2.15 mm", DRAWING, "underside to the top of the lead"),
 
+    "Coxa link, two prints: lower plate with the femur servo wall, and a top plate over the horn (leg frame: origin on the coxa axis at femur axis height, +X out along the link, Z up). Coxa servos: shaft up, body along Y (front and middle -Y, rear +Y)",
+    ("coxa_cover_gap", "1 mm", DESIGN, "top plate to the underside of the top cover"),
+    ("coxa_top_z", "=body_top_z - coxa_cover_gap", CALC, "top of the link"),
+    ("coxa_horn_roof", "2 mm", DESIGN, "plate above the horn pocket"),
+    ("coxa_horn_z", "=coxa_top_z - coxa_horn_roof", CALC, "outer face of the coxa horn"),
+    ("coxa_servo_seat_z", "=coxa_horn_z - horn_top", CALC, "coxa servo tab underside"),
+    ("coxa_servo_bottom_z", "=coxa_servo_seat_z - mg90_below_tab", CALC, "coxa servo bottom"),
+    ("coxa_low_gap", "0.5 mm", DESIGN, "servo bottom to the lower plate"),
+    ("coxa_low_top_z", "=coxa_servo_bottom_z - coxa_low_gap", CALC, "top of the lower hub"),
+    ("coxa_low_hub_t", "4 mm", DESIGN, "lower hub: bearing + 1.5 roof"),
+    ("coxa_low_z", "=coxa_low_top_z - coxa_low_hub_t", CALC, "underside of the lower plate"),
+    ("coxa_low_clear", "=coxa_low_z - body_bottom_z - body_plate_t", CALC, "lower plate to the body's bottom plate"),
+    ("coxa_low_hub_d", "18 mm", DESIGN, "around the bearing seat"),
+    ("coxa_bore_d", "9 mm", DESIGN, "through hole above the bearing"),
+    ("coxa_pin_d", "=bearing_id", CALC, "body pin through the bearing"),
+    ("coxa_beam_t", "3 mm", DESIGN, "plate thickness; concept 3-4"),
+    ("coxa_beam_w", "14 mm", DESIGN, "plate width; femur fork arms pass outside it"),
+    ("coxa_end", "72 mm", DESIGN, "plates end, past the femur servo tabs"),
+    ("coxa_tail_wall", "2.5 mm", DESIGN, "top plate past the horn tip"),
+    ("coxa_tail_c", "=horn_span / 2 + coxa_tail_wall - coxa_beam_w / 2", CALC, "centre of the rounded top plate tail"),
+    ("coxa_top_low_z", "=coxa_horn_z - coxa_horn_pocket", CALC, "underside of the top plate at the horn"),
+    ("coxa_horn_pocket", "=horn_hub_h", OLD1, "horn sits fully in the plate, as in ServoGear_MG90S_clone"),
+    ("coxa_access_d", "5 mm", TODO, "through hole for the horn screw"),
+    ("horn_screw_r", "11 mm", TODO, "horn arm hole used to screw it to the plate, from the shaft"),
+    ("horn_screw_d", "2 mm", TODO, "clearance hole for that screw"),
+    ("coxa_wall_t", "3 mm", DESIGN, "femur servo wall"),
+    ("coxa_wall_x0", "37 mm", DESIGN, "inner end of the wall, past the tab tip"),
+    ("coxa_seat_y", "=-mg90_stack / 2 + mg90_below_tab", CALC, "femur servo tab underside: its stack is centred on the leg plane"),
+    ("coxa_wall_top_z", "=coxa_top_z - coxa_beam_t", CALC, "top of the wall, the top plate lands here"),
+    ("coxa_boss_len", "6 mm", DESIGN, "boss for the top plate screw"),
+    ("coxa_boss_w", "6 mm", DESIGN, "boss for the top plate screw"),
+    ("coxa_boss_h", "5 mm", DESIGN, "boss for the top plate screw"),
+    ("coxa_boss_x1", "48 mm", DESIGN, "inner top plate screw"),
+    ("coxa_boss_x2", "62 mm", DESIGN, "outer top plate screw"),
+    ("coxa_plate_screw_d", "2.2 mm", DESIGN, "clearance hole for the top plate screws, M2"),
+    ("pla_density", "1.24", STD, "g/cm3, solid, for the weight check"),
+
     "Catalog: how the dummies are spread out in the document (not robot sizes)",
     ("catalog_pitch", "90 mm", "layout", "between dummies along X"),
+    ("catalog_row2_y", "-150 mm", "layout", "printed parts row"),
 ]
 
 

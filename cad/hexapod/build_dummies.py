@@ -107,7 +107,6 @@ def pca9685(i):
     gy = "-%s / 2 + %s + %s / 2" % (p("pca_w"), p("pca_grp_edge"), p("pca_grp_depth"))
     for n in "123":
         d.cbox("pins_" + n, p("pca_grp_w"), p("pca_grp_depth"), p("pca_grp_h"), p("pca_grp_x" + n), gy, "0 mm", GOLD)
-    d.cbox("power_plug", p("pca_plug_len"), p("pca_plug_w"), p("pca_plug_h"), p("pca_plug_x"), p("pca_plug_y"), "0 mm", BLACK)
     sx = "-(%s / 2 - %s)" % (p("pca_len"), p("pca_sock_edge"))
     d.cbox("socket", p("pca_sock_w"), p("pca_sock_len"), p("pca_sock_h"), sx, "0 mm", "-(%s + %s)" % (t, p("pca_sock_h")), BLACK)
     # 3 Mini360 on the back, long side across the board
