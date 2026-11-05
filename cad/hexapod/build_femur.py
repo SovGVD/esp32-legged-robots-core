@@ -7,6 +7,10 @@ a bearing in that part: Ø9 x 1 spacer, Ø8 x 3 shaft.
 
 Print with the rim on the bed; the strap floors are then short bridges.
 
+Both servo cables leave into the open gap between the servos and run in a channel on
+the +Z face to the hip, held by alternate fingers. Thin cable only: the connector is
+removed, so no big holes.
+
 Right leg; Femur_Main_L is the left leg's. Femur frame: origin on the femur axis,
 +X to the knee, Z up with the femur level.
 
@@ -81,6 +85,27 @@ for tag, sign, axis in (("hip", 1, "0 mm"), ("knee", -1, fl)):
     solid.append(cyl("boss_" + tag, p("fem_boss_d"), p("fem_boss_h"), axis, boss_y, "0 mm", along_y=True))
     solid.append(cyl("shaft_" + tag, p("fem_shaft_d"), p("fem_shaft_len"), axis, "%s - %s" % (boss_y, p("fem_shaft_len")), "0 mm", along_y=True))
 
+# cable channel on the +Z face: 2 rails, and fingers from alternate rails to hold the cables
+chan_w, depth_c = p("chan_w"), p("chan_depth")
+chan_mid = "((%s) + (%s)) / 2" % (y0, y1)
+chan_lo = "%s - %s / 2" % (chan_mid, chan_w)
+chan_hi = "%s + %s / 2" % (chan_mid, chan_w)
+chan_len = "%s - (%s)" % (p("chan_x1"), p("chan_x0"))
+rail_lo = "%s - (%s)" % (chan_lo, y0)
+rail_hi = "(%s) - (%s)" % (y1, chan_hi)
+solid += [
+    box("rail_a", chan_len, rail_lo, depth_c, p("chan_x0"), y0, half),
+    box("rail_b", chan_len, rail_hi, depth_c, p("chan_x0"), chan_hi, half),
+]
+finger_z = "%s + %s" % (half, depth_c)
+for n, side in enumerate((0, 1, 0)):
+    x = "%s + %d * ((%s) - %s) / 2" % (p("chan_x0"), n, chan_len, p("chan_finger_len"))
+    if side == 0:
+        solid.append(box("finger_%d" % n, p("chan_finger_len"), "%s + %s" % (rail_lo, p("chan_finger_over")), p("chan_finger_t"), x, y0, finger_z))
+    else:
+        solid.append(box("finger_%d" % n, p("chan_finger_len"), "%s + %s" % (rail_hi, p("chan_finger_over")),
+                         p("chan_finger_t"), x, "%s - %s" % (chan_hi, p("chan_finger_over")), finger_z))
+
 win_h = "%s + 2 * %s" % (p("mg90_body_w"), fit)
 win_len = "%s + 2 * %s" % (p("mg90_body_len"), fit)
 near = "%s + %s" % (p("mg90_shaft_end"), fit)
@@ -148,6 +173,43 @@ def straight_edges(shape):
     return [(i + 1, ch, ch) for i in kept]
 
 
+def fit_edges(shape):
+    """Lead-ins where a servo goes in: the mouth of each tab pocket and the top of each hole."""
+    ch = val("fem_fit_ch")
+    limit = val("mg90_body_w") / 2 + val("mg90_fit") + 1e-3
+    top, seat_y = val("fem_plate_y1"), val("joint_seat_y")
+    near, far = val("mg90_shaft_end") + val("mg90_fit"), val("mg90_body_len") - val("mg90_shaft_end") + val("mg90_fit")
+    hole_ends = (-near, far, val("femur_len") - far, val("femur_len") + near)
+    wanted = []
+    for i, e in enumerate(shape.Edges):
+        bb = e.BoundBox
+        if e.Curve.TypeId != "Part::GeomLine" or bb.YLength > 1e-4 or e.Length < 2:
+            continue
+        if abs(bb.ZMin) > limit or abs(bb.ZMax) > limit:
+            continue
+        if abs(bb.YMin - top) < 1e-4:
+            wanted.append(i)
+        # at the seat only the ends of the holes are open edges: the rest are inside
+        # corners, where a chamfer would add material under the tab
+        elif abs(bb.YMin - seat_y) < 1e-4 and bb.XLength < 1e-4 and min(abs(bb.XMin - x) for x in hole_ends) < 1e-3:
+            wanted.append(i)
+
+    def works(items):
+        try:
+            result = shape.makeChamfer(ch, [shape.Edges[i] for i in items])
+            return result.isValid() and len(result.Solids) == 1
+        except Exception:
+            return False
+
+    kept = wanted if works(wanted) else []
+    if not kept:
+        for i in wanted:
+            if works(kept + [i]):
+                kept.append(i)
+    print("lead-ins: %d of %d edges" % (len(kept), len(wanted)))
+    return [(i + 1, ch, ch) for i in kept]
+
+
 def shaft_edges(shape):
     tip = val("fem_floor_y0") - val("fem_boss_h") - val("fem_shaft_len")
     boss = val("fem_floor_y0") - val("fem_boss_h")
@@ -169,11 +231,17 @@ step.Base = body
 step.Edges = straight_edges(body.Shape)
 body.ViewObject.Visibility = False
 doc.recompute()
+lead = doc.addObject("Part::Chamfer", "Femur_Fit")
+part.addObject(lead)
+lead.Base = step
+lead.Edges = fit_edges(step.Shape)
+step.ViewObject.Visibility = False
+doc.recompute()
 main = doc.addObject("Part::Chamfer", "Femur_Main")
 part.addObject(main)
-main.Base = step
-main.Edges = shaft_edges(step.Shape)
-step.ViewObject.Visibility = False
+main.Base = lead
+main.Edges = shaft_edges(lead.Shape)
+lead.ViewObject.Visibility = False
 main.ViewObject.ShapeColor = PLA
 mirror = doc.addObject("Part::Mirroring", "Femur_Main_L")
 part.addObject(mirror)
@@ -213,8 +281,8 @@ main_s = solids_of(doc, ["Femur_Main"])
 Pl = lambda x, y, rot: App.Placement(App.Vector(x, y, 0), rot)
 hip_s, knee_s = solids_of(doc, SERVO, Pl(0, s_y, HIP_SERVO)), solids_of(doc, SERVO, Pl(f_len, s_y, KNEE_SERVO))
 bb = main.Shape.BoundBox
-print("femur %.1f g solid; valid %s; solids %d; %d + %d chamfered edges; %.1f x %.1f x %.1f, y %.1f to %.1f" % (
-    main.Shape.Volume / 1000 * val("pla_density"), main.Shape.isValid(), len(main.Shape.Solids), len(step.Edges), len(main.Edges),
+print("femur %.1f g solid; valid %s; solids %d; %d + %d + %d chamfered edges; %.1f x %.1f x %.1f, y %.1f to %.1f" % (
+    main.Shape.Volume / 1000 * val("pla_density"), main.Shape.isValid(), len(main.Shape.Solids), len(step.Edges), len(lead.Edges), len(main.Edges),
     bb.XLength, bb.YLength, bb.ZLength, bb.YMin, bb.YMax))
 print("overlap mm3: hip servo %.3f, knee servo %.3f, servos with each other %.3f, horns %.3f, bearings %.3f" % (
     clash(hip_s, main_s), clash(knee_s, main_s), clash(hip_s, knee_s),
