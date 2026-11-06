@@ -112,6 +112,12 @@ TARGETS["battery cartridge with holder, XT30 and latches"] = cart
 TARGETS["battery cartridge alone"] = [("Battery_Cartridge", None, (0.55, 0.6, 0.75))]
 TARGETS["bottom plate with cartridge in"] = [("Body_Bottom", None, GREY), ("Battery_Cartridge", None, (0.55, 0.6, 0.75)),
                                            ("Battery_Latch", check_pl("latch_f"), DARK), ("Battery_Latch", check_pl("latch_r"), DARK)]
+rear = [("Body_Bottom", None, GREY), ("Battery_Cartridge", None, (0.55, 0.6, 0.75))]
+for link, part_name in (("ina219", "Dummy_INA219"), ("rocker", "Dummy_Rocker"), ("cells", "Dummy_18650_pair")):
+    for child in doc.getObject(part_name).Group:
+        if hasattr(child, "Shape") and child.Shape.Solids:
+            rear.append((child.Name, check_pl(link), tuple(child.ViewObject.ShapeColor[:3])))
+TARGETS["bottom plate with INA219, battery and switch"] = rear
 TARGETS["fit test"] = [(o.Name, None, (0.85, 0.55, 0.2)) for o in doc.getObject("FitTest").Group] if doc.getObject("FitTest") else []
 if globals().get("ONLY"):
     TARGETS = {k: TARGETS[k] for k in ONLY}

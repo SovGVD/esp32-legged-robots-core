@@ -147,6 +147,12 @@ esp_y, esp_len = v("esp_y"), v("esp_len")
 for xo in (-esp_len / 2 + 8, esp_len / 2 - 8 - rail_len, -rail_len / 2):
     bot_parts.append(block(xo, xo + rail_len, esp_y - v("esp_t") - rfit - rail_t, esp_y - v("esp_t") - rfit, top_bot, top_bot + v("esp_rail_h")))
     bot_parts.append(block(xo, xo + rail_len, esp_y + rfit, esp_y + rfit + rail_t, top_bot, top_bot + v("esp_rail_h")))
+# the INA219 stands along Y at the rear: a slot through the rear rib and 2 short slot pairs near its ends
+ina_x, ina_y, ina_gap = v("ina_x"), v("ina_y"), v("ina_t") / 2 + rfit
+for yo in (-v("ina_w") / 2 + 1.5, v("ina_w") / 2 - 1.5 - rail_len):
+    y0 = ina_y + yo
+    bot_parts.append(block(ina_x - ina_gap - rail_t, ina_x - ina_gap, y0, y0 + rail_len, top_bot, top_bot + rail_h))
+    bot_parts.append(block(ina_x + ina_gap, ina_x + ina_gap + rail_t, y0, y0 + rail_len, top_bot, top_bot + 1.8))   # a low lip on the component side
 # ------------------------------------------------------------ battery cartridge, in from below
 hy, hl, hw, htab = v("holder_y"), v("holder_len"), v("holder_w"), v("holder_tab")
 cfit, cwall = v("cart_fit"), v("cart_wall_t")
@@ -193,6 +199,9 @@ for sign in (1, -1):
 bot_cuts.append(prism(cart_outline(cfit), "xy", z_bot - 1, top_bot + 1))
 for lx, ly, _ in LATCHES.values():
     bot_cuts.append(rod(v("mg90_screw_pilot_d"), 10, (lx, ly, z_bot - 1), "z"))
+bot_cuts.append(block(ina_x - ina_gap, ina_x + ina_gap, ina_y - v("ina_w") / 2 - 0.5, ina_y + v("ina_w") / 2 + 0.5, top_bot, top_bot + 20))   # its slot, through the rear rib
+bot_cuts.append(block(ina_x + ina_gap, ina_x + ina_gap + v("ina_parts_h") + v("ina_term_out") + 0.5, ina_y - v("ina_w") / 2 - 0.5,
+                      ina_y + v("ina_w") / 2 + 0.5, top_bot + 1.8, top_bot + 20))                                          # room for its components
 bottom_shape = bottom_solid.cut(Part.makeCompound(bot_cuts)).removeSplitter()
 
 # ------------------------------------------------------------ top print
@@ -406,6 +415,7 @@ link("cartridge", "Battery_Cartridge", (0, 0, 0))
 link("xt30", "Dummy_XT30", (0, 0, 0)).Placement = XT30_AT
 for key, (lx, ly, turn) in LATCHES.items():
     link("latch_" + key, "Battery_Latch", (lx, ly, z_bot), turn)
+link("ina219", "Dummy_INA219", (ina_x, ina_y, top_bot))
 link("rocker", "Dummy_Rocker", (v("pwr_x"), v("pwr_y"), top1))
 for side in (-1, 1):
     tl = link("tof_%s" % ("l" if side < 0 else "r"), "Dummy_VL53L5CX", (0, 0, 0))
@@ -432,6 +442,7 @@ inside = {
     "pca l": solids_of(doc, names("Dummy_PCA9685"), Pl((-px, -py, pz), Z180.multiply(PCA_RIGHT))),
     "esp32": solids_of(doc, names("Dummy_ESP32_devkit"), Pl((0, esp_y, v("esp_z")), ESP_FRONT)),
     "gy91": solids_of(doc, names("Dummy_GY91"), Pl((0, 0, v("gy91_z")))),
+    "ina219": solids_of(doc, names("Dummy_INA219"), Pl((ina_x, ina_y, top_bot))),
     "rocker": solids_of(doc, names("Dummy_Rocker"), Pl((v("pwr_x"), v("pwr_y"), top1))),
     "tof mount": solids_of(doc, ["Body_ToF_Mount"]),
     "cartridge": solids_of(doc, ["Battery_Cartridge"]),

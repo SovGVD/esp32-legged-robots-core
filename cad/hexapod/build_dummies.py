@@ -193,6 +193,16 @@ def xt30(i):
     d.cbox("female", p("xt30_w"), p("xt30_t"), "%s - %s" % (p("xt30_mated_h"), p("xt30_male_h")), "0 mm", "0 mm", p("xt30_male_h"), (0.75, 0.55, 0.05))
 
 
+def ina219(i):
+    d = Dummy("INA219", i)
+    t = p("ina_t")
+    d.box("pcb", t, p("ina_w"), p("ina_h"), "-%s / 2" % t, "-%s / 2" % p("ina_w"), "0 mm", PCB_PURPLE)
+    d.box("parts", p("ina_parts_h"), "%s - 4 mm" % p("ina_w"), "%s - %s - 3 mm" % (p("ina_h"), p("ina_term_len")),
+          "%s / 2" % t, "-(%s - 4 mm) / 2" % p("ina_w"), "2 mm", BLACK)
+    d.box("terminal", p("ina_term_out"), p("ina_term_w"), p("ina_term_len"), "%s / 2" % t, "-%s / 2" % p("ina_term_w"),
+          "%s - %s" % (p("ina_h"), p("ina_term_len")), BLUE)
+
+
 def bearing(i):
     d = Dummy("Bearing", i)
     d.cyl("ring", p("bearing_od"), p("bearing_t"), "0 mm", "0 mm", "0 mm", SILVER)
@@ -207,7 +217,7 @@ def bearing(i):
 
 BUILDERS = {"MG90S": mg90s, "18650_pair": cells, "PCA9685": pca9685, "Mini360": mini360,
             "ESP32_devkit": esp32, "GY91": gy91, "VL53L5CX": vl53l5cx, "Microswitch": microswitch,
-            "Bearing": bearing, "Horn": horn, "Rocker": rocker, "XT30": xt30}
+            "Bearing": bearing, "Horn": horn, "Rocker": rocker, "XT30": xt30, "INA219": ina219}
 ORDER = list(BUILDERS)
 
 for name in globals().get("PARTS") or ORDER:
