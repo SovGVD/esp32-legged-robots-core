@@ -133,43 +133,53 @@ for name in list(pieces):
     print(name)
     pieces[name] = common["lead_ins"](pieces[name], v("lead_small"), v("lead_big"), v("lead_small_d"))
 
-# ------------------------------------------------------------ pack them into a compact block and export
-# shelves: the tallest (in Y) first, each row filled up to ROW_W, 5 mm apart, centred on the bed origin
+# ------------------------------------------------------------ pack them into compact blocks and export
+# Some pieces go to their own file (printed on their own, e.g. the tall servo pocket); the rest share one.
+SEPARATE = {"A_servo_pocket": "fit_test_servo.stl"}
 ROW_W, GAP = 80.0, 5.0
-order = sorted(pieces.items(), key=lambda kv: -kv[1].BoundBox.YLength)
-rows, row, row_w = [], [], 0.0
-for name, shape in order:
-    w = shape.BoundBox.XLength
-    if row and row_w + GAP + w > ROW_W:
-        rows.append(row)
-        row, row_w = [], 0.0
-    row_w += (GAP if row else 0.0) + w
-    row.append((name, shape))
-rows.append(row)
-spots, y = [], 0.0
-for row in rows:
-    x = 0.0
-    depth = max(s.BoundBox.YLength for _, s in row)
-    for name, shape in row:
-        spots.append((name, shape, x, y))
-        x += shape.BoundBox.XLength + GAP
-    y -= depth + GAP
-placed, d = [], v("pla_density")
-for name, shape, x, y in spots:
-    bb = shape.BoundBox
-    s = shape.copy()
-    s.translate(App.Vector(x - bb.XMin, y - bb.YMax, -bb.ZMin))
-    obj = common["as_part"](doc, part, "FitTest_" + name, s, (0.85, 0.55, 0.2))
-    placed.append(s)
-    print("%-18s %5.1f x %4.1f x %4.1f mm  %.1f g  valid %s" % (name, bb.XLength, bb.YLength, bb.ZLength, s.Volume / 1000 * d, s.isValid()))
-common["save"](doc)
+d = v("pla_density")
 out_dir = os.path.join(HERE, "print")
 os.makedirs(out_dir, exist_ok=True)
-whole = Part.makeCompound(placed)
-c = whole.BoundBox.Center
-whole.translate(App.Vector(-c.x, -c.y, 0))
-print("block %.0f x %.0f mm" % (whole.BoundBox.XLength, whole.BoundBox.YLength))
-mesh = MeshPart.meshFromShape(Shape=whole, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
-path = os.path.join(out_dir, "fit_test.stl")
-mesh.write(path)
-print("total %.1f g solid, %d triangles -> %s" % (whole.Volume / 1000 * d, mesh.CountFacets, path))
+
+
+def pack_and_export(group, filename):
+    """Shelves: the tallest (in Y) first, each row filled up to ROW_W, 5 mm apart, centred on the bed origin."""
+    order = sorted(group.items(), key=lambda kv: -kv[1].BoundBox.YLength)
+    rows, row, row_w = [], [], 0.0
+    for name, shape in order:
+        w = shape.BoundBox.XLength
+        if row and row_w + GAP + w > ROW_W:
+            rows.append(row)
+            row, row_w = [], 0.0
+        row_w += (GAP if row else 0.0) + w
+        row.append((name, shape))
+    rows.append(row)
+    placed, y = [], 0.0
+    for row in rows:
+        x = 0.0
+        depth = max(sh.BoundBox.YLength for _, sh in row)
+        for name, shape in row:
+            bb = shape.BoundBox
+            sh = shape.copy()
+            sh.translate(App.Vector(x - bb.XMin, y - bb.YMax, -bb.ZMin))
+            common["as_part"](doc, part, "FitTest_" + name, sh, (0.85, 0.55, 0.2))
+            placed.append(sh)
+            print("%-18s %5.1f x %4.1f x %4.1f mm  %.1f g  valid %s" % (name, bb.XLength, bb.YLength, bb.ZLength, sh.Volume / 1000 * d, sh.isValid()))
+            x += bb.XLength + GAP
+        y -= depth + GAP
+    whole = Part.makeCompound(placed)
+    c = whole.BoundBox.Center
+    whole.translate(App.Vector(-c.x, -c.y, 0))
+    mesh = MeshPart.meshFromShape(Shape=whole, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
+    path = os.path.join(out_dir, filename)
+    mesh.write(path)
+    print("%s: %.0f x %.0f mm, %.1f g solid, %d triangles" % (filename, whole.BoundBox.XLength, whole.BoundBox.YLength,
+                                                             whole.Volume / 1000 * d, mesh.CountFacets))
+
+
+groups = {}
+for name, shape in pieces.items():
+    groups.setdefault(SEPARATE.get(name, "fit_test.stl"), {})[name] = shape
+for filename, group in groups.items():
+    pack_and_export(group, filename)
+common["save"](doc)

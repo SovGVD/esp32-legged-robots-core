@@ -80,8 +80,8 @@ tip_cuts = [
     block(-hw, hw, -hw, hw, body_z, top_z),
     block(-v("wire_void_x") / 2, v("wire_void_x") / 2, -v("wire_void_y") / 2, v("wire_void_y") / 2, top_z, v("wire_exit_z") + 8),
 ]
-screws = [(v("tib_screw_a_x"), v("tib_screw_a_z")), (-v("tib_screw_a_x"), v("tib_screw_a_z")),
-          (v("tib_screw_b_x"), v("tib_screw_b_z")), (-v("tib_screw_b_x"), v("tib_screw_b_z"))]
+# 2 screws on a diagonal hold the halves (4 crowded the tip with head recesses)
+screws = [(v("tib_screw_a_x"), v("tib_screw_a_z")), (-v("tib_screw_b_x"), v("tib_screw_b_z"))]
 arm = v("horn_reach") - v("horn_tip_w") / 2
 tip_w = v("horn_tip_w")
 pocket = v("horn_hub_h") + v("horn_fit")      # the horn plus a little room for glue
