@@ -110,6 +110,16 @@ cuts.append(prism([(hx0, g_y0 - t, 3), (hx1, g_y0 - t, 3), (hx1, b_y0 + t, 5), (
 skirt = block(-rear - 1, v("coxa_arch_x0") + 1, -rear - 8, rear + 8, floor_z0 - 2, z0).cut(
     prism([(-v("coxa_skirt_x"), 9.2, 4), (v("coxa_arch_x0") + 2, 9.2, 0), (v("coxa_arch_x0") + 2, -9.2, 0), (-v("coxa_skirt_x"), -9.2, 4)], "xy", floor_z0 - 3, z0 + 1))
 cuts.append(skirt)
+# pockets in the solid sides beside the servo (the stress map there is near zero), open from below
+sw_ = v("coxa_side_wall")
+keep_y = hw + sw_                                 # wall left next to the servo and its tabs
+out_r = rear - sw_                                # wall left inside the rounded rear outline
+side_x1 = v("coxa_hollow_x0") - sw_                # (ending them 4 mm short of the servo's far corner changed nothing in the FEA)
+for sg in (1, -1):
+    y_in, y_out = sg * keep_y, sg * out_r
+    pk = block(-out_r, side_x1, min(y_in, y_out), max(y_in, y_out), z0 - 1, z1 - v("coxa_side_roof")).common(
+        rod(2 * out_r, z1 - z0 + 2, (0, 0, z0 - 2), "z").fuse(block(0, side_x1 + 1, -out_r, out_r, z0 - 2, z1)))
+    cuts.append(pk)
 shape = shape.cut(Part.makeCompound(cuts)).removeSplitter()
 # 2 small bridges over the groove
 bridges = [block(x, x + 3, g_y0 - 0.1, g_y1 + 0.1, z1 - 1.4, z1) for x in (g_x0 + 6, g_x0 + 16)]
