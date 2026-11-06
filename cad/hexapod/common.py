@@ -211,6 +211,79 @@ def rounded_face(points, plane):
     return Part.Face(Part.Wire(edges))
 
 
+def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
+    """Chamfer the convex edges (hole and pocket mouths, outer corners; never the inside corners
+    such as a pocket's floor, which a chamfer would fill): `small` on round edges up to small_d,
+    `big` on the rest. keep(edge) True leaves an edge alone. Edges the kernel can't do together
+    are tried one at a time; the ones it refuses stay sharp, and are counted."""
+    import Part
+    picked = {}
+    for i, e in enumerate(shape.Edges):
+        if keep(e) or e.Length < max(min_len, 3 * small):
+            continue
+        faces = shape.ancestorsOfType(e, Part.Face)
+        if len(faces) != 2:
+            continue
+        p = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        n = App.Vector()
+        for f in faces:
+            try:
+                u, v = f.Surface.parameter(p)
+                nf = f.normalAt(u, v)
+            except Exception:
+                n = None
+                break
+            n = n + nf
+        if n is None or n.Length < 1e-6 or n.Length > 1.8:        # shallow joins (tangent, or an existing chamfer's 135 deg) are not corners
+            continue
+        n.normalize()
+        if shape.isInside(p + n * 0.05, 1e-4, True):               # inside corner: leave it
+            continue
+        round_small = e.Curve.TypeId in ("Part::GeomCircle",) and 2 * e.Curve.Radius <= small_d + 1e-6
+        size = small if round_small else big
+        if e.Length < 3 * size:
+            continue
+        picked.setdefault(size, []).append(i)
+    result, done, tried = shape, 0, 0
+    for size, idx in sorted(picked.items(), reverse=True):
+        # edges of the current result that match the picked ones (indices change after each chamfer)
+        targets = [shape.Edges[i] for i in idx]
+        tried += len(targets)
+        def match(sh):
+            out = []
+            for t in targets:
+                c = t.valueAt((t.FirstParameter + t.LastParameter) / 2)
+                for e in sh.Edges:
+                    if abs(e.Length - t.Length) < 1e-6 and e.distToShape(Part.Vertex(c))[0] < 1e-6:
+                        out.append(e)
+                        break
+            return out
+        edges = match(result)
+        try:
+            trial = result.makeChamfer(size, edges)
+            ok = trial.isValid() and len(trial.Solids) == len(result.Solids)
+        except Exception:
+            ok = False
+        if ok:
+            result, done = trial, done + len(edges)
+            continue
+        for e in edges:
+            try:
+                trial = result.makeChamfer(size, [m for m in result.Edges if m.isSame(e)] or match_one(result, e))
+                if trial.isValid() and len(trial.Solids) == len(result.Solids):
+                    result, done = trial, done + 1
+            except Exception:
+                pass
+    print("  lead-ins: %d of %d convex edges" % (done, tried))
+    return result
+
+
+def match_one(sh, e):
+    import Part
+    c = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+    return [m for m in sh.Edges if abs(m.Length - e.Length) < 1e-6 and m.distToShape(Part.Vertex(c))[0] < 1e-6][:1]
+
+
 def horn_pocket(hub_r, tip_r, length, depth, origin, x_dir, normal):
     """A horn's outline as a pocket: the hub circle at the origin, the tip circle `length` along
     x_dir, joined by the two straight lines tangent to both (the arm tapers), extruded `depth`

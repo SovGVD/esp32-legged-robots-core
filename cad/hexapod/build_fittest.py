@@ -65,7 +65,7 @@ a = block(-t_near - WALL, t_far + WALL, -bw - WALL, bw + WALL, 0, h).cut(Part.ma
     block(-t_near, t_far, -bw, bw, floor, h + 1),                            # the tabs, from the top
     rod(v("mg90_screw_pilot_d"), floor + 2, (-v("mg90_hole_near"), 0, -1), "z"),
     rod(v("mg90_screw_pilot_d"), floor + 2, (v("mg90_hole_far"), 0, -1), "z")])).removeSplitter()
-pieces["A_servo_pocket"] = top_bottom_chamfer(a, v("fem_fit_ch"), (h, 0))
+pieces["A_servo_pocket"] = a
 
 # ------------------------------------------------------------ B: horn pocket
 pd, pw = v("horn_pocket_d"), v("horn_pocket_w")
@@ -76,7 +76,7 @@ bh = depth + roof
 b = block(-pd / 2 - WALL, arm + pw / 2 + WALL, -pd / 2 - WALL, pd / 2 + WALL, 0, bh).cut(Part.makeCompound([
     common["horn_pocket"](pd / 2, pw / 2, arm, depth + 1, (0, 0, roof), (1, 0, 0), (0, 0, 1)),
     rod(5.0, bh + 2, (0, 0, -1), "z")])).removeSplitter()
-pieces["B_horn_pocket"] = top_bottom_chamfer(b, 0.4, (0,))
+pieces["B_horn_pocket"] = b
 
 # ------------------------------------------------------------ C: bearing seat and shaft
 seat_d, bt = v("bearing_seat_d"), v("bearing_t")
@@ -93,7 +93,7 @@ pieces["C_shaft"] = shaft.makeChamfer(v("fem_shaft_ch"), tip)
 # ------------------------------------------------------------ D: column end and screw plate
 d_len = 12.0
 col = rod(v("col_d"), d_len, (0, 0, 0), "z").cut(rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, d_len - v("col_screw_depth")), "z"))
-pieces["D_column"] = top_bottom_chamfer(col, v("col_end_ch"), (0, d_len))
+pieces["D_column"] = col
 d_t = v("top_plate_t") + v("col_top_floor")          # the top plate at a column
 pieces["D_plate"] = block(-7, 7, -7, 7, 0, d_t).cut(Part.makeCompound([
     rod(v("screw_clear_d"), d_t + 2, (0, 0, -1), "z"),
@@ -113,6 +113,11 @@ pieces["E_board_slots"] = e.removeSplitter()
 sw, sl = v("pwr_cut_w"), v("pwr_cut_len")
 pieces["F_switch_panel"] = block(-sw / 2 - 5, sw / 2 + 5, -sl / 2 - 5, sl / 2 + 5, 0, v("pwr_panel_t")).cut(
     block(-sw / 2, sw / 2, -sl / 2, sl / 2, -1, 3))
+
+# ------------------------------------------------------------ lead-ins on every hole, pocket and outline
+for name in list(pieces):
+    print(name)
+    pieces[name] = common["lead_ins"](pieces[name], v("lead_small"), v("lead_big"), v("lead_small_d"))
 
 # ------------------------------------------------------------ pack them into a compact block and export
 # shelves: the tallest (in Y) first, each row filled up to ROW_W, 5 mm apart, centred on the bed origin
