@@ -257,8 +257,8 @@ const float SIT_HEIGHT = -30;
  */
 const TofSensor TOF_SENSORS[] = {
 	// position (mm, body frame), yaw (+ = left), tilt down (rad), field of view (rad), zones per side, max range (mm)
-	{ { -14, 74, 22 },  0.35, 0.61, 0.785, 8, 450 },
-	{ {  14, 74, 22 }, -0.35, 0.384, 0.785, 8, 450 },
+	{ { -14, 74, 23 },  0.35, 0.61, 0.785, 8, 450 },
+	{ {  14, 74, 23 }, -0.35, 0.384, 0.785, 8, 450 },
 };
 #define TOF_SENSOR_COUNT 2
 
