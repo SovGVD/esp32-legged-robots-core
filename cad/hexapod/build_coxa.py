@@ -76,7 +76,7 @@ far = v("mg90_body_len") - v("mg90_shaft_end") + fit
 tab_near = v("mg90_tab_near") + fit
 tab_far = v("mg90_tab_far") + fit
 tip_w = v("horn_tip_w")
-pocket = v("horn_hub_h")
+pocket = v("horn_hub_h") + v("horn_fit")      # the horn plus a little room for glue
 arm = v("horn_reach") - tip_w / 2
 through = a_y1 - a_y0 + 1
 cuts = [
@@ -85,9 +85,9 @@ cuts = [
     rod(v("mg90_screw_pilot_d"), v("coxa_plate_floor") + 1, (-v("mg90_hole_near"), 0, z0 - 1), "z"),
     rod(v("mg90_screw_pilot_d"), v("coxa_plate_floor") + 1, (v("mg90_hole_far"), 0, z0 - 1), "z"),
     # the femur servo's horn, its arm toward the coxa axis
-    block(fl - arm, fl, a_y0, a_y0 + pocket, -tip_w / 2, tip_w / 2),
-    rod(tip_w, pocket, (fl - arm, a_y0, 0), "y"),
-    rod(v("horn_hub_d"), pocket, (fl, a_y0, 0), "y"),
+    block(fl - arm, fl, a_y0, a_y0 + pocket, -v("horn_pocket_w") / 2, v("horn_pocket_w") / 2),
+    rod(v("horn_pocket_w"), pocket, (fl - arm, a_y0, 0), "y"),
+    rod(v("horn_pocket_d"), pocket, (fl, a_y0, 0), "y"),
     rod(5.0, through, (fl, a_y0, 0), "y"),
     # the femur's bearing
     rod(v("bearing_seat_d"), b_y1 - v("tib_bear_seat_end") + 1, (fl, v("tib_bear_seat_end"), 0), "y"),

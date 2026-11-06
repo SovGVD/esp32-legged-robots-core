@@ -84,11 +84,11 @@ screws = [(v("tib_screw_a_x"), v("tib_screw_a_z")), (-v("tib_screw_a_x"), v("tib
           (v("tib_screw_b_x"), v("tib_screw_b_z")), (-v("tib_screw_b_x"), v("tib_screw_b_z"))]
 arm = v("horn_reach") - v("horn_tip_w") / 2
 tip_w = v("horn_tip_w")
-pocket = v("horn_hub_h")
+pocket = v("horn_hub_h") + v("horn_fit")      # the horn plus a little room for glue
 cuts_a = list(tip_cuts) + [
-    block(-tip_w / 2, tip_w / 2, low_y, low_y + pocket, -arm, 0),
-    rod(tip_w, pocket, (0, low_y, -arm), "y"),
-    rod(v("horn_hub_d"), pocket, (0, low_y, 0), "y"),
+    block(-v("horn_pocket_w") / 2, v("horn_pocket_w") / 2, low_y, low_y + pocket, -arm, 0),
+    rod(v("horn_pocket_w"), pocket, (0, low_y, -arm), "y"),
+    rod(v("horn_pocket_d"), pocket, (0, low_y, 0), "y"),
     rod(5.0, top_y - low_y + 1, (0, low_y, 0), "y"),
 ]
 for x, z in screws:

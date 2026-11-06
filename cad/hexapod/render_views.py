@@ -112,6 +112,7 @@ TARGETS["battery cartridge with holder, XT30 and latches"] = cart
 TARGETS["battery cartridge alone"] = [("Battery_Cartridge", None, (0.55, 0.6, 0.75))]
 TARGETS["bottom plate with cartridge in"] = [("Body_Bottom", None, GREY), ("Battery_Cartridge", None, (0.55, 0.6, 0.75)),
                                            ("Battery_Latch", check_pl("latch_f"), DARK), ("Battery_Latch", check_pl("latch_r"), DARK)]
+TARGETS["fit test"] = [(o.Name, None, (0.85, 0.55, 0.2)) for o in doc.getObject("FitTest").Group] if doc.getObject("FitTest") else []
 if globals().get("ONLY"):
     TARGETS = {k: TARGETS[k] for k in ONLY}
 for name, items in TARGETS.items():
