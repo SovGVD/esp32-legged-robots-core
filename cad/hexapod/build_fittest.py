@@ -9,11 +9,11 @@ parameter to change for all parts. Exports print/fit_test.stl, everything flat o
   C  bearing seat as in the body, femur and tibia, plus a shaft on its spacer.
      Try: the MR128K presses into the seat; the shaft turns in its inner ring.  bearing_seat_d, bearing_id
   D  column end with a screw pilot, and a plate with the clearance hole.
-     Try: a stock screw through the plate bites into the column.                mg90_screw_pilot_d
+     Try: a stock screw through the plate bites into the column, its head flush.  screw_clear_d, screw_head_d/_h
   E  board slots as in the bottom plate: PCA9685 (6 mm high) and ESP32 (3.5).
      Try: the boards slide in by hand and stand without wobbling.               rail_fit
   F  power switch cutout in a 1.6 mm panel.
-     Try: the KCD1 snaps in and holds.                                          pwr_fit, pwr_panel_t
+     Try: the KCD1 snaps in and holds.                                          pwr_cut_w, pwr_cut_len, pwr_panel_t
 
 Run inside FreeCAD after build_params.py.
 """
@@ -74,9 +74,7 @@ depth = v("horn_hub_h") + v("horn_fit")
 roof = v("tib_horn_roof")
 bh = depth + roof
 b = block(-pd / 2 - WALL, arm + pw / 2 + WALL, -pd / 2 - WALL, pd / 2 + WALL, 0, bh).cut(Part.makeCompound([
-    rod(pd, depth + 1, (0, 0, roof), "z"),
-    block(0, arm, -pw / 2, pw / 2, roof, bh + 1),
-    rod(pw, depth + 1, (arm, 0, roof), "z"),
+    common["horn_pocket"](pd / 2, pw / 2, arm, depth + 1, (0, 0, roof), (1, 0, 0), (0, 0, 1)),
     rod(5.0, bh + 2, (0, 0, -1), "z")])).removeSplitter()
 pieces["B_horn_pocket"] = top_bottom_chamfer(b, 0.4, (0,))
 
@@ -85,7 +83,7 @@ seat_d, bt = v("bearing_seat_d"), v("bearing_t")
 c_h = bt + 1.5
 c = rod(seat_d + 2 * WALL, c_h, (0, 0, 0), "z").cut(Part.makeCompound([
     rod(seat_d, bt + 1, (0, 0, c_h - bt), "z"),
-    rod(v("fem_boss_d") - 1, c_h + 2, (0, 0, -1), "z")])).removeSplitter()    # push the bearing out from below
+    rod(v("bearing_push_d"), c_h + 2, (0, 0, -1), "z")])).removeSplitter()    # push the bearing out from below
 shaft = rod(14, 2, (0, 0, 0), "z").fuse([rod(v("fem_boss_d"), v("fem_boss_h"), (0, 0, 2), "z"),
                                          rod(v("fem_shaft_d"), v("fem_shaft_len"), (0, 0, 2 + v("fem_boss_h")), "z")]).removeSplitter()
 tip = [e for e in shaft.Edges if abs(e.BoundBox.ZMin - (2 + v("fem_boss_h") + v("fem_shaft_len"))) < 1e-4 and e.BoundBox.ZLength < 1e-4]
@@ -96,7 +94,10 @@ pieces["C_shaft"] = shaft.makeChamfer(v("fem_shaft_ch"), tip)
 d_len = 12.0
 col = rod(v("col_d"), d_len, (0, 0, 0), "z").cut(rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, d_len - v("col_screw_depth")), "z"))
 pieces["D_column"] = top_bottom_chamfer(col, v("col_end_ch"), (0, d_len))
-pieces["D_plate"] = block(-7, 7, -7, 7, 0, v("top_plate_t")).cut(rod(2.2, 5, (0, 0, -1), "z"))
+d_t = v("top_plate_t") + v("col_top_floor")          # the top plate at a column
+pieces["D_plate"] = block(-7, 7, -7, 7, 0, d_t).cut(Part.makeCompound([
+    rod(v("screw_clear_d"), d_t + 2, (0, 0, -1), "z"),
+    rod(v("screw_head_d"), v("screw_head_h") + 1, (0, 0, d_t - v("screw_head_h")), "z")]))
 
 # ------------------------------------------------------------ E: board slots
 rt, rl, rf = v("rail_t"), 10.0, v("rail_fit")
@@ -109,8 +110,7 @@ for y, board_t, rh in ((5.0, v("pca_t"), v("rail_h")), (-5.0, v("esp_t"), v("esp
 pieces["E_board_slots"] = e.removeSplitter()
 
 # ------------------------------------------------------------ F: switch cutout
-pf = v("pwr_fit")
-sw, sl = v("pwr_body_w") + 2 * pf, v("pwr_body_len") + 2 * pf
+sw, sl = v("pwr_cut_w"), v("pwr_cut_len")
 pieces["F_switch_panel"] = block(-sw / 2 - 5, sw / 2 + 5, -sl / 2 - 5, sl / 2 + 5, 0, v("pwr_panel_t")).cut(
     block(-sw / 2, sw / 2, -sl / 2, sl / 2, -1, 3))
 

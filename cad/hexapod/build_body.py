@@ -177,10 +177,10 @@ bottom_solid = bottom_solid.cut(pockets(z_bot + v("bot_skin_t"), top_bot + 0.01,
 bot_cuts = []
 for _, x, y, __, ___ in AXES:
     bot_cuts.append(rod(v("bearing_seat_d"), v("bearing_t") + 1, (x, y, top_bot - v("bearing_t")), "z"))
-    bot_cuts.append(rod(v("fem_boss_d"), v("body_plate_t") + 2, (x, y, z_bot - 1), "z"))
+    bot_cuts.append(rod(v("bearing_push_d"), v("body_plate_t") + 2, (x, y, z_bot - 1), "z"))
 for x, y in COLUMNS:
     bot_cuts.append(rod(v("col_d") + v("col_fit"), v("rib_bot_h") + 1, (x, y, top_bot), "z"))
-    bot_cuts.append(rod(2.2, top_bot - z_bot + 1, (x, y, z_bot - 0.5), "z"))
+    bot_cuts.append(rod(v("screw_clear_d"), top_bot - z_bot + 1, (x, y, z_bot - 0.5), "z"))
     bot_cuts.append(rod(v("col_head_d"), v("col_head_h") + 1, (x, y, z_bot - 1), "z"))
 # notch the border rib behind the PCA9685 pin groups (outside the slots), with a little room
 for sign in (1, -1):
@@ -220,19 +220,16 @@ for _, x, y, yaw, __ in AXES:
     strip = Part.makeBox(v("horn_reach") + 2.5, tip_w + 5, boss_h, App.Vector(0, -(tip_w + 5) / 2, 0))
     strip.Placement = App.Placement(App.Vector(x, y, hub_z), App.Rotation(App.Vector(0, 0, 1), yaw + 180))
     top_parts.append(strip)
-    pk = Part.makeBox(arm, v("horn_pocket_w"), pocket, App.Vector(0, -v("horn_pocket_w") / 2, 0))
-    pk.Placement = App.Placement(App.Vector(x, y, hub_z), App.Rotation(App.Vector(0, 0, 1), yaw + 180))
-    top_cuts.append(pk)
-    top_cuts.append(rod(v("horn_pocket_w"), pocket, (x + c * arm, y + s * arm, hub_z), "z"))
-    top_cuts.append(rod(v("horn_pocket_d"), pocket, (x, y, hub_z), "z"))
+    top_cuts.append(common["horn_pocket"](v("horn_pocket_d") / 2, v("horn_pocket_w") / 2, arm, pocket, (x, y, hub_z), (c, s, 0), (0, 0, 1)))
     top_cuts.append(rod(5.0, boss_h + 1, (x, y, hub_z), "z"))
 for x, y in COLUMNS:
-    top_cuts.append(rod(2.2, v("top_plate_t") + 2, (x, y, top0 - 1), "z"))
-    top_cuts.append(rod(v("col_d") + v("col_fit"), v("rib_h") + 1, (x, y, r_low - 1), "z"))   # the column stands here, its top against the plate
-pf_ = v("pwr_frame") + v("pwr_fit")
+    top_cuts.append(rod(v("screw_clear_d"), top1 - top0 + v("col_top_floor") + 2, (x, y, top0 - v("col_top_floor") - 1), "z"))
+    top_cuts.append(rod(v("screw_head_d"), v("screw_head_h") + 1, (x, y, top1 - v("screw_head_h")), "z"))          # the head sinks in
+    top_cuts.append(rod(v("col_d") + v("col_fit"), v("rib_h") + 1 - v("col_top_floor"), (x, y, r_low - 1), "z"))   # the column stands here, 1 mm short of the plate
+pf_ = v("pwr_frame")
 top_keep_extra = [block(-9.5, 9.5, -13, 13, top0 - 1, top1),                                   # under the GY-91
-                  block(v("pwr_x") - v("pwr_body_w") / 2 - pf_ - 1, v("pwr_x") + v("pwr_body_w") / 2 + pf_ + 1,
-                        v("pwr_y") - v("pwr_body_len") / 2 - pf_ - 1, v("pwr_y") + v("pwr_body_len") / 2 + pf_ + 1, top0 - 1, top1)] + \
+                  block(v("pwr_x") - v("pwr_cut_w") / 2 - pf_ - 1, v("pwr_x") + v("pwr_cut_w") / 2 + pf_ + 1,
+                        v("pwr_y") - v("pwr_cut_len") / 2 - pf_ - 1, v("pwr_y") + v("pwr_cut_len") / 2 + pf_ + 1, top0 - 1, top1)] + \
                  [rod(8.0, top1 - top0 + 2, (sx * v("tof_mount_screw_x"), v("tof_mount_screw_y"), top0 - 1), "z") for sx in (1, -1)] + \
                  [rod(8.5, top1 - top0 + 2, (0, v("tof_wire_y"), top0 - 1), "z")]
 top_pockets = pockets(top0 - 0.01, top1 - v("top_skin_t"), top_parts[1:], top_keep_extra, hang=True)
@@ -305,17 +302,17 @@ try:
     mount = mount.makeChamfer(0.6, [mount.Edges[i - 1] for i, _, __ in picked]) if picked else mount
 except Exception as exc:
     print("mount chamfer skipped:", exc)
-top_holes = [rod(2.2, top1 - top0 + 2, (sx * msx, msy, top0 - 1), "z") for sx in (-1, 1)]
+top_holes = [rod(v("screw_clear_d"), top1 - top0 + 2, (sx * msx, msy, top0 - 1), "z") for sx in (-1, 1)]
 top_holes.append(rod(v("tof_wire_d"), v("rib_h") + top1 - top0 + 2, (0, v("tof_wire_y"), top0 - v("rib_h") - 1), "z"))
-px_, py_, pf = v("pwr_x"), v("pwr_y"), v("pwr_fit")
-pw, plen, fr = v("pwr_body_w") + 2 * pf, v("pwr_body_len") + 2 * pf, v("pwr_frame")
+px_, py_ = v("pwr_x"), v("pwr_y")
+pw, plen, fr = v("pwr_cut_w"), v("pwr_cut_len"), v("pwr_frame")
 pwr_cut = [block(px_ - pw / 2, px_ + pw / 2, py_ - plen / 2, py_ + plen / 2, top0 - v("rib_h") - 1, top1 + 1),
            block(px_ - pw / 2 - fr, px_ + pw / 2 + fr, py_ - plen / 2 - fr, py_ + plen / 2 + fr, top0 - v("rib_h") - 1, top1 - v("pwr_panel_t"))]
 top_final = top_round.cut(Part.makeCompound(top_holes + pwr_cut)).removeSplitter()
 print("top: solids %d valid %s; ToF mount: solids %d valid %s %.1f g" % (len(top_final.Solids), top_final.isValid(), len(mount.Solids), mount.isValid(), mount.Volume / 1000 * v("pla_density")))
 top = common["as_part"](doc, part, "Body_Top", top_final, COL_TOP)
 tof_mount = common["as_part"](doc, part, "Body_ToF_Mount", mount, COL_TOP)
-col_len = top0 - top_bot
+col_len = top0 - v("col_top_floor") - top_bot
 col_raw = rod(v("col_d"), col_len, (0, 0, 0), "z").cut(Part.makeCompound([
     rod(v("col_bore_d"), col_len - 2 * v("col_screw_depth"), (0, 0, v("col_screw_depth")), "z"),
     rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, -1), "z"),
@@ -340,7 +337,7 @@ cart = cart.cut(Part.makeCompound(
     []+    [rod(v("holder_screw_d"), 20, (0, hy + sg * v("holder_hole_span") / 2, z_bot - 1), "z") for sg in (1, -1)])).removeSplitter()
 cartridge = common["as_part"](doc, part, "Battery_Cartridge", cart, COL_BOT)
 latch_raw = prism([(-lw / 2, 0, lw / 2 - 0.01), (lw / 2, 0, lw / 2 - 0.01), (lw / 2, llen, lw / 2 - 0.01), (-lw / 2, llen, lw / 2 - 0.01)], "xy", -lt, 0).fuse(
-    rod(lw, lt, (0, 0, -lt), "z")).fuse(rod(lw, lt, (0, llen, -lt), "z")).removeSplitter().cut(rod(2.2, lt + 2, (0, 0, -lt - 1), "z"))
+    rod(lw, lt, (0, 0, -lt), "z")).fuse(rod(lw, lt, (0, llen, -lt), "z")).removeSplitter().cut(rod(v("screw_clear_d"), lt + 2, (0, 0, -lt - 1), "z"))
 latch = common["as_part"](doc, part, "Battery_Latch", latch_raw, COL_BOT)
 print("cartridge %.1f g, latch %.1f g; valid %s %s; opening %.1f x %.1f, y %.1f to %.1f" % (
     cart.Volume / 1000 * v("pla_density"), latch_raw.Volume / 1000 * v("pla_density"), cart.isValid(), latch_raw.isValid(),

@@ -78,7 +78,13 @@ def build(case, load, bonded):
             shape = with_servos(shape, (App.Placement(App.Vector(0, seat_y, 0), ROT_IN_LEG.multiply(App.Rotation(App.Vector(0, 0, 1), 180))),
                                         App.Placement(App.Vector(val("femur_len"), seat_y, 0), ROT_IN_LEG)))
     elif case == "tibia":
-        shape = src.getObject("Tibia_Horn").Shape.fuse(src.getObject("Tibia_Bearing").Shape).removeSplitter()
+        # glued at the split, the halves' rounded edges meet in tiny slivers at the outer corners of the
+        # fork's crotch (x +-5.8, z apex) that gmsh fills with inverted elements: a small filler there,
+        # in the FEA only (each printed half is fine on its own)
+        import Part
+        az = val("tib_a_apex_z")
+        filler = Part.makeBox(14, 1.6, 1.5, App.Vector(-7, -0.8, az - 0.3))
+        shape = src.getObject("Tibia_Horn").Shape.fuse([src.getObject("Tibia_Bearing").Shape, filler]).removeSplitter()
     elif case == "beam":
         import Part
         shape = Part.makeBox(100, 10, 5)
@@ -127,6 +133,12 @@ def build(case, load, bonded):
         shape = src.getObject("Coxa_Main").Shape.copy()
         if bonded:
             shape = with_servos(shape, (App.Placement(App.Vector(0, 0, val("coxa_seat_z")), App.Rotation(App.Vector(0, 0, 1), 90)),))
+    # through STEP and back: gmsh then meshes shapes it otherwise leaves empty (the tibia's apex
+    # where the halves meet); the faces found below are looked up by geometry, so nothing else changes
+    import Part
+    step = os.path.join(tempfile.mkdtemp(prefix="hexapod_step_"), "part.step")
+    shape.exportStep(step)
+    shape = Part.read(step)
     obj.Shape = shape
     doc.recompute()
     an = ObjectsFem.makeAnalysis(doc, "Analysis")
@@ -188,7 +200,7 @@ def build(case, load, bonded):
             c, s_ = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
             top = val("body_plate_top")
             seat = ("ring", x, y, val("bearing_seat_d") / 2, top - val("bearing_t"), top)
-            horn = ("ring", x, y, val("horn_hub_d") / 2, val("top_boss_z0"), val("coxa_horn_z"))
+            horn = ("ring", x, y, val("horn_pocket_d") / 2, val("top_boss_z0"), val("coxa_horn_z"))
             loads.append(("%s up" % tag, seat, each, Z))
             loads.append(("%s low x" % tag, seat, -push * c, X))
             loads.append(("%s low y" % tag, seat, -push * s_, Y))
@@ -204,7 +216,7 @@ def build(case, load, bonded):
             out = []
             for i, f in enumerate(obj.Shape.Faces):
                 su = f.Surface
-                if su.TypeId != "Part::GeomCylinder" or min(abs(su.Radius - val("bearing_seat_d") / 2), abs(su.Radius - val("horn_hub_d") / 2)) > 0.01:
+                if su.TypeId != "Part::GeomCylinder" or min(abs(su.Radius - val("bearing_seat_d") / 2), abs(su.Radius - val("horn_pocket_d") / 2)) > 0.01:
                     continue
                 if abs(abs(su.Axis.dot(axis)) - 1) > 1e-6 or (su.Center - base).cross(axis).Length > 0.01:
                     continue
@@ -240,7 +252,7 @@ def build(case, load, bonded):
             loads.append(("side", shaft, side, Y))
         probe = (fl, 0.0, lever)
     elif case == "tibia":
-        held = cyl_faces(val("bearing_seat_d") / 2, 0) + cyl_faces(val("horn_hub_d") / 2, 0)
+        held = cyl_faces(val("bearing_seat_d") / 2, 0) + cyl_faces(val("horn_pocket_d") / 2, 0)
         # the presser pushes on the ledge at the top of its cavity: small faces, so by position
         top = ("near", val("tip_cavity_z1"), val("tip_cavity_x") / 2 + 0.1, val("tip_hole_w") / 2 + 0.1)
         loads = [("foot up", top, up, Z)]
@@ -251,7 +263,7 @@ def build(case, load, bonded):
         hub = val("coxa_len")
         held = cyl_faces(val("coxa_shaft_d") / 2, 0) + (cyl_faces(servo_shaft, 0) if bonded else cyl_faces(pilot, -near) + cyl_faces(pilot, far))
         seat = cyl_faces(val("bearing_seat_d") / 2, hub)
-        horn = cyl_faces(val("horn_hub_d") / 2, hub)
+        horn = cyl_faces(val("horn_pocket_d") / 2, hub)
         lever = 0.100
         arm = val("coxa_arm_a_y1") - val("coxa_arm_b_y0") - 4.0
         twist = side * lever / (arm / 1000)
@@ -270,12 +282,20 @@ def build(case, load, bonded):
     mesh.CharacteristicLengthMin = float(globals().get("MESH_MIN", 0.3))
     mesh.ElementOrder = "2nd"
     mesh.SecondOrderLinear = True   # straight element edges: curved ones invert on small features
+    mesh.OptimizeNetgen = True      # untangles the few flat elements gmsh leaves at thin spots (the tibia's apex)
     an.addObject(mesh)
     doc.recompute()
     from femmesh.gmshtools import GmshTools
-    err = GmshTools(mesh).create_mesh()
-    if err:
-        print("gmsh:", err[:300])
+    # gmsh sometimes returns an empty mesh for the same input (seen on the tibia): try again,
+    # nudging the size a little each time
+    for attempt in range(4):
+        err = GmshTools(mesh).create_mesh()
+        if err:
+            print("gmsh:", err[:300])
+        if mesh.FemMesh.NodeCount:
+            break
+        mesh.CharacteristicLengthMax = mesh.CharacteristicLengthMax.Value * 0.97
+        doc.recompute()
     print("mesh nodes", mesh.FemMesh.NodeCount, "solids", len(obj.Shape.Solids), "valid", obj.Shape.isValid())
     solver = ObjectsFem.makeSolverCalculiXCcxTools(doc, "CalculiX")
     an.addObject(solver)

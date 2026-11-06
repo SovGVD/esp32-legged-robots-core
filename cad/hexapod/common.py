@@ -211,6 +211,28 @@ def rounded_face(points, plane):
     return Part.Face(Part.Wire(edges))
 
 
+def horn_pocket(hub_r, tip_r, length, depth, origin, x_dir, normal):
+    """A horn's outline as a pocket: the hub circle at the origin, the tip circle `length` along
+    x_dir, joined by the two straight lines tangent to both (the arm tapers), extruded `depth`
+    along normal."""
+    import math
+    import Part
+    s_ = (hub_r - tip_r) / length
+    c_ = math.sqrt(1 - s_ * s_)
+    V = App.Vector
+    hub_top, hub_bot = V(hub_r * s_, hub_r * c_, 0), V(hub_r * s_, -hub_r * c_, 0)
+    tip_top, tip_bot = V(length + tip_r * s_, tip_r * c_, 0), V(length + tip_r * s_, -tip_r * c_, 0)
+    wire = Part.Wire([Part.Arc(hub_bot, V(-hub_r, 0, 0), hub_top).toShape(), Part.LineSegment(hub_top, tip_top).toShape(),
+                      Part.Arc(tip_top, V(length + tip_r, 0, 0), tip_bot).toShape(), Part.LineSegment(tip_bot, hub_bot).toShape()])
+    solid = Part.Face(wire).extrude(V(0, 0, depth))
+    x = V(*x_dir).normalize()
+    n = V(*normal).normalize()
+    y = n.cross(x)
+    m = App.Matrix(x.x, y.x, n.x, 0, x.y, y.y, n.y, 0, x.z, y.z, n.z, 0, 0, 0, 0, 1)
+    solid.Placement = App.Placement(V(*origin), App.Rotation(m))
+    return solid
+
+
 def prism(points, plane, lo, hi):
     """rounded_face pushed along the plane's normal, from lo to hi."""
     normal = {"xy": App.Vector(0, 0, 1), "xz": App.Vector(0, 1, 0), "yz": App.Vector(1, 0, 0)}[plane]

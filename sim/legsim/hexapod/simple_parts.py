@@ -92,7 +92,7 @@ def torso(p):
     t.box("logic_buck", (0, -44, -12), (8.5, 1.5, 5.5), 2.0, BUCK)
     t.box("gy91", tuple(p.imu_pos), (7, 10, 1), 3.0, "0.6 0.1 0.6 1")  # under the top cover, centre
     for sx in (-1, 1):
-        t.box(f"tof_{'l' if sx < 0 else 'r'}", (sx * 14, 74, 23), (6.5, 1.5, 4.5), 3.0, "0.48 0.25 0.69 1", -sx * 0.35)
+        t.box(f"tof_{'l' if sx < 0 else 'r'}", (sx * 14, 74, 22), (6.5, 1.5, 4.5), 3.0, "0.48 0.25 0.69 1", -sx * 0.35)
     rest = m.electronics - (t.used - e0)
     if rest > 0:                     # fuse, switch, connectors
         t.box("electronics_misc", (0, -30, -24), (6, 4, 2), rest, "0.2 0.2 0.2 1")
@@ -108,7 +108,7 @@ def leg(p, leg):
     off = SERVO_LEN / 2 - SHAFT_FROM_END
 
     cx = _Parts(n + "_")
-    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 33.3, PLA)
+    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 32.1, PLA)
     cx.box("coxa_servo", (off, 0, -8), (SERVO_LEN / 2, SERVO_WID / 2, SERVO_HGT / 2), SERVO_MASS, SERVO)
     cx.lump(m.coxa, (geo.coxa / 2, 0, -5), "coxa_misc")
 
@@ -120,7 +120,7 @@ def leg(p, leg):
 
     ti = _Parts(n + "_")
     L = geo.tibia
-    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 16.1, PLA)
+    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 14.9, PLA)
     ti.box("foot_switch", (5, 0, -L + 12), (3, 3, 6), 2.0, "0.76 0.23 0.23 1")   # switch in the tibia tip
     ti.lump(m.tibia, (0, 0, -L / 2), "tibia_misc")
     return str(cx), str(fe), str(ti)

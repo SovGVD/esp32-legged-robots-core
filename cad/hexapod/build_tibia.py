@@ -86,9 +86,7 @@ arm = v("horn_reach") - v("horn_tip_w") / 2
 tip_w = v("horn_tip_w")
 pocket = v("horn_hub_h") + v("horn_fit")      # the horn plus a little room for glue
 cuts_a = list(tip_cuts) + [
-    block(-v("horn_pocket_w") / 2, v("horn_pocket_w") / 2, low_y, low_y + pocket, -arm, 0),
-    rod(v("horn_pocket_w"), pocket, (0, low_y, -arm), "y"),
-    rod(v("horn_pocket_d"), pocket, (0, low_y, 0), "y"),
+    common["horn_pocket"](v("horn_pocket_d") / 2, v("horn_pocket_w") / 2, arm, pocket, (0, low_y, 0), (0, 0, -1), (0, 1, 0)),
     rod(5.0, top_y - low_y + 1, (0, low_y, 0), "y"),
 ]
 for x, z in screws:
@@ -96,7 +94,7 @@ for x, z in screws:
     cuts_a.append(rod(v("tib_screw_head_d"), top_y, (x, v("tib_screw_head_y"), z), "y"))
 cuts_b = list(tip_cuts) + [
     rod(v("bearing_seat_d"), y1 - seat_end + 1, (0, seat_end, 0), "y"),
-    rod(v("fem_boss_d"), v("tib_bear_roof") + 1, (0, y0 - 1, 0), "y"),
+    rod(v("bearing_push_d"), v("tib_bear_roof") + 1, (0, y0 - 1, 0), "y"),
 ]
 for x, z in screws:
     cuts_b.append(rod(v("tib_screw_d"), half_t + 1, (x, -half_t - 1, z), "y"))
