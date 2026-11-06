@@ -19,6 +19,7 @@
 #define DCMOTOR  105
 #define VL53L5CX 106
 #define LD06     107   // LDROBOT LD06 / LD19 2D lidar (same protocol)
+#define HIL_SIM  108   // simulated on the PC over the USB serial port (hardware in the loop, hil.cpp)
 
 /**
  * Robot models

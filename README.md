@@ -52,6 +52,13 @@ pio device monitor                   # serial CLI, 115200
 `./build.sh cli [port]`) and still builds the web client (`./build.sh build-client-env`, needs Node.js),
 which regenerates `src/esp32-legged-robot/web/index.html.gz.h`.
 
+### Hardware in the loop
+
+`robot-dog-hil` / `robot-hexapod-hil` build the full firmware for a bare ESP32 board whose servos, IMU, battery,
+ToF sensors and foot switches are simulated in MuJoCo on the PC over the USB cable
+(`python sim/examples/hil.py --port /dev/ttyUSB0`). The web UI, CLI and WiFi work as on the robot. See
+[sim/README.md](sim/README.md#hardware-in-the-loop-a-real-esp32-as-the-brain).
+
 ### Flash from the browser
 
 Every merge into `main` builds the firmware for all robots and publishes a flasher page on GitHub Pages

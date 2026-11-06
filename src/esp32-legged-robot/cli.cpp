@@ -6,7 +6,7 @@ static void CLI_prepareCommand();
 const char *CLI_delimiters = " \n";
 char CLI_BUFFER[CLI_BUFFER_LENGTH + 1];
 
-#define CLI_COMMANDS 19
+#define CLI_COMMANDS 20
 #define CLI_MAIN_SET 0
 #define CLI_MODEL_SET 100
 
@@ -37,7 +37,8 @@ const cliCommand cliCommands[CLI_COMMANDS] = {
   { "turnto",    cliTurnTo,     "Turn to compass heading <deg>",     1, 0 },
   { "lidar",     cliLidar,      "[state|print|reset|freeze|stop]",   1, 0 },
   { "goto",      cliGoto,       "Walk to map point <x m> <y m>",     2, 0 },
-  { "feet",      cliFeet,       "[on|off|state] foot switches",      1, 0 }
+  { "feet",      cliFeet,       "[on|off|state] foot switches",      1, 0 },
+  { "hil",       cliHil,        "Hardware in the loop link state",   0, 0 }
 };
 
 

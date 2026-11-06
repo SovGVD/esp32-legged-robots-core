@@ -119,6 +119,7 @@ void updateFeet(leg *legsOut, uint8_t legCount, bool apply);   // motion task, e
 bool footSwitchesFitted();                    // FOOT_SWITCH_PINS set
 bool footSwitchesInUse();                     // fitted and `feet on`
 void cliFeet();                               // CLI: feet on|off|state
+FootInput &footInput();                       // GPIO switches (feet.cpp), or the simulated ones (HIL)
 // Odometry for the lidar / ToF room scans (motion.cpp): gait velocity turned by the gyro, any task
 struct MotionOdometry {
 	LR_pose2 pose;         // mm, rad (counter-clockwise), since boot
@@ -192,6 +193,7 @@ void initIMU();
 void updateIMU();
 void calibrateIMU();
 // ToF (tof.cpp), VL53L5CX with TOF_TYPE
+TofArray &tofArray();   // the VL53L5CX driver (tof.cpp), or the simulated sensors (HIL)
 void    initTof();
 uint8_t tofSensorCount();
 bool    tofReady(uint8_t i);
@@ -222,6 +224,18 @@ void initPowerSensor();
 void updatePower();
 float getPowerSensorVoltage();
 float getPowerSensorCurrent();
+
+/**
+ * Hardware in the loop (hil.cpp, -DHIL): the devices are simulated on the PC
+ */
+#ifdef HIL
+void initHil();                     // after Serial.begin()
+void hilReceive();                  // motion task, start of a tick: sensor / ToF / move frames from the PC
+void hilSend(uint32_t dtUs);        // motion task, end of a tick: the servo pulses
+// newest simulated sensors; newMag: the magnetometer reading is new (takeMag: and now it is taken)
+bool hilSensors(HilSensors &out, bool &newMag, bool takeMag = true);
+#endif
+void cliHil();                      // CLI: hil (link state)
 
 /**
  * Failsafe (failsafe.cpp)
