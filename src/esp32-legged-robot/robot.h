@@ -109,6 +109,16 @@ void printGaitState();                        // CLI: active gait parameters
 void cliTerrain();                            // CLI: terrain on|off|state
 void cliHeading();                            // CLI: heading on|off|state|cal|hand
 void cliTurnTo();                             // CLI: turnto <deg>
+bool motionUsesContacts();                    // the gait runs on the foot switches now
+
+/**
+ * Foot contact switches on GPIO (feet.cpp, FOOT_SWITCH_PINS in config.h)
+ */
+void initFeet();
+void updateFeet(leg *legsOut, uint8_t legCount, bool apply);   // motion task, every tick
+bool footSwitchesFitted();                    // FOOT_SWITCH_PINS set
+bool footSwitchesInUse();                     // fitted and `feet on`
+void cliFeet();                               // CLI: feet on|off|state
 // Odometry for the lidar / ToF room scans (motion.cpp): gait velocity turned by the gyro, any task
 struct MotionOdometry {
 	LR_pose2 pose;         // mm, rad (counter-clockwise), since boot
