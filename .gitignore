@@ -3,3 +3,5 @@ src/esp32-legged-robot/web/index.html.gz
 src/esp32-legged-robot/config_model.h
 .vscode
 .pio
+.cache
+compile_commands.json
