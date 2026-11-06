@@ -70,6 +70,7 @@ static void robotSetup()
 		vTaskDelay(100);
 
 		initMotion();
+		initFeet();
 		vTaskDelay(100);
 
 		initIMU();

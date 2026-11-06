@@ -119,6 +119,16 @@ with the stick the target follows, and when you let go the robot keeps the headi
 `turnto <deg>` turns to a compass heading and holds it (`heading off` stops). `heading state` prints the
 heading, the field strength and whether it is used. The hold pauses while the failsafe is on (no client).
 
+**Foot switches.** A lever microswitch per foot on its own GPIO pin (`FOOT_SWITCH_PINS` in `config.h`, leg
+id order; hexapod default LF LM LR RF RM RR = GPIO 16 17 18 19 23 25). Wire each switch's NO contact between the
+pin and GND: the internal pull-up makes a pressed foot read LOW (`FOOT_SWITCH_ACTIVE_HIGH` for the opposite).
+Keep them off the strapping pins (0, 2, 5, 12, 15: the robot boots standing, switches closed) and the input-only
+pins 34-39 (no pull-up). Reads are debounced over `FOOT_SWITCH_DEBOUNCE` motion ticks (default 2, ~9 ms).
+`feet state` shows each foot, its pin, raw and debounced state and how often it changed (a foot that never
+changes while walking has a broken wire or a stuck lever). `feet on` (applied once standing) makes the gait use
+them: a swing ends early once its foot touches, and in terrain mode a foot that hasn't touched keeps reaching
+down. Off by default (timed steps); `FOOT_SWITCH_ON` starts with them on. Not tested on the real robot yet.
+
 **Terrain (ToF).** `terrain on` (once standing) switches to the rough gait (`GAIT_PARAMS_ROUGH`, slower and
 higher steps), turns leveling on and feeds the VL53L5CX frames into the terrain map: feet step onto
 obstacles instead of into them, footholds keep away from gaps, and a gap too wide to step over stops the

@@ -110,6 +110,19 @@
 //#define LIDAR_TYPE               LD06
 #define LIDAR_RX_PIN             15
 
+// Foot contact switches (lever microswitches), one GPIO per leg in leg id
+// order: LF, LM, LR, RF, RM, RR. Each switch's NO contact between its pin and
+// GND, internal pull-up (pressed = LOW). Thin wire along the servo cables, a
+// loose loop at each joint. Not on 0/2/5/12/15 (strapping: the robot boots
+// standing, switches closed), 34-39 (no pull-up), or 16/17 on boards with
+// PSRAM (WROVER). Off at boot, `feet on` makes the gait use them; uncomment
+// FOOT_SWITCH_ON to start with them on. Comment out FOOT_SWITCH_PINS if the
+// feet have no switches. See feet.cpp.
+#define FOOT_SWITCH_PINS         { 16, 17, 18, 19, 23, 25 }
+#define FOOT_SWITCH_DEBOUNCE     2      // motion ticks the new state must hold (~9 ms)
+//#define FOOT_SWITCH_ACTIVE_HIGH       // NC contact or external pull-down: pressed = HIGH
+//#define FOOT_SWITCH_ON
+
 #define IGNORE_BROWNOUT_CONDITION
 
 //Cores loop time

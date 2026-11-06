@@ -77,6 +77,7 @@ float motionOdometryBias() { return 0; }
 void cliTerrain() { cliSerial->println("Tracks: no terrain mode."); }
 void cliHeading() { cliSerial->println("Tracks: no heading hold yet."); }
 void cliTurnTo()  { cliSerial->println("Tracks: no heading hold yet."); }
+bool motionUsesContacts() { return false; }
 
 void updateMotion(float dt)
 {
@@ -332,6 +333,27 @@ static void applyTerrainRequest()
 }
 
 /**
+ * Foot switches (`feet on|off`, feet.cpp) into the gait, changed only while
+ * standing like the gaits: GaitParams.useContactSensors follows the switch
+ * setting whatever gait is loaded (GAIT_PARAMS, the rough gait, `gait walk`).
+ */
+static void applyContactSensing()
+{
+	bool want = footSwitchesInUse();
+	if (motion.gait().params().useContactSensors == want || motion.gait().isActive()) {
+		return;
+	}
+	GaitParams p = motion.gait().params();
+	p.useContactSensors = want;
+	motion.gait().setParams(p);
+}
+
+bool motionUsesContacts()
+{
+	return motion.gait().params().useContactSensors;
+}
+
+/**
  * Terrain mode, every tick: the map tilt filter (and the map ages while
  * walking), new ToF frames into the map with this tick's body pose, and the
  * tilt the gait didn't plan for the touchdown heights. The same steps as
@@ -461,6 +483,10 @@ void updateMotion(float dt)
 	}
 
 	applyTerrainRequest();
+	applyContactSensing();
+	// switch reads into legs[].sensor before the gait looks at them (only while it uses them:
+	// otherwise the gait sets onGround itself)
+	updateFeet(legs, LEG_NUM, motion.gait().params().useContactSensors);
 	updateTerrain(dt, batteryState() != BATTERY_CRITICAL ? wantTilt : 0);
 
 	LR_moveVector cmd = getMoveCommand();
