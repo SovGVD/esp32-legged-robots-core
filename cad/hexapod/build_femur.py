@@ -106,7 +106,7 @@ for n, side in enumerate((0, 1, 0)):
         solid.append(box("finger_%d" % n, p("chan_finger_len"), "%s + %s" % (rail_hi, p("chan_finger_over")),
                          p("chan_finger_t"), x, "%s - %s" % (chan_hi, p("chan_finger_over")), finger_z))
 
-win_h = "%s + 2 * %s" % (p("mg90_body_w"), fit)
+win_h = "%s + 2 * %s" % (p("mg90_body_w"), p("mg90_fit_w"))
 win_len = "%s + 2 * %s" % (p("mg90_body_len"), fit)
 near = "%s + %s" % (p("mg90_shaft_end"), fit)
 tab_len = "%s + 2 * %s" % (p("mg90_tab_total"), fit)
@@ -143,7 +143,7 @@ def straight_edges(shape):
     """Every straight edge, inside corners too, except where a servo must fit: those
     stay sharp. Edges the kernel can't chamfer with the others are left out, counted."""
     ch = val("fem_edge_ch")
-    limit = val("mg90_body_w") / 2 + val("mg90_fit") + 1e-3
+    limit = val("mg90_body_w") / 2 + val("mg90_fit_w") + 1e-3
     floor_in, top = val("fem_floor_y1"), val("fem_plate_y1")
 
     def servo_fit(e):
@@ -176,7 +176,7 @@ def straight_edges(shape):
 def fit_edges(shape):
     """Lead-ins where a servo goes in: the mouth of each tab pocket and the top of each hole."""
     ch = val("fem_fit_ch")
-    limit = val("mg90_body_w") / 2 + val("mg90_fit") + 1e-3
+    limit = val("mg90_body_w") / 2 + val("mg90_fit_w") + 1e-3
     top, seat_y = val("fem_plate_y1"), val("joint_seat_y")
     near, far = val("mg90_shaft_end") + val("mg90_fit"), val("mg90_body_len") - val("mg90_shaft_end") + val("mg90_fit")
     hole_ends = (-near, far, val("femur_len") - far, val("femur_len") + near)

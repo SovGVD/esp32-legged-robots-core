@@ -55,7 +55,7 @@ def top_bottom_chamfer(shape, size, z_levels):
 
 # ------------------------------------------------------------ A: MG90S pocket
 fit = v("mg90_fit")
-bw = v("mg90_body_w") / 2 + fit
+bw = v("mg90_body_w") / 2 + v("mg90_fit_w")
 near, far = v("mg90_shaft_end") + fit, v("mg90_body_len") - v("mg90_shaft_end") + fit
 t_near, t_far = v("mg90_tab_near") + fit, v("mg90_tab_far") + fit
 floor, rim = v("fem_plate_floor"), v("fem_rim_h")

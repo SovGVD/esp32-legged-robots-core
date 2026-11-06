@@ -70,7 +70,7 @@ shape = above.common(side).removeSplitter()
 
 # ------------------------------------------------------------ cut the pockets into it
 fit = v("mg90_fit")
-hw = v("mg90_body_w") / 2 + fit
+hw = v("mg90_body_w") / 2 + v("mg90_fit_w")
 near = v("mg90_shaft_end") + fit
 far = v("mg90_body_len") - v("mg90_shaft_end") + fit
 tab_near = v("mg90_tab_near") + fit
