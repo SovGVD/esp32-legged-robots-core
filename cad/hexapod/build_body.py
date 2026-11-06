@@ -220,7 +220,9 @@ for _, x, y, yaw, __ in AXES:
     strip = Part.makeBox(v("horn_reach") + 2.5, tip_w + 5, boss_h, App.Vector(0, -(tip_w + 5) / 2, 0))
     strip.Placement = App.Placement(App.Vector(x, y, hub_z), App.Rotation(App.Vector(0, 0, 1), yaw + 180))
     top_parts.append(strip)
-    top_cuts.append(common["horn_pocket"](v("horn_pocket_d") / 2, v("horn_pocket_w") / 2, arm, pocket, (x, y, hub_z), (c, s, 0), (0, 0, 1)))
+    # the pocket and a clear way in from below in one cut (the horn comes up into it: no rib may cross
+    # its outline); one cut, so no seam at the pocket's mouth
+    top_cuts.append(common["horn_pocket"](v("horn_pocket_d") / 2, v("horn_pocket_w") / 2, arm, hub_z + pocket - (r_low - 1), (x, y, r_low - 1), (c, s, 0), (0, 0, 1)))
     top_cuts.append(rod(5.0, boss_h + 1, (x, y, hub_z), "z"))
 for x, y in COLUMNS:
     top_cuts.append(rod(v("screw_clear_d"), top1 - top0 + v("col_top_floor") + 2, (x, y, top0 - v("col_top_floor") - 1), "z"))
@@ -466,6 +468,15 @@ for tag, x, y, yaw, side in AXES:
             if x_ > 0.001:
                 sweep.setdefault((tag, name), []).append((deg, round(x_, 1)))
 print("horn and bearing fits mm3: %s" % {k: round(x_, 3) for k, x_ in fits.items()})
+# the horns go up into their pockets from below (top plate put on last): the way in must be clear
+way_in = {}
+for tag, x, y, yaw, side in AXES:
+    for dz in (0.5, 1, 2, 3, 4, 6, 8, 10, 12):
+        horn_low = solids_of(doc, HORN, Pl((x, y, seat - dz), App.Rotation(App.Vector(0, 0, 1), yaw).multiply(Z180)))
+        x_ = clash(horn_low, top_s)
+        if x_ > 0.001:
+            way_in.setdefault(tag, []).append((dz, round(x_, 2)))
+print("horns up into the top plate from 12 mm below: %s" % (way_in or "clear"))
 print("coxa sweep +-40 deg: %s" % (sweep or "no collisions"))
 
 # the cartridge comes out straight down with the latches turned 90 deg, the XT30 pair still plugged (lead slack)

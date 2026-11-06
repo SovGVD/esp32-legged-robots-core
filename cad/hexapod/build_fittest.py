@@ -122,6 +122,10 @@ APPROVED = {
     "D_column": "fit test 2: perfect",
     "D_plate": "fit test 2: perfect (2.5 clearance, 5.6 x 1.4 counterbore)",
     "E_esp_slot": "fit test 2: good (0.05 a side)",
+    "C_bearing_seat": "fit test 3: perfect (12.3 seat, 10 push-out hole)",
+    "C_shaft": "fit test 3: perfect (2.6 long)",
+    "E_pca_slot": "fit test 3: good enough (1.55 board, 0.05 a side)",
+    "F_switch_panel": "fit test 3: perfect (11.8 x 19.15)",
 }
 if not globals().get("ALL"):
     for name in APPROVED:
@@ -182,4 +186,8 @@ for name, shape in pieces.items():
     groups.setdefault(SEPARATE.get(name, "fit_test.stl"), {})[name] = shape
 for filename, group in groups.items():
     pack_and_export(group, filename)
+for filename in set(SEPARATE.values()) | {"fit_test.stl"}:      # a file whose pieces are all approved goes
+    if filename not in groups and os.path.exists(os.path.join(out_dir, filename)):
+        os.remove(os.path.join(out_dir, filename))
+        print("%s: nothing left to try, removed" % filename)
 common["save"](doc)

@@ -36,6 +36,8 @@ import tempfile
 
 import FreeCAD as App
 import ObjectsFem
+import runpy
+common = runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "common.py"))
 
 STALL_NM = 0.19
 LOADS = {"walk": (8.0, 0.0, True), "twist": (8.0, 4.0, True), "fall": (30.0, 15.0, False)}
@@ -106,12 +108,23 @@ def build(case, load, bonded):
             coxa = o.LinkedObject.Shape.copy()
             coxa.Placement = o.Placement.multiply(coxa.Placement)
             pieces.append(coxa)
-            for prefix, names in (("servo_", SERVO), ("horn_", ("Horn_hub", "Horn_arm", "Horn_tip")), ("bearing_", ("Bearing_body",))):
+            for prefix, names in (("servo_", SERVO), ("bearing_", ("Bearing_body",))):
                 link = src.getObject("BodyCheck_" + prefix + tag)
                 for n in names:
                     piece = src.getObject(n).Shape.copy()
                     piece.Placement = link.Placement.multiply(piece.Placement)
                     pieces.append(piece)
+            # the glued horn fills its pocket: the pocket's own shape (the dummy's straight arm left
+            # thin wedges in the tapered pocket, which meshed into inverted elements)
+            hl = src.getObject("BodyCheck_horn_" + tag).Placement
+            arm_dir = hl.Rotation.multVec(App.Vector(1, 0, 0))
+            # (down through the cleared channel under it too: a hair stiffer at the rib notches, but the
+            # notch walls next to the pocket's mouth meshed into inverted elements)
+            r_low_z = val("top_plate_z0") - val("rib_h")
+            # grown 0.5 all round: it also fills the 0.4 lead-ins at the channel's edges, which left thin voids
+            pieces.append(common["horn_pocket"](val("horn_pocket_d") / 2 + 0.5, val("horn_pocket_w") / 2 + 0.5, val("horn_reach") - val("horn_tip_w") / 2,
+                                                val("top_boss_z0") + val("horn_hub_h") + val("horn_fit") - r_low_z + 0.5, (hl.Base.x, hl.Base.y, r_low_z - 0.5),
+                                                (arm_dir.x, arm_dir.y, 0), (0, 0, 1)))
             frame_legs[tag] = o.Placement
         shape = src.getObject("Body_Bottom").Shape.multiFuse(pieces).removeSplitter()
         if len(shape.Solids) != 1:
