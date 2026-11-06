@@ -252,8 +252,30 @@ def top_sharp(e):
     return not (bb.ZLength < 1e-4 and abs(bb.ZMin - top1) < 1e-4) or (e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 8)
 
 
+def only_on(cutters, extra=lambda e: False):
+    """For the plates: lead-ins only on the fit openings, the edges lying on one of these cutters
+    (and extra(edge)); the rib grid's thousands of edges stay as they are."""
+    import Part
+    boxes = [(c, c.BoundBox) for c in cutters]
+
+    def keep(e):
+        if extra(e):
+            return False
+        p = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        for c, bb in boxes:
+            if bb.XMin - 0.01 <= p.x <= bb.XMax + 0.01 and bb.YMin - 0.01 <= p.y <= bb.YMax + 0.01 and bb.ZMin - 0.01 <= p.z <= bb.ZMax + 0.01:
+                if c.distToShape(Part.Vertex(p))[0] < 1e-3:
+                    return False
+        return True
+    return keep
+
+
+rail_tops = (top_bot + v("rail_h"), top_bot + v("esp_rail_h"))
 print("bottom")
-bottom = common["as_part"](doc, part, "Body_Bottom", common["smooth"](bottom_shape, edge_r, lambda e: bottom_sharp(e) or (e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 8)), COL_BOT)
+bottom_round = common["smooth"](bottom_shape, edge_r, lambda e: bottom_sharp(e) or (e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 8))
+bottom_round = common["lead_ins"](bottom_round, v("lead_small"), v("lead_big"), v("lead_small_d"), only_on(bot_cuts, lambda e: (
+    e.BoundBox.ZLength < 1e-4 and min(abs(e.BoundBox.ZMin - z) for z in rail_tops) < 1e-4)))
+bottom = common["as_part"](doc, part, "Body_Bottom", bottom_round, COL_BOT)
 print("top")
 top_round = common["smooth"](top_shape, edge_r, top_sharp)
 
@@ -310,7 +332,9 @@ pwr_cut = [block(px_ - pw / 2, px_ + pw / 2, py_ - plen / 2, py_ + plen / 2, top
            block(px_ - pw / 2 - fr, px_ + pw / 2 + fr, py_ - plen / 2 - fr, py_ + plen / 2 + fr, top0 - v("rib_h") - 1, top1 - v("pwr_panel_t"))]
 top_final = top_round.cut(Part.makeCompound(top_holes + pwr_cut)).removeSplitter()
 print("top: solids %d valid %s; ToF mount: solids %d valid %s %.1f g" % (len(top_final.Solids), top_final.isValid(), len(mount.Solids), mount.isValid(), mount.Volume / 1000 * v("pla_density")))
+top_final = common["lead_ins"](top_final, v("lead_small"), v("lead_big"), v("lead_small_d"), only_on(top_cuts + top_holes + pwr_cut))
 top = common["as_part"](doc, part, "Body_Top", top_final, COL_TOP)
+mount = common["lead_ins"](mount, v("lead_small"), v("lead_big"), v("lead_small_d"))
 tof_mount = common["as_part"](doc, part, "Body_ToF_Mount", mount, COL_TOP)
 col_len = top0 - v("col_top_floor") - top_bot
 col_raw = rod(v("col_d"), col_len, (0, 0, 0), "z").cut(Part.makeCompound([
@@ -318,7 +342,7 @@ col_raw = rod(v("col_d"), col_len, (0, 0, 0), "z").cut(Part.makeCompound([
     rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, -1), "z"),
     rod(v("mg90_screw_pilot_d"), v("col_screw_depth") + 1, (0, 0, col_len - v("col_screw_depth")), "z")]))
 col_edges = [e for e in col_raw.Edges if e.Curve.TypeId == "Part::GeomCircle" and abs(e.Curve.Radius - v("col_d") / 2) < 1e-4]
-column = common["as_part"](doc, part, "Body_Column", col_raw.makeChamfer(v("col_end_ch"), col_edges), COL_BOT)
+column = common["as_part"](doc, part, "Body_Column", common["lead_ins"](col_raw, v("lead_small"), v("lead_big"), v("lead_small_d")), COL_BOT)
 
 # the cartridge: floor flush with the plate's underside, low walls around the holder, lugs for the latches,
 # bosses for the holder's 2 screws, a tongue with the male XT30
@@ -335,9 +359,11 @@ cart = cart.fuse([walls,
                  [rod(v("holder_boss_d"), skin - z_bot, (0, hy + sg * v("holder_hole_span") / 2, z_bot), "z") for sg in (1, -1)]).removeSplitter()
 cart = cart.cut(Part.makeCompound(
     []+    [rod(v("holder_screw_d"), 20, (0, hy + sg * v("holder_hole_span") / 2, z_bot - 1), "z") for sg in (1, -1)])).removeSplitter()
+cart = common["lead_ins"](cart, v("lead_small"), v("lead_big"), v("lead_small_d"))
 cartridge = common["as_part"](doc, part, "Battery_Cartridge", cart, COL_BOT)
 latch_raw = prism([(-lw / 2, 0, lw / 2 - 0.01), (lw / 2, 0, lw / 2 - 0.01), (lw / 2, llen, lw / 2 - 0.01), (-lw / 2, llen, lw / 2 - 0.01)], "xy", -lt, 0).fuse(
     rod(lw, lt, (0, 0, -lt), "z")).fuse(rod(lw, lt, (0, llen, -lt), "z")).removeSplitter().cut(rod(v("screw_clear_d"), lt + 2, (0, 0, -lt - 1), "z"))
+latch_raw = common["lead_ins"](latch_raw, v("lead_small"), v("lead_big"), v("lead_small_d"))
 latch = common["as_part"](doc, part, "Battery_Latch", latch_raw, COL_BOT)
 print("cartridge %.1f g, latch %.1f g; valid %s %s; opening %.1f x %.1f, y %.1f to %.1f" % (
     cart.Volume / 1000 * v("pla_density"), latch_raw.Volume / 1000 * v("pla_density"), cart.isValid(), latch_raw.isValid(),

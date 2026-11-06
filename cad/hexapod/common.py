@@ -143,7 +143,21 @@ def solids_of(doc, names, placement=None):
 
 
 def clash(group_a, group_b):
-    return sum(a.common(b).Volume for a in group_a for b in group_b)
+    """Overlap volume of two groups of solids. When the kernel's common() fails on a pair (it does
+    on some tiny chamfer faces), apart is apart; touching or overlapping is measured with a cut."""
+    total = 0.0
+    for a in group_a:
+        for b in group_b:
+            try:
+                total += a.common(b).Volume
+            except Exception:
+                if a.distToShape(b)[0] > 1e-6:
+                    continue
+                try:
+                    total += a.Volume - a.cut(b).Volume
+                except Exception:
+                    total += 1e9          # can't tell: make it loud
+    return total
 
 
 def chamfer_edges(shape, size, skip, min_length=1.5):
@@ -219,27 +233,37 @@ def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
     import Part
     picked = {}
     for i, e in enumerate(shape.Edges):
-        if keep(e) or e.Length < max(min_len, 3 * small):
+        try:
+            if keep(e) or e.Length < max(min_len, 3 * small):
+                continue
+            curve = e.Curve.TypeId
+        except Exception:                       # edges without a plain curve (BSpline seams): leave them
             continue
         faces = shape.ancestorsOfType(e, Part.Face)
         if len(faces) != 2:
             continue
-        p = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
-        n = App.Vector()
-        for f in faces:
-            try:
-                u, v = f.Surface.parameter(p)
-                nf = f.normalAt(u, v)
-            except Exception:
-                n = None
-                break
-            n = n + nf
-        if n is None or n.Length < 1e-6 or n.Length > 1.8:        # shallow joins (tangent, or an existing chamfer's 135 deg) are not corners
+        mid = (e.FirstParameter + e.LastParameter) / 2
+        p = e.valueAt(mid)
+        try:
+            t = e.tangentAt(mid)
+            f1, f2 = faces
+            n1 = f1.normalAt(*f1.Surface.parameter(p))
+            n2 = f2.normalAt(*f2.Surface.parameter(p))
+        except Exception:
             continue
-        n.normalize()
-        if shape.isInside(p + n * 0.05, 1e-4, True):               # inside corner: leave it
+        if n1.dot(n2) > 0.7:                    # shallow (tangent, or an existing chamfer's 135 deg): not a corner
             continue
-        round_small = e.Curve.TypeId in ("Part::GeomCircle",) and 2 * e.Curve.Radius <= small_d + 1e-6
+        # d1 runs in the first face away from the edge; the corner is convex when the second face's
+        # outward normal points back against it (an outer corner), concave when along it (a floor)
+        d1 = n1.cross(t)
+        if d1.Length < 1e-9:
+            continue
+        d1.normalize()
+        if f1.distToShape(Part.Vertex(p + d1 * 0.05))[0] > 0.01:
+            d1 = d1 * -1
+        if n2.dot(d1) > -0.1:
+            continue
+        round_small = curve == "Part::GeomCircle" and 2 * e.Curve.Radius <= small_d + 1e-6
         size = small if round_small else big
         if e.Length < 3 * size:
             continue
@@ -274,7 +298,8 @@ def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
                     result, done = trial, done + 1
             except Exception:
                 pass
-    print("  lead-ins: %d of %d convex edges" % (done, tried))
+    grew = result.Volume - shape.Volume
+    print("  lead-ins: %d of %d convex edges, %.2f mm3 removed%s" % (done, tried, -grew, "  ** VOLUME GREW: an inside corner was filled **" if grew > 1e-3 else ""))
     return result
 
 
@@ -362,10 +387,17 @@ def as_part(doc, part, name, shape, color, visible=True):
 
 
 def add_mirror(doc, part, obj, color):
-    mirror = doc.addObject("Part::Mirroring", obj.Name + "_L")
+    """The left leg's copy, mirrored in Y. A plain copy of the shape, not a Mirroring feature: mirrored
+    tiny chamfer faces come out invalid, and the shape needs a repair (same volume after it)."""
+    doc.recompute()
+    shape = obj.Shape.mirror(App.Vector(0, 0, 0), App.Vector(0, 1, 0))
+    if not shape.isValid():
+        shape.fix(1e-7, 1e-7, 1e-5)
+    if not shape.isValid() or abs(shape.Volume - obj.Shape.Volume) > 1e-3 * obj.Shape.Volume:
+        raise RuntimeError("the mirror of %s is broken" % obj.Name)
+    mirror = doc.addObject("Part::Feature", obj.Name + "_L")
     part.addObject(mirror)
-    mirror.Source = obj
-    mirror.Normal = App.Vector(0, 1, 0)
+    mirror.Shape = shape
     mirror.ViewObject.Visibility = False
     mirror.ViewObject.ShapeColor = color
     return mirror

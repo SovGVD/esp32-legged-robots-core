@@ -257,7 +257,7 @@ TABLE = [
     ("fem_shaft_d", "=bearing_id", CALC, "shaft"),
     ("fem_shaft_len", "3 mm", BIPED, "shaft"),
     ("fem_edge_ch", "1 mm", BIPED, "chamfer on the edges"),
-    ("fem_fit_ch", "0.5 mm", DESIGN, "lead-in on the servo openings: tab pocket mouth and servo hole"),
+    ("fem_fit_ch", "=lead_big", CALC, "lead-in on the servo openings: tab pocket mouth and servo hole"),
     ("fem_shaft_ch", "0.4 mm", BIPED, "chamfer on the shaft tip"),
     ("fem_boss_ch", "0.2 mm", BIPED, "chamfer on the spacer"),
 

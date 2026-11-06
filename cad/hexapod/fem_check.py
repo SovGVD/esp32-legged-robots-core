@@ -136,9 +136,10 @@ def build(case, load, bonded):
     # through STEP and back: gmsh then meshes shapes it otherwise leaves empty (the tibia's apex
     # where the halves meet); the faces found below are looked up by geometry, so nothing else changes
     import Part
-    step = os.path.join(tempfile.mkdtemp(prefix="hexapod_step_"), "part.step")
-    shape.exportStep(step)
-    shape = Part.read(step)
+    if globals().get("STEP_TRIP", case == "tibia"):
+        step = os.path.join(tempfile.mkdtemp(prefix="hexapod_step_"), "part.step")
+        shape.exportStep(step)
+        shape = Part.read(step)
     obj.Shape = shape
     doc.recompute()
     an = ObjectsFem.makeAnalysis(doc, "Analysis")
@@ -282,7 +283,7 @@ def build(case, load, bonded):
     mesh.CharacteristicLengthMin = float(globals().get("MESH_MIN", 0.3))
     mesh.ElementOrder = "2nd"
     mesh.SecondOrderLinear = True   # straight element edges: curved ones invert on small features
-    mesh.OptimizeNetgen = True      # untangles the few flat elements gmsh leaves at thin spots (the tibia's apex)
+    mesh.OptimizeNetgen = bool(globals().get("NETGEN", case == "tibia"))   # untangles the few flat elements gmsh leaves at the tibia's apex
     an.addObject(mesh)
     doc.recompute()
     from femmesh.gmshtools import GmshTools

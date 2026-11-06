@@ -121,6 +121,21 @@ print("horn half")
 horn_shape = common["smooth"](half_a, edge_r, keep_sharp)
 print("bearing half")
 bear_shape = common["smooth"](half_b, edge_r, keep_sharp)
+
+
+def split_face(e):
+    """Edges in the split plane stay sharp (the halves meet there), except the screw holes' mouths."""
+    bb = e.BoundBox
+    try:
+        small_hole = e.Curve.TypeId == "Part::GeomCircle" and 2 * e.Curve.Radius <= v("lead_small_d") + 1e-6
+    except Exception:
+        small_hole = False
+    return bb.YLength < 1e-4 and abs(bb.YMin) < 1e-4 and not small_hole
+
+
+print("lead-ins")
+horn_shape = common["lead_ins"](horn_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), split_face)
+bear_shape = common["lead_ins"](bear_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), split_face)
 horn = common["as_part"](doc, part, "Tibia_Horn", horn_shape, COL_A)
 bear = common["as_part"](doc, part, "Tibia_Bearing", bear_shape, COL_B)
 common["add_mirror"](doc, part, horn, COL_A)

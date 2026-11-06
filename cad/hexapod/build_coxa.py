@@ -142,6 +142,10 @@ def keep_sharp(e):
 
 
 main_shape = common["smooth"](shape, v("coxa_edge_r"), keep_sharp)
+main_shape = common["lead_ins"](main_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), lambda e: (
+    # the shaft and its spacer under the floor stay as they are: the spacer presses on the bearing's inner ring
+    e.BoundBox.Center.Length <= 99 and (e.BoundBox.Center.x ** 2 + e.BoundBox.Center.y ** 2) ** 0.5 <= v("fem_boss_d") / 2 + 0.2
+    and e.BoundBox.ZMax <= floor_z0 + 0.01))
 main = common["as_part"](doc, part, "Coxa_Main", main_shape, PLA)
 common["add_mirror"](doc, part, main, PLA)
 common["save"](doc)

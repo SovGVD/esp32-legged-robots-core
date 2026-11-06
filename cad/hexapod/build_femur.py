@@ -237,18 +237,28 @@ lead.Base = step
 lead.Edges = fit_edges(step.Shape)
 step.ViewObject.Visibility = False
 doc.recompute()
-main = doc.addObject("Part::Chamfer", "Femur_Main")
-part.addObject(main)
-main.Base = lead
-main.Edges = shaft_edges(lead.Shape)
+shaft_ch = doc.addObject("Part::Chamfer", "Femur_Shafts")
+part.addObject(shaft_ch)
+shaft_ch.Base = lead
+shaft_ch.Edges = shaft_edges(lead.Shape)
 lead.ViewObject.Visibility = False
+doc.recompute()
+# lead-ins on whatever is still sharp: screw pilots, cable channel, the rest of the outline
+main = doc.addObject("Part::Feature", "Femur_Main")
+part.addObject(main)
+
+
+def shaft_or_spacer(e):
+    """The shafts and their spacers stay as they are: the spacer's face presses on the bearing's inner ring."""
+    c = e.BoundBox.Center
+    near_axis = min(abs(c.x), abs(c.x - val("femur_len"))) <= val("fem_boss_d") / 2 + 0.2 and abs(c.z) <= val("fem_boss_d") / 2 + 0.2
+    return near_axis and e.BoundBox.YMax <= val("fem_floor_y0") + 0.01
+
+
+main.Shape = common["lead_ins"](shaft_ch.Shape, val("lead_small"), val("lead_big"), val("lead_small_d"), shaft_or_spacer)
+shaft_ch.ViewObject.Visibility = False
 main.ViewObject.ShapeColor = PLA
-mirror = doc.addObject("Part::Mirroring", "Femur_Main_L")
-part.addObject(mirror)
-mirror.Source = main
-mirror.Normal = App.Vector(0, 1, 0)
-mirror.ViewObject.Visibility = False
-mirror.ViewObject.ShapeColor = PLA
+mirror = common["add_mirror"](doc, part, main, PLA)
 common["save"](doc)
 
 
@@ -282,7 +292,7 @@ Pl = lambda x, y, rot: App.Placement(App.Vector(x, y, 0), rot)
 hip_s, knee_s = solids_of(doc, SERVO, Pl(0, s_y, HIP_SERVO)), solids_of(doc, SERVO, Pl(f_len, s_y, KNEE_SERVO))
 bb = main.Shape.BoundBox
 print("femur %.1f g solid; valid %s; solids %d; %d + %d + %d chamfered edges; %.1f x %.1f x %.1f, y %.1f to %.1f" % (
-    main.Shape.Volume / 1000 * val("pla_density"), main.Shape.isValid(), len(main.Shape.Solids), len(step.Edges), len(lead.Edges), len(main.Edges),
+    main.Shape.Volume / 1000 * val("pla_density"), main.Shape.isValid(), len(main.Shape.Solids), len(step.Edges), len(lead.Edges), len(shaft_ch.Edges),
     bb.XLength, bb.YLength, bb.ZLength, bb.YMin, bb.YMax))
 print("overlap mm3: hip servo %.3f, knee servo %.3f, servos with each other %.3f, horns %.3f, bearings %.3f" % (
     clash(hip_s, main_s), clash(knee_s, main_s), clash(hip_s, knee_s),
