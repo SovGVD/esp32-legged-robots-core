@@ -114,14 +114,32 @@ sw, sl = v("pwr_body_w") + 2 * pf, v("pwr_body_len") + 2 * pf
 pieces["F_switch_panel"] = block(-sw / 2 - 5, sw / 2 + 5, -sl / 2 - 5, sl / 2 + 5, 0, v("pwr_panel_t")).cut(
     block(-sw / 2, sw / 2, -sl / 2, sl / 2, -1, 3))
 
-# ------------------------------------------------------------ lay them out in a row and export
-x = 0.0
+# ------------------------------------------------------------ pack them into a compact block and export
+# shelves: the tallest (in Y) first, each row filled up to ROW_W, 5 mm apart, centred on the bed origin
+ROW_W, GAP = 80.0, 5.0
+order = sorted(pieces.items(), key=lambda kv: -kv[1].BoundBox.YLength)
+rows, row, row_w = [], [], 0.0
+for name, shape in order:
+    w = shape.BoundBox.XLength
+    if row and row_w + GAP + w > ROW_W:
+        rows.append(row)
+        row, row_w = [], 0.0
+    row_w += (GAP if row else 0.0) + w
+    row.append((name, shape))
+rows.append(row)
+spots, y = [], 0.0
+for row in rows:
+    x = 0.0
+    depth = max(s.BoundBox.YLength for _, s in row)
+    for name, shape in row:
+        spots.append((name, shape, x, y))
+        x += shape.BoundBox.XLength + GAP
+    y -= depth + GAP
 placed, d = [], v("pla_density")
-for name, shape in pieces.items():
+for name, shape, x, y in spots:
     bb = shape.BoundBox
     s = shape.copy()
-    s.translate(App.Vector(x - bb.XMin, -bb.Center.y, -bb.ZMin))
-    x += bb.XLength + 4
+    s.translate(App.Vector(x - bb.XMin, y - bb.YMax, -bb.ZMin))
     obj = common["as_part"](doc, part, "FitTest_" + name, s, (0.85, 0.55, 0.2))
     placed.append(s)
     print("%-18s %5.1f x %4.1f x %4.1f mm  %.1f g  valid %s" % (name, bb.XLength, bb.YLength, bb.ZLength, s.Volume / 1000 * d, s.isValid()))
@@ -129,6 +147,9 @@ common["save"](doc)
 out_dir = os.path.join(HERE, "print")
 os.makedirs(out_dir, exist_ok=True)
 whole = Part.makeCompound(placed)
+c = whole.BoundBox.Center
+whole.translate(App.Vector(-c.x, -c.y, 0))
+print("block %.0f x %.0f mm" % (whole.BoundBox.XLength, whole.BoundBox.YLength))
 mesh = MeshPart.meshFromShape(Shape=whole, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
 path = os.path.join(out_dir, "fit_test.stl")
 mesh.write(path)
