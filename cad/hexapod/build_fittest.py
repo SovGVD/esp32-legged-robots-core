@@ -126,6 +126,7 @@ APPROVED = {
     "C_shaft": "fit test 3: perfect (2.6 long)",
     "E_pca_slot": "fit test 3: good enough (1.55 board, 0.05 a side)",
     "F_switch_panel": "fit test 3: perfect (11.8 x 19.15)",
+    "A_servo_pocket": "fit test 4: perfect (0.15 a side across, 0.2 along)",
 }
 if not globals().get("ALL"):
     for name in APPROVED:
@@ -184,6 +185,8 @@ def pack_and_export(group, filename):
 groups = {}
 for name, shape in pieces.items():
     groups.setdefault(SEPARATE.get(name, "fit_test.stl"), {})[name] = shape
+if not pieces:
+    print("every piece approved: nothing left to print")
 for filename, group in groups.items():
     pack_and_export(group, filename)
 for filename in set(SEPARATE.values()) | {"fit_test.stl"}:      # a file whose pieces are all approved goes
