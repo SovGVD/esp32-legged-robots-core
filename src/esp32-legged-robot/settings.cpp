@@ -18,7 +18,13 @@
  * The first boot after the update imports the trims from the old EEPROM
  * layout once, if they are valid for this model.
  */
-#define SETTINGS_NAMESPACE "robot"
+#ifdef HIL
+	// hardware in the loop: the simulated robot needs no trims, so keep the real
+	// robot's settings apart (in case this is the robot's own ESP32)
+	#define SETTINGS_NAMESPACE "robot_hil"
+#else
+	#define SETTINGS_NAMESPACE "robot"
+#endif
 #define SETTINGS_VERSION   1
 
 static Preferences prefs;
@@ -78,7 +84,11 @@ void initSettings()
 
 	if (model == 0 && version == 0) {
 		// nothing stored yet
-		if (settingsImportEEPROM()) {
+		bool imported = false;
+		#ifndef HIL
+			imported = settingsImportEEPROM();
+		#endif
+		if (imported) {
 			Serial.println("Settings: imported trims from the old EEPROM settings");
 			settingsSave();
 		} else {

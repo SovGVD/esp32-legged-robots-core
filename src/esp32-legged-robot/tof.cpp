@@ -26,9 +26,6 @@
 
 #if defined(TOF_TYPE) && TOF_TYPE == VL53L5CX
 
-#include <Wire.h>
-#include <SparkFun_VL53L5CX_Library.h>
-
 #ifndef TOF_ZONE_MIRROR_X
 	#define TOF_ZONE_MIRROR_X 1   // the ST driver lists the zones mirrored left/right (SparkFun example 1)
 #endif
@@ -51,18 +48,30 @@ struct TofFrame {
 	uint32_t seq;
 };
 
-static SparkFun_VL53L5CX     sensors[TOF_MAX_SENSORS];
-static VL53L5CX_ResultsData  results;
-static TofFrame              frames[TOF_MAX_SENSORS];
-static bool                  sensorOk[TOF_MAX_SENSORS] = { false, false };
-static volatile bool         started = false;
-static portMUX_TYPE          frameLock = portMUX_INITIALIZER_UNLOCKED;
-static float                 rayScale[TOF_ZONES];   // perpendicular -> along the ray
+static TofFrame     frames[TOF_MAX_SENSORS];
+static portMUX_TYPE frameLock = portMUX_INITIALIZER_UNLOCKED;
 
 static uint8_t sensorCount()
 {
 	return MODEL_TERRAIN.tofCount < TOF_MAX_SENSORS ? MODEL_TERRAIN.tofCount : TOF_MAX_SENSORS;
 }
+
+// TofFrameSink: a new frame from the driver (its task, or the HIL link)
+static void publishFrame(uint8_t i, const int16_t *mm)
+{
+	if (i >= sensorCount()) {
+		return;
+	}
+	portENTER_CRITICAL(&frameLock);
+	memcpy(frames[i].mm, mm, sizeof(frames[i].mm));
+	frames[i].seq++;
+	portEXIT_CRITICAL(&frameLock);
+}
+
+#ifndef HIL   // the HIL build gets its frames from the simulator (hil.cpp)
+
+#include <Wire.h>
+#include <SparkFun_VL53L5CX_Library.h>
 
 static TwoWire &tofBus()
 {
@@ -82,94 +91,127 @@ static uint8_t mapZone(uint8_t z)
 	return row * 8 + col;
 }
 
-static bool startSensor(uint8_t i, uint8_t address)
-{
-	SparkFun_VL53L5CX &s = sensors[i];
-	Serial.printf("ToF %u: ", i);
-	if (!s.begin(address, tofBus())) {
-		Serial.println("not found");
-		return false;
-	}
-	s.setWireMaxPacketSize(32);   // short transfers: the motion task's IMU read waits at most ~1 ms
-	if (!s.setResolution(TOF_ZONES) || !s.setRangingFrequency(TOF_RANGING_HZ) || !s.startRanging()) {
-		Serial.println("setup failed");
-		return false;
-	}
-	Serial.printf("VL53L5CX at 0x%02X, 8x8 at %u Hz\n", s.getAddress(), TOF_RANGING_HZ);
-	return true;
-}
+class Vl53l5cxArray : public TofArray {
+	public:
+		const char *name() const override { return "VL53L5CX"; }
 
-static void startSensors()
-{
-	const uint8_t defaultAddress = 0x29;
-#if defined(TOF_I2C_SDA) && defined(TOF_I2C_SCL)
-	Wire1.begin(TOF_I2C_SDA, TOF_I2C_SCL, 1000000);
-	Wire1.setTimeOut(20);
-#endif
-	if (sensorCount() > 1) {
-	#ifdef TOF_LPN_PIN
-		pinMode(TOF_LPN_PIN, OUTPUT);
-		digitalWrite(TOF_LPN_PIN, LOW);   // sensor 1 off while sensor 0 moves to 0x2A
-		vTaskDelay(pdMS_TO_TICKS(10));
-		// after a reset without a power cycle sensor 0 may still be at 0x2A
-		tofBus().beginTransmission(0x2A);
-		bool moved = tofBus().endTransmission() == 0;
-		sensorOk[0] = moved ? startSensor(0, 0x2A)
-		                    : (startSensor(0, defaultAddress) && sensors[0].setAddress(0x2A));
-		digitalWrite(TOF_LPN_PIN, HIGH);
-		vTaskDelay(pdMS_TO_TICKS(10));
-		sensorOk[1] = startSensor(1, defaultAddress);
-	#else
-		Serial.println("ToF: two sensors need TOF_LPN_PIN (config.h), using sensor 0 only");
-		sensorOk[0] = startSensor(0, defaultAddress);
-	#endif
-	} else if (sensorCount() == 1) {
-		sensorOk[0] = startSensor(0, defaultAddress);
-	}
-}
-
-static void tofTask(void *)
-{
-	// zone ray scale for sensors that report perpendicular distances
-	if (sensorCount() > 0) {
-		TofSensor axis = MODEL_TERRAIN.tof[0];
-		axis.yaw = 0;
-		axis.tilt = 0;
-		for (uint8_t z = 0; z < TOF_ZONES; z++) {
-			LR_point d = TerrainMap::zoneDirection(axis, z);
-			rayScale[z] = TOF_DISTANCE_PERPENDICULAR && d.y > 0.1f ? 1.0f / d.y : 1.0f;
-		}
-	}
-	startSensors();
-	started = true;
-	for (;;) {
-		for (uint8_t i = 0; i < sensorCount(); i++) {
-			if (!sensorOk[i] || !sensors[i].isDataReady() || !sensors[i].getRangingData(&results)) {
-				continue;
+		void begin(uint8_t count, TofFrameSink sink) override
+		{
+			_count = count;
+			_sink  = sink;
+			if (count == 0) {
+				return;
 			}
-			TofFrame f;
+			// core 0, below the services loop: the firmware upload takes a while
+			xTaskCreatePinnedToCore(task, "tof", 6144, this, 0, nullptr, 0);
+		}
+
+		bool started() const override { return _started; }
+		bool ok(uint8_t i) const override { return i < _count && _ok[i]; }
+
+	private:
+		static void task(void *arg) { static_cast<Vl53l5cxArray *>(arg)->run(); }
+
+		bool startSensor(uint8_t i, uint8_t address)
+		{
+			SparkFun_VL53L5CX &s = _sensors[i];
+			Serial.printf("ToF %u: ", i);
+			if (!s.begin(address, tofBus())) {
+				Serial.println("not found");
+				return false;
+			}
+			s.setWireMaxPacketSize(32);   // short transfers: the motion task's IMU read waits at most ~1 ms
+			if (!s.setResolution(TOF_ZONES) || !s.setRangingFrequency(TOF_RANGING_HZ) || !s.startRanging()) {
+				Serial.println("setup failed");
+				return false;
+			}
+			Serial.printf("VL53L5CX at 0x%02X, 8x8 at %u Hz\n", s.getAddress(), TOF_RANGING_HZ);
+			return true;
+		}
+
+		void startSensors()
+		{
+			const uint8_t defaultAddress = 0x29;
+		#if defined(TOF_I2C_SDA) && defined(TOF_I2C_SCL)
+			Wire1.begin(TOF_I2C_SDA, TOF_I2C_SCL, 1000000);
+			Wire1.setTimeOut(20);
+		#endif
+			if (_count > 1) {
+			#ifdef TOF_LPN_PIN
+				pinMode(TOF_LPN_PIN, OUTPUT);
+				digitalWrite(TOF_LPN_PIN, LOW);   // sensor 1 off while sensor 0 moves to 0x2A
+				vTaskDelay(pdMS_TO_TICKS(10));
+				// after a reset without a power cycle sensor 0 may still be at 0x2A
+				tofBus().beginTransmission(0x2A);
+				bool moved = tofBus().endTransmission() == 0;
+				_ok[0] = moved ? startSensor(0, 0x2A)
+				               : (startSensor(0, defaultAddress) && _sensors[0].setAddress(0x2A));
+				digitalWrite(TOF_LPN_PIN, HIGH);
+				vTaskDelay(pdMS_TO_TICKS(10));
+				_ok[1] = startSensor(1, defaultAddress);
+			#else
+				Serial.println("ToF: two sensors need TOF_LPN_PIN (config.h), using sensor 0 only");
+				_ok[0] = startSensor(0, defaultAddress);
+			#endif
+			} else if (_count == 1) {
+				_ok[0] = startSensor(0, defaultAddress);
+			}
+		}
+
+		void run()
+		{
+			// zone ray scale for sensors that report perpendicular distances
+			TofSensor axis = MODEL_TERRAIN.tof[0];
+			axis.yaw = 0;
+			axis.tilt = 0;
 			for (uint8_t z = 0; z < TOF_ZONES; z++) {
-				uint8_t st = results.target_status[z];
-				bool valid = st == 5 || st == 9;   // 100 % valid, or valid with a large pulse (ST UM2884)
-				uint8_t m = mapZone(z);
-				f.mm[m] = valid ? (int16_t)(results.distance_mm[z] * rayScale[m]) : 0;
+				LR_point d = TerrainMap::zoneDirection(axis, z);
+				_rayScale[z] = TOF_DISTANCE_PERPENDICULAR && d.y > 0.1f ? 1.0f / d.y : 1.0f;
 			}
-			portENTER_CRITICAL(&frameLock);
-			f.seq = frames[i].seq + 1;
-			frames[i] = f;
-			portEXIT_CRITICAL(&frameLock);
+			startSensors();
+			_started = true;
+			for (;;) {
+				for (uint8_t i = 0; i < _count; i++) {
+					if (!_ok[i] || !_sensors[i].isDataReady() || !_sensors[i].getRangingData(&_results)) {
+						continue;
+					}
+					int16_t mm[TOF_ZONES];
+					for (uint8_t z = 0; z < TOF_ZONES; z++) {
+						uint8_t st = _results.target_status[z];
+						bool valid = st == 5 || st == 9;   // 100 % valid, or valid with a large pulse (ST UM2884)
+						uint8_t m = mapZone(z);
+						mm[m] = valid ? (int16_t)(_results.distance_mm[z] * _rayScale[m]) : 0;
+					}
+					_sink(i, mm);
+				}
+				vTaskDelay(pdMS_TO_TICKS(8));
+			}
 		}
-		vTaskDelay(pdMS_TO_TICKS(8));
-	}
+
+		SparkFun_VL53L5CX    _sensors[TOF_MAX_SENSORS];
+		VL53L5CX_ResultsData _results;
+		float                _rayScale[TOF_ZONES];   // perpendicular -> along the ray
+		uint8_t              _count = 0;
+		TofFrameSink         _sink = nullptr;
+		bool                 _ok[TOF_MAX_SENSORS] = { false, false };
+		volatile bool        _started = false;
+};
+
+TofArray &tofArray()
+{
+	static Vl53l5cxArray dev;
+	return dev;
 }
+
+#endif   // HIL
 
 void initTof()
 {
 	if (sensorCount() == 0) {
 		return;
 	}
-	// core 0, below the services loop: the firmware upload takes a while
-	xTaskCreatePinnedToCore(tofTask, "tof", 6144, nullptr, 0, nullptr, 0);
+	Serial.printf("ToF %s x%u\n", tofArray().name(), sensorCount());
+	tofArray().begin(sensorCount(), publishFrame);
 }
 
 uint8_t tofSensorCount()
@@ -179,7 +221,7 @@ uint8_t tofSensorCount()
 
 bool tofReady(uint8_t i)
 {
-	return started && i < sensorCount() && sensorOk[i];
+	return tofArray().started() && i < sensorCount() && tofArray().ok(i);
 }
 
 bool tofTakeFrame(uint8_t i, uint32_t &seq, float *mm)
@@ -224,8 +266,10 @@ void cliTof()
 		return;
 	}
 	for (uint8_t i = 0; i < sensorCount(); i++) {
-		cliSerial->printf("ToF %u: %s\n", i, !started ? "starting" : (sensorOk[i] ? "ok" : "not found"));
-		if (strcmp(mode, "print") != 0 || !sensorOk[i]) {
+		bool ok = tofArray().ok(i);
+		cliSerial->printf("ToF %u (%s): %s\n", i, tofArray().name(),
+		                  !tofArray().started() ? "starting" : (ok ? "ok" : "not found"));
+		if (strcmp(mode, "print") != 0 || !ok) {
 			continue;
 		}
 		uint32_t seq = 0xFFFFFFFF;   // any frame, even one already taken

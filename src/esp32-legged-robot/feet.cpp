@@ -15,21 +15,25 @@
 	#define FOOT_SWITCH_DEBOUNCE 2   // motion ticks in a row (~9 ms at 230 ticks/s)
 #endif
 
+#ifdef HIL
+	#define FOOT_SWITCHES_FITTED 1   // simulated on every leg (hil.cpp)
+#elif defined(FOOT_SWITCH_PINS)
+	#define FOOT_SWITCHES_FITTED 1
+#endif
+
 static FootSwitches  feet;
 static volatile bool feetUse =
-#if defined(FOOT_SWITCH_PINS) && defined(FOOT_SWITCH_ON)
+#if defined(FOOT_SWITCHES_FITTED) && defined(FOOT_SWITCH_ON)
 	true;
 #else
 	false;
 #endif
 
+#ifndef HIL   // the HIL build reads the simulated switches (hil.cpp)
+
 #ifdef FOOT_SWITCH_PINS
 static const uint8_t footPins[] = FOOT_SWITCH_PINS;
-static const uint8_t footCount  = sizeof(footPins) / sizeof(footPins[0]);
 static_assert(sizeof(footPins) / sizeof(footPins[0]) == LEG_NUM, "FOOT_SWITCH_PINS needs one pin per leg");
-#else
-static const uint8_t *const footPins = nullptr;
-static const uint8_t footCount = 0;
 #endif
 
 static const char *footPinProblem(uint8_t pin)
@@ -43,60 +47,106 @@ static const char *footPinProblem(uint8_t pin)
 	return nullptr;
 }
 
-static uint32_t readFeetRaw()
-{
-	uint32_t raw = 0;
-	for (uint8_t i = 0; i < footCount; i++) {
-		bool level = digitalRead(footPins[i]) == HIGH;
-	#ifdef FOOT_SWITCH_ACTIVE_HIGH
-		bool pressed = level;
-	#else
-		bool pressed = !level;
-	#endif
-		if (pressed) {
-			raw |= 1u << i;
+/**
+ * One switch per GPIO pin (FOOT_SWITCH_PINS), none without it.
+ */
+class GpioFootInput : public FootInput {
+	public:
+		const char *name() const override { return "GPIO"; }
+
+		uint8_t count() const override
+		{
+		#ifdef FOOT_SWITCH_PINS
+			return sizeof(footPins) / sizeof(footPins[0]);
+		#else
+			return 0;
+		#endif
 		}
-	}
-	return raw;
+
+		int pin(uint8_t i) const override
+		{
+		#ifdef FOOT_SWITCH_PINS
+			return i < count() ? footPins[i] : -1;
+		#else
+			(void)i;
+			return -1;
+		#endif
+		}
+
+		void begin() override
+		{
+			for (uint8_t i = 0; i < count(); i++) {
+				uint8_t p = (uint8_t)pin(i);
+				const char *problem = footPinProblem(p);
+				if (problem != nullptr) {
+					Serial.printf("Foot switch %u on GPIO %u: %s\n", i, p, problem);
+				}
+			#ifdef FOOT_SWITCH_ACTIVE_HIGH
+				pinMode(p, INPUT);
+			#else
+				pinMode(p, INPUT_PULLUP);
+			#endif
+			}
+			delayMicroseconds(50);   // let the pull-ups charge the wires
+		}
+
+		uint32_t read() override
+		{
+			uint32_t raw = 0;
+			for (uint8_t i = 0; i < count(); i++) {
+				bool level = digitalRead((uint8_t)pin(i)) == HIGH;
+			#ifdef FOOT_SWITCH_ACTIVE_HIGH
+				bool pressed = level;
+			#else
+				bool pressed = !level;
+			#endif
+				if (pressed) {
+					raw |= 1u << i;
+				}
+			}
+			return raw;
+		}
+};
+
+FootInput &footInput()
+{
+	static GpioFootInput dev;
+	return dev;
+}
+
+#endif   // HIL
+
+static uint8_t footCount()
+{
+	return footInput().count();
 }
 
 void initFeet()
 {
-	if (footCount == 0) {
+	if (footCount() == 0) {
 		return;
 	}
-	Serial.println("Init foot switches");
-	for (uint8_t i = 0; i < footCount; i++) {
-		const char *problem = footPinProblem(footPins[i]);
-		if (problem != nullptr) {
-			Serial.printf("Foot switch %u on GPIO %u: %s\n", i, footPins[i], problem);
-		}
-	#ifdef FOOT_SWITCH_ACTIVE_HIGH
-		pinMode(footPins[i], INPUT);
-	#else
-		pinMode(footPins[i], INPUT_PULLUP);
-	#endif
-	}
-	delayMicroseconds(50);   // let the pull-ups charge the wires
-	feet.begin(footCount, FOOT_SWITCH_DEBOUNCE, readFeetRaw());
+	Serial.printf("Init foot switches (%s)\n", footInput().name());
+	footInput().begin();
+	feet.begin(footCount(), FOOT_SWITCH_DEBOUNCE, footInput().read());
 }
 
 bool footSwitchesFitted()
 {
-	return footCount > 0;
+	return footCount() > 0;
 }
 
 bool footSwitchesInUse()
 {
-	return footCount > 0 && feetUse;
+	return footCount() > 0 && feetUse;
 }
 
 void updateFeet(leg *legsOut, uint8_t legCount, bool apply)
 {
-	if (footCount == 0) {
+	if (footCount() == 0) {
 		return;
 	}
-	feet.update(readFeetRaw());
+	feet.update(footInput().read());
 	if (apply) {
 		feet.apply(legsOut, legCount);
 	}
@@ -109,7 +159,7 @@ void updateFeet(leg *legsOut, uint8_t legCount, bool apply)
  */
 void cliFeet()
 {
-	if (footCount == 0) {
+	if (footCount() == 0) {
 		cliSerial->println("No foot switches: set FOOT_SWITCH_PINS in the model's config.h.");
 		return;
 	}
@@ -125,8 +175,14 @@ void cliFeet()
 	                  feetUse ? TITLE_ON : TITLE_OFF, motionUsesContacts() ? "yes" : "no",
 	                  (unsigned)FOOT_SWITCH_DEBOUNCE);
 	uint32_t raw = feet.raw();
-	for (uint8_t i = 0; i < footCount; i++) {
-		cliSerial->printf("  %-4s GPIO %2u: %s (raw %s), changes %lu\n", legs[i].id.title, footPins[i],
+	for (uint8_t i = 0; i < footCount(); i++) {
+		char where[12];
+		if (footInput().pin(i) >= 0) {
+			snprintf(where, sizeof(where), "GPIO %2d", footInput().pin(i));
+		} else {
+			snprintf(where, sizeof(where), "%s", footInput().name());
+		}
+		cliSerial->printf("  %-4s %s: %s (raw %s), changes %lu\n", legs[i].id.title, where,
 		                  feet.pressed(i) ? "pressed " : "released", ((raw >> i) & 1) ? "pressed" : "released",
 		                  (unsigned long)feet.changes(i));
 	}

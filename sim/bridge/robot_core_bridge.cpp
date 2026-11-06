@@ -848,3 +848,68 @@ RC_API int rc_nav_path(float *out)
 	for (uint8_t i = 0; i < n; i++) { out[2 * i] = x[i]; out[2 * i + 1] = y[i]; }
 	return n;
 }
+
+/**
+ * Hardware in the loop link (lib/robot_core hil_link.h), for the Python
+ * side's tests (sim/legsim/hil.py must speak the same bytes as the firmware).
+ */
+RC_API int rc_hil_encode_servos(uint32_t seq, uint32_t dtUs, int enabled, int count, const uint16_t *us, uint8_t *out)
+{
+	HilServos s;
+	s.seq = seq;
+	s.dtUs = dtUs;
+	s.enabled = enabled ? 1 : 0;
+	s.count = (uint8_t)count;
+	for (int i = 0; i < count && i < HIL_MAX_SERVOS; i++) s.us[i] = us[i];
+	return (int)hilEncodeServos(s, out);
+}
+
+RC_API int rc_hil_encode_hello(uint8_t *out)
+{
+	HilHello h = { HIL_VERSION, (uint8_t)ROBOT_MODEL, LEG_NUM, LEG_DOF, LOOP_TIME, (uint8_t)TOF_SENSOR_COUNT };
+	return (int)hilEncodeHello(h, out);
+}
+
+/**
+ * Parse bytes with HilParser: the first good frame's type and decoded values.
+ * out (floats): sensors -> accel 3, gyro 3, mag 3, flags, feet, voltage, current;
+ * ToF -> sensor, 64 zones; move -> 6. Returns the frame type, 0 if none, -1 if it didn't decode.
+ */
+RC_API int rc_hil_parse(const uint8_t *data, int n, float *out, uint32_t *errors)
+{
+	HilParser p;
+	for (int i = 0; i < n; i++) {
+		if (!p.feed(data[i])) {
+			continue;
+		}
+		errors[0] = p.crcErrors();
+		errors[1] = p.skipped();
+		switch (p.type()) {
+			case HIL_SENSORS: {
+				HilSensors s;
+				if (!hilDecodeSensors(p.payload(), p.length(), s)) return -1;
+				for (int k = 0; k < 3; k++) { out[k] = s.accel[k]; out[3 + k] = s.gyro[k]; out[6 + k] = s.mag[k]; }
+				out[9] = s.flags; out[10] = s.feet; out[11] = s.voltage; out[12] = s.current;
+				return p.type();
+			}
+			case HIL_TOF: {
+				HilTof t;
+				if (!hilDecodeTof(p.payload(), p.length(), t)) return -1;
+				out[0] = t.sensor;
+				for (int k = 0; k < HIL_TOF_ZONES; k++) out[1 + k] = t.mm[k];
+				return p.type();
+			}
+			case HIL_MOVE: {
+				HilMove m;
+				if (!hilDecodeMove(p.payload(), p.length(), m)) return -1;
+				for (int k = 0; k < 6; k++) out[k] = m.v[k];
+				return p.type();
+			}
+			default:
+				return -1;
+		}
+	}
+	errors[0] = p.crcErrors();
+	errors[1] = p.skipped();
+	return 0;
+}
