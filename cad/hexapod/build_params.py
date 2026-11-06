@@ -207,9 +207,9 @@ TABLE = [
     ("xt30_mated_h", "16 mm", TODO, "the pair mated, solder cup to solder cup"),
 
     "Foot switch, 6x6 tact switch with side leads (part origin: centre of the body's underside; +Z = button; leads on +X)",
-    ("sw_w", "6 mm", DRAWING, "body, square"),
-    ("sw_body_h", "3.45 mm", DRAWING, "body"),
-    ("sw_total_h", "4.7 mm", TODO, "H is open on the drawing; hexapod.FCStd tibiaButtonCut 4.7"),
+    ("sw_w", "5.98 mm", CAL, "caliper, body, square"),
+    ("sw_body_h", "3.39 mm", CAL, "caliper, body without the button"),
+    ("sw_total_h", "4.03 mm", CAL, "caliper, body and button"),
     ("sw_btn_d", "3.5 mm", DRAWING, "button"),
     ("sw_travel", "0.4 mm", OLD1, "clickButtonMoveLength"),
     ("sw_lead_span", "10.3 mm", DRAWING, "body edge to the lead tips, overall"),
