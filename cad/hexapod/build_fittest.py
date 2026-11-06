@@ -10,12 +10,13 @@ parameter to change for all parts. Exports print/fit_test.stl, everything flat o
      Try: the MR128K presses into the seat; the shaft turns in its inner ring.  bearing_seat_d, bearing_id
   D  column end with a screw pilot, and a plate with the clearance hole.
      Try: a stock screw through the plate bites into the column, its head flush.  screw_clear_d, screw_head_d/_h
-  E  board slots as in the bottom plate: PCA9685 (6 mm high) and ESP32 (3.5).
+  E  board slots as in the bottom plate: PCA9685 (6 mm high) and ESP32 (3.5), one piece each.
      Try: the boards slide in by hand and stand without wobbling.               rail_fit
   F  power switch cutout in a 1.6 mm panel.
      Try: the KCD1 snaps in and holds.                                          pwr_cut_w, pwr_cut_len, pwr_panel_t
 
-Run inside FreeCAD after build_params.py.
+Pieces already approved in a printed test (APPROVED below) are left out of the STL; ALL=True puts
+them back. Run inside FreeCAD after build_params.py.
 """
 import os
 import runpy
@@ -102,17 +103,30 @@ pieces["D_plate"] = block(-7, 7, -7, 7, 0, d_t).cut(Part.makeCompound([
 # ------------------------------------------------------------ E: board slots
 rt, rl, rf = v("rail_t"), 10.0, v("rail_fit")
 base_t = v("bot_skin_t") + 1.2
-e = block(-8, 8, -10, 10, 0, base_t)
-for y, board_t, rh in ((5.0, v("pca_t"), v("rail_h")), (-5.0, v("esp_t"), v("esp_rail_h"))):
+for name, board_t, rh in (("E_pca_slot", v("pca_t"), v("rail_h")), ("E_esp_slot", v("esp_t"), v("esp_rail_h"))):
     gap = board_t / 2 + rf
-    e = e.fuse([block(-rl / 2, rl / 2, y - gap - rt, y - gap, base_t, base_t + rh),
-                block(-rl / 2, rl / 2, y + gap, y + gap + rt, base_t, base_t + rh)])
-pieces["E_board_slots"] = e.removeSplitter()
+    e = block(-8, 8, -5, 5, 0, base_t).fuse([block(-rl / 2, rl / 2, -gap - rt, -gap, base_t, base_t + rh),
+                                            block(-rl / 2, rl / 2, gap, gap + rt, base_t, base_t + rh)])
+    pieces[name] = e.removeSplitter()
 
 # ------------------------------------------------------------ F: switch cutout
 sw, sl = v("pwr_cut_w"), v("pwr_cut_len")
 pieces["F_switch_panel"] = block(-sw / 2 - 5, sw / 2 + 5, -sl / 2 - 5, sl / 2 + 5, 0, v("pwr_panel_t")).cut(
     block(-sw / 2, sw / 2, -sl / 2, sl / 2, -1, 3))
+
+# ------------------------------------------------------------ only what still needs trying
+# Pieces whose fit the user has approved in a printed fit test; they stay here (ALL=True prints them
+# again) but leave the STL.
+APPROVED = {
+    "B_horn_pocket": "fit test 2: perfect (tapered horn, flattened to 3.8)",
+    "D_column": "fit test 2: perfect",
+    "D_plate": "fit test 2: perfect (2.5 clearance, 5.6 x 1.4 counterbore)",
+    "E_esp_slot": "fit test 2: good (0.05 a side)",
+}
+if not globals().get("ALL"):
+    for name in APPROVED:
+        pieces.pop(name, None)
+print("printing:", ", ".join(pieces))
 
 # ------------------------------------------------------------ lead-ins on every hole, pocket and outline
 for name in list(pieces):
