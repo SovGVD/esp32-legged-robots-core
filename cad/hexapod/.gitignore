@@ -5,3 +5,5 @@ __pycache__/
 # FEA pictures, made by fem_check.py
 fea/
 views/
+# STL exports, made by export_stl.py
+stl/
