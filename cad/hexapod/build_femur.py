@@ -8,8 +8,8 @@ a bearing in that part: Ø9 x 1 spacer, Ø8 x 3 shaft.
 Print with the rim on the bed; the strap floors are then short bridges.
 
 Both servo cables leave into the open gap between the servos and run in a channel on
-the +Z face to the hip, held by alternate fingers. Thin cable only: the connector is
-removed, so no big holes.
+the +Z face to the hip, threaded under 3 bridges across the channel. Thin cable only:
+the connector is removed, so no big holes.
 
 Right leg; Femur_Main_L is the left leg's. Femur frame: origin on the femur axis,
 +X to the knee, Z up with the femur level.
@@ -85,7 +85,7 @@ for tag, sign, axis in (("hip", 1, "0 mm"), ("knee", -1, fl)):
     solid.append(cyl("boss_" + tag, p("fem_boss_d"), p("fem_boss_h"), axis, boss_y, "0 mm", along_y=True))
     solid.append(cyl("shaft_" + tag, p("fem_shaft_d"), p("fem_shaft_len"), axis, "%s - %s" % (boss_y, p("fem_shaft_len")), "0 mm", along_y=True))
 
-# cable channel on the +Z face: 2 rails, and fingers from alternate rails to hold the cables
+# cable channel on the +Z face: 2 rails, and bridges across both to hold the cables
 chan_w, depth_c = p("chan_w"), p("chan_depth")
 chan_mid = "((%s) + (%s)) / 2" % (y0, y1)
 chan_lo = "%s - %s / 2" % (chan_mid, chan_w)
@@ -98,13 +98,10 @@ solid += [
     box("rail_b", chan_len, rail_hi, depth_c, p("chan_x0"), chan_hi, half),
 ]
 finger_z = "%s + %s" % (half, depth_c)
-for n, side in enumerate((0, 1, 0)):
+# full bridges over the channel: the cables thread under them (fingers from one rail broke off, print 1)
+for n in range(3):
     x = "%s + %d * ((%s) - %s) / 2" % (p("chan_x0"), n, chan_len, p("chan_finger_len"))
-    if side == 0:
-        solid.append(box("finger_%d" % n, p("chan_finger_len"), "%s + %s" % (rail_lo, p("chan_finger_over")), p("chan_finger_t"), x, y0, finger_z))
-    else:
-        solid.append(box("finger_%d" % n, p("chan_finger_len"), "%s + %s" % (rail_hi, p("chan_finger_over")),
-                         p("chan_finger_t"), x, "%s - %s" % (chan_hi, p("chan_finger_over")), finger_z))
+    solid.append(box("bridge_%d" % n, p("chan_finger_len"), "(%s) - (%s)" % (y1, y0), p("chan_finger_t"), x, y0, finger_z))
 
 win_h = "%s + 2 * %s" % (p("mg90_body_w"), p("mg90_fit_w"))
 win_len = "%s + 2 * %s" % (p("mg90_body_len"), fit)

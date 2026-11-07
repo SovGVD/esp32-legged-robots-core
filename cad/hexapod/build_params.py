@@ -278,9 +278,8 @@ TABLE = [
     ("chan_depth", "=cable_t + 0.2 mm", CALC, "rail height above the face"),
     ("chan_x0", "-9 mm", DESIGN, "channel start at the hip"),
     ("chan_x1", "30 mm", DESIGN, "channel end, in the gap between the servos"),
-    ("chan_finger_len", "4 mm", DESIGN, "finger along X"),
-    ("chan_finger_t", "1.2 mm", DESIGN, "finger thickness; prints as a short bridge"),
-    ("chan_finger_over", "3 mm", DESIGN, "finger reaches this far over the channel, leaving room to press the cable past it"),
+    ("chan_finger_len", "8 mm", DESIGN, "cable bridge along X (4 x 1.2 fingers broke off, print 1)"),
+    ("chan_finger_t", "2.4 mm", DESIGN, "cable bridge thickness, across the whole channel; prints as a short bridge"),
 
     "Tibia: 2 flat halves split on the leg plane and screwed together; the switch sits inside the tip and a presser trapped between the halves pushes it (tibia frame: origin on the knee axis, -Z down the tibia, horn on +Y)",
     ("tib_arm_w", "18 mm", DESIGN, "arm width in X, around the bearing seat"),
