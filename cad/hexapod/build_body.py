@@ -123,6 +123,77 @@ COLUMNS = [(sx * v("col_front_x"), sy * v("col_front_y")) for sx in (1, -1) for 
 z_bot, top_bot = v("body_bottom_z"), v("body_plate_top")
 top0, top1 = v("top_plate_z0"), v("top_plate_z1")
 bot_parts = [ring(top_bot, top_bot + v("rib_bot_h"))]
+
+# ------------------------------------------------------------ the inner wall's path (2D, from above)
+# It wraps the electronics: inside the plates' edge, outside the coxa links' and servos' +-40 deg swing.
+W_LEVELS = [top_bot + 0.3 + k * (top0 - v("rib_h") - top_bot - 0.6) / 6 for k in range(7)]
+
+
+def flat2d(solid):
+    face = Part.makeFace(solid.slice(App.Vector(0, 0, 1), 0.5), "Part::FaceMakerBullseye")
+    face.translate(App.Vector(0, 0, -0.5))
+    return face
+
+
+def slab2d(face, z0=0.0, z1=1.0):
+    f = face.copy()
+    f.translate(App.Vector(0, 0, z0))
+    return f.extrude(App.Vector(0, 0, z1 - z0))
+
+
+def footprint2d(shapes, levels):
+    """Outline from above, as a 1 mm slab: slices joined as slabs (joining flat faces only stacks them)."""
+    slabs = []
+    for sh in shapes:
+        for z in levels:
+            if sh.BoundBox.ZMin < z < sh.BoundBox.ZMax:
+                # each loop filled (holes too): for the legs' swing that only errs on the safe side
+                for w in sh.slice(App.Vector(0, 0, 1), z):
+                    if w.isClosed():
+                        f = Part.Face(w)
+                        f.translate(App.Vector(0, 0, -z))
+                        slabs.append(f.extrude(App.Vector(0, 0, 1)))
+    return slabs[0].fuse(slabs[1:]).removeSplitter() if len(slabs) > 1 else slabs[0]
+
+
+print("inner wall path")
+SERVO_NAMES = ("MG90S_body", "MG90S_tabs", "MG90S_turret", "MG90S_shaft")
+w_seat = v("coxa_seat_z")
+swings = []
+for _, x, y, yaw, side in AXES:
+    rot = App.Rotation(App.Vector(0, 0, 1), yaw)
+    shapes = []
+    sh = doc.getObject("Coxa_Main" + side).Shape.copy()
+    sh.Placement = App.Placement(App.Vector(x, y, 0), rot).multiply(sh.Placement)
+    shapes.append(sh)
+    for n in SERVO_NAMES:
+        sh = doc.getObject(n).Shape.copy()
+        sh.Placement = App.Placement(App.Vector(x, y, w_seat), rot.multiply(App.Rotation(App.Vector(0, 0, 1), 90))).multiply(sh.Placement)
+        shapes.append(sh)
+    base = footprint2d(shapes, W_LEVELS)
+    turns = []
+    for deg in range(-40, 41, 5):
+        t = base.copy()
+        t.rotate(App.Vector(x, y, 0), App.Vector(0, 0, 1), deg)
+        turns.append(t)
+    swings.append(turns[0].fuse(turns[1:]).removeSplitter())
+swing2d = flat2d(swings[0].fuse(swings[1:]).removeSplitter())
+# the tighter clearance where the wall squeezes past: the middle legs (PCA9685 pins), the rear legs (battery
+# cartridge's corners) and the front legs (the ESP32's ends)
+mid_boxes = Part.makeCompound([Part.makeBox(60, 60, 4, App.Vector(20 if sx > 0 else -80, -30, -1)) for sx in (1, -1)] +
+                              [Part.makeBox(20, 20, 4, App.Vector(15 if sx > 0 else -35, -60, -1)) for sx in (1, -1)] +
+                              [Part.makeBox(16, 16, 4, App.Vector(18 if sx > 0 else -34, 34, -1)) for sx in (1, -1)])
+mid_boxes = mid_boxes.Solids[0].fuse(mid_boxes.Solids[1:]).removeSplitter()
+keep_out = slab2d(swing2d.makeOffset2D(v("wall_clear"))).cut(mid_boxes).fuse(
+    slab2d(swing2d.makeOffset2D(v("wall_clear_mid"))).common(mid_boxes)).removeSplitter()
+plate2d = flat2d(prism(outline, "xy", 0, 1))
+room2d = max(flat2d(slab2d(plate2d.makeOffset2D(-v("wall_edge"))).cut(keep_out).removeSplitter()).Faces, key=lambda f: f.Area)
+wall2d = flat2d(slab2d(room2d).cut(slab2d(room2d.makeOffset2D(-v("wall_t")), -1, 2)).removeSplitter())
+print("  wall path %.0f mm long" % (room2d.OuterWire.Length))
+# the bottom plate keeps full thickness under it (a solid band, not rib-grid pockets) and has a groove for it
+wall_band = slab2d(flat2d(slab2d(room2d.makeOffset2D(1.5)).cut(slab2d(room2d.makeOffset2D(-v("wall_t") - 1.5), -1, 2))), z_bot - 2, top_bot + 2)
+wall_groove = slab2d(flat2d(slab2d(room2d.makeOffset2D(v("wall_fit"))).cut(slab2d(room2d.makeOffset2D(-v("wall_t") - v("wall_fit")), -1, 2))),
+                     top_bot - v("wall_groove"), top_bot + 1)
 fx, fy = v("col_front_x"), v("col_front_y")
 sx_, sy_ = v("col_side_x"), v("col_side_y")
 h_b = top_bot + v("rib_bot_h")
@@ -147,12 +218,14 @@ esp_y, esp_len = v("esp_y"), v("esp_len")
 for xo in (-esp_len / 2 + 8, esp_len / 2 - 8 - rail_len, -rail_len / 2):
     bot_parts.append(block(xo, xo + rail_len, esp_y - v("esp_t") - rfit - rail_t, esp_y - v("esp_t") - rfit, top_bot, top_bot + v("esp_rail_h")))
     bot_parts.append(block(xo, xo + rail_len, esp_y + rfit, esp_y + rfit + rail_t, top_bot, top_bot + v("esp_rail_h")))
-# the INA219 stands along Y at the rear: a slot through the rear rib and 2 short slot pairs near its ends
+# the INA219 stands across the robot at the front, components forward: slot pairs near its ends, full
+# height behind it (toward the ESP32), a low lip in front under its components
 ina_x, ina_y, ina_gap = v("ina_x"), v("ina_y"), v("ina_t") / 2 + rfit
-for yo in (-v("ina_w") / 2 + 1.5, v("ina_w") / 2 - 1.5 - rail_len):
-    y0 = ina_y + yo
-    bot_parts.append(block(ina_x - ina_gap - rail_t, ina_x - ina_gap, y0, y0 + rail_len, top_bot, top_bot + rail_h))
-    bot_parts.append(block(ina_x + ina_gap, ina_x + ina_gap + rail_t, y0, y0 + rail_len, top_bot, top_bot + 1.8))   # a low lip on the component side
+INA_TURN = App.Rotation(App.Vector(0, 0, 1), 90)                        # the dummy's +X (component side) to +Y
+for xo in (-v("ina_w") / 2 + 1.5, v("ina_w") / 2 - 1.5 - rail_len):
+    x0 = ina_x + xo
+    bot_parts.append(block(x0, x0 + rail_len, ina_y - ina_gap - rail_t, ina_y - ina_gap, top_bot, top_bot + rail_h))
+    bot_parts.append(block(x0, x0 + rail_len, ina_y + ina_gap, ina_y + ina_gap + rail_t, top_bot, top_bot + 1.8))
 # ------------------------------------------------------------ battery cartridge, in from below
 hy, hl, hw, htab = v("holder_y"), v("holder_len"), v("holder_w"), v("holder_tab")
 cfit, cwall = v("cart_fit"), v("cart_wall_t")
@@ -178,7 +251,7 @@ for lx, ly, _ in LATCHES.values():
     bot_parts.append(rod(7.0, top_bot - z_bot, (lx, ly, z_bot), "z"))
 bot_parts.append(rod(7.0, 3.0, (LATCHES["r"][0], LATCHES["r"][1], top_bot), "z"))   # thread for the rear latch's screw (the front one's goes into the ESP32's slot rail)
 bottom_solid = plate_prism(z_bot, top_bot).fuse(bot_parts).removeSplitter()
-bottom_solid = bottom_solid.cut(pockets(z_bot + v("bot_skin_t"), top_bot + 0.01, bot_parts[1:], [])).removeSplitter()
+bottom_solid = bottom_solid.cut(pockets(z_bot + v("bot_skin_t"), top_bot + 0.01, bot_parts[1:], [wall_band])).removeSplitter()
 
 bot_cuts = []
 for _, x, y, __, ___ in AXES:
@@ -199,9 +272,7 @@ for sign in (1, -1):
 bot_cuts.append(prism(cart_outline(cfit), "xy", z_bot - 1, top_bot + 1))
 for lx, ly, _ in LATCHES.values():
     bot_cuts.append(rod(v("mg90_screw_pilot_d"), 10, (lx, ly, z_bot - 1), "z"))
-bot_cuts.append(block(ina_x - ina_gap, ina_x + ina_gap, ina_y - v("ina_w") / 2 - 0.5, ina_y + v("ina_w") / 2 + 0.5, top_bot, top_bot + 20))   # its slot, through the rear rib
-bot_cuts.append(block(ina_x + ina_gap, ina_x + ina_gap + v("ina_parts_h") + v("ina_term_out") + 0.5, ina_y - v("ina_w") / 2 - 0.5,
-                      ina_y + v("ina_w") / 2 + 0.5, top_bot + 1.8, top_bot + 20))                                          # room for its components
+bot_cuts.append(wall_groove)
 bottom_shape = bottom_solid.cut(Part.makeCompound(bot_cuts)).removeSplitter()
 
 # ------------------------------------------------------------ top print
@@ -284,7 +355,7 @@ def only_on(cutters, extra=lambda e: False):
 rail_tops = (top_bot + v("rail_h"), top_bot + v("esp_rail_h"))
 print("bottom")
 bottom_round = common["smooth"](bottom_shape, edge_r, lambda e: bottom_sharp(e) or (e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 8))
-bottom_round = common["lead_ins"](bottom_round, v("lead_small"), v("lead_big"), v("lead_small_d"), only_on(bot_cuts, lambda e: (
+bottom_round = common["lead_ins"](bottom_round, v("lead_small"), v("lead_big"), v("lead_small_d"), only_on([c for c in bot_cuts if c is not wall_groove], lambda e: (
     e.BoundBox.ZLength < 1e-4 and min(abs(e.BoundBox.ZMin - z) for z in rail_tops) < 1e-4)))
 bottom = common["as_part"](doc, part, "Body_Bottom", bottom_round, COL_BOT)
 print("top")
@@ -347,6 +418,69 @@ top_final = common["lead_ins"](top_final, v("lead_small"), v("lead_big"), v("lea
 top = common["as_part"](doc, part, "Body_Top", top_final, COL_TOP)
 mount = common["lead_ins"](mount, v("lead_small"), v("lead_big"), v("lead_small_d"))
 tof_mount = common["as_part"](doc, part, "Body_ToF_Mount", mount, COL_TOP)
+
+# ------------------------------------------------------------ the inner wall: a separate print
+print("inner wall")
+wall = slab2d(wall2d, top_bot - v("wall_groove"), top0 - 0.2)
+# notches wherever the plates' ribs, rails, posts and bosses cross its path (both plates, +wall_fit)
+
+
+def notch_of(solid, z0, z1):
+    """A feature's outline from below (holes kept: a ring rib stays a ring), grown by wall_fit, as a block z0..z1."""
+    faces = [f for f in solid.Faces if f.Surface.TypeId == "Part::GeomPlane" and f.normalAt(0, 0).z < -0.999]
+    if not faces:
+        return None
+    zl = min(f.BoundBox.ZMin for f in faces)
+    out = []
+    for low in [f for f in faces if abs(f.BoundBox.ZMin - zl) < 1e-6]:   # a ring rib broken by the legs has several
+        f = low.makeOffset2D(v("wall_fit"))
+        f.translate(App.Vector(0, 0, z0 - f.BoundBox.ZMin))
+        out.append(f.extrude(App.Vector(0, 0, z1 - z0)))
+    return Part.makeCompound(out)
+
+
+# notches wherever the plates' ribs, rails, posts and bosses cross its path: from the simple feature
+# solids the plates are built of (slicing the finished plates took too long)
+print("  notches from %d top and %d bottom features" % (len(top_parts), len(bot_parts)))
+# each notch only as tall as its feature (+wall_fit): a 1.2 mm column ring doesn't take 10 mm of wall
+notches = [notch_of(p_, p_.BoundBox.ZMin - v("wall_fit"), top0 + 1) for p_ in top_parts]
+notches += [notch_of(p_, top_bot - 2, p_.BoundBox.ZMax + v("wall_fit")) for p_ in bot_parts if p_.BoundBox.ZMax > top_bot + 0.1]
+notches = [n_ for n_ in notches if n_ is not None and n_.BoundBox.intersect(wall.BoundBox)]
+notches = [n_ for n_ in notches if n_.distToShape(wall)[0] < 1e-6]
+print("  %d notches touch the wall" % len(notches))
+wall = wall.cut(Part.makeCompound(notches)).removeSplitter() if notches else wall
+print("  notched")
+# slits where the PCA9685's outer pin groups pass through (the middle coxas swing right outside them)
+slits = []
+pins = [c for c in doc.getObject("Dummy_PCA9685").Group if c.Name.startswith("PCA9685_pins")]
+for pl_ in (App.Placement(App.Vector(v("pca_x"), v("pca_y"), v("pca_z")), PCA_RIGHT),
+            App.Placement(App.Vector(-v("pca_x"), -v("pca_y"), v("pca_z")), Z180.multiply(PCA_RIGHT))):
+    for c in pins:
+        sh = c.Shape.copy()
+        sh.Placement = pl_.multiply(sh.Placement)
+        if sh.distToShape(wall)[0] < 0.5:
+            bb = sh.BoundBox
+            slits.append(block(bb.XMin - 0.5, bb.XMax + 0.5, bb.YMin - 0.5, bb.YMax + 0.5, top_bot - 2, bb.ZMax + 0.5))
+if slits:
+    wall = wall.cut(Part.makeCompound(slits)).removeSplitter()
+print("  %d slits for the PCA9685's pins" % len(slits))
+# over the battery opening (the rear corners) the wall starts above the cartridge's side walls: it comes out below
+wall = wall.cut(prism(cart_outline(cfit + 0.3), "xy", top_bot - 3, top_bot + v("cart_side_h") + 0.5)).removeSplitter()
+# a slot at each coxa for its servo cables, on the wall where it passes closest to the coxa axis
+slots = []
+for _, x, y, __, ___ in AXES:
+    near_pt = room2d.OuterWire.distToShape(Part.Vertex(App.Vector(x, y, 0)))[1][0][0]
+    sw_ = v("wall_slot_w") / 2
+    slots.append(block(near_pt.x - sw_, near_pt.x + sw_, near_pt.y - sw_, near_pt.y + sw_, top0 - 0.2 - v("wall_slot_h"), top0 + 1))
+# a window at the ESP32's USB-C socket
+esp_usb = doc.getObject("ESP32_devkit_usb").Shape.copy()
+esp_usb.Placement = App.Placement(App.Vector(0, esp_y, v("esp_z")), ESP_FRONT).multiply(esp_usb.Placement)
+ub = esp_usb.BoundBox
+slots.append(block(ub.XMin - 20, ub.XMin + 1, ub.Center.y - 7, ub.Center.y + 7, ub.Center.z - 6, ub.Center.z + 6))
+wall = wall.cut(Part.makeCompound(slots)).removeSplitter()
+wall = max(wall.Solids, key=lambda sd: sd.Volume)          # crumbs the notches, slits and slots cut loose stay out
+print("  wall %.1f g, %d pieces, valid %s" % (wall.Volume / 1000 * v("pla_density"), len(wall.Solids), wall.isValid()))
+wall_obj = common["as_part"](doc, part, "Body_Wall", wall, COL_TOP)
 col_len = top0 - v("col_top_floor") - top_bot
 col_raw = rod(v("col_d"), col_len, (0, 0, 0), "z").cut(Part.makeCompound([
     rod(v("col_bore_d"), col_len - 2 * v("col_screw_depth"), (0, 0, v("col_screw_depth")), "z"),
@@ -415,7 +549,8 @@ link("cartridge", "Battery_Cartridge", (0, 0, 0))
 link("xt30", "Dummy_XT30", (0, 0, 0)).Placement = XT30_AT
 for key, (lx, ly, turn) in LATCHES.items():
     link("latch_" + key, "Battery_Latch", (lx, ly, z_bot), turn)
-link("ina219", "Dummy_INA219", (ina_x, ina_y, top_bot))
+link("ina219", "Dummy_INA219", (ina_x, ina_y, top_bot), INA_TURN)
+link("wall", "Body_Wall", (0, 0, 0))
 link("rocker", "Dummy_Rocker", (v("pwr_x"), v("pwr_y"), top1))
 for side in (-1, 1):
     tl = link("tof_%s" % ("l" if side < 0 else "r"), "Dummy_VL53L5CX", (0, 0, 0))
@@ -442,7 +577,8 @@ inside = {
     "pca l": solids_of(doc, names("Dummy_PCA9685"), Pl((-px, -py, pz), Z180.multiply(PCA_RIGHT))),
     "esp32": solids_of(doc, names("Dummy_ESP32_devkit"), Pl((0, esp_y, v("esp_z")), ESP_FRONT)),
     "gy91": solids_of(doc, names("Dummy_GY91"), Pl((0, 0, v("gy91_z")))),
-    "ina219": solids_of(doc, names("Dummy_INA219"), Pl((ina_x, ina_y, top_bot))),
+    "ina219": solids_of(doc, names("Dummy_INA219"), Pl((ina_x, ina_y, top_bot), INA_TURN)),
+    "wall": solids_of(doc, ["Body_Wall"]),
     "rocker": solids_of(doc, names("Dummy_Rocker"), Pl((v("pwr_x"), v("pwr_y"), top1))),
     "tof mount": solids_of(doc, ["Body_ToF_Mount"]),
     "cartridge": solids_of(doc, ["Battery_Cartridge"]),

@@ -118,6 +118,15 @@ for link, part_name in (("ina219", "Dummy_INA219"), ("rocker", "Dummy_Rocker"), 
         if hasattr(child, "Shape") and child.Shape.Solids:
             rear.append((child.Name, check_pl(link), tuple(child.ViewObject.ShapeColor[:3])))
 TARGETS["bottom plate with INA219, battery and switch"] = rear
+inner = [("Body_Bottom", None, GREY), ("Body_Wall", None, (0.35, 0.6, 0.85))]
+for link, part_name in (("pca_r", "Dummy_PCA9685"), ("pca_l", "Dummy_PCA9685"), ("esp32", "Dummy_ESP32_devkit"), ("ina219", "Dummy_INA219"), ("cells", "Dummy_18650_pair")):
+    for child in doc.getObject(part_name).Group:
+        if hasattr(child, "Shape") and child.Shape.Solids:
+            inner.append((child.Name, check_pl(link), tuple(child.ViewObject.ShapeColor[:3])))
+for link in ("coxa_RF", "coxa_RM", "coxa_RR", "coxa_LF", "coxa_LM", "coxa_LR"):
+    inner.append((doc.getObject("BodyCheck_" + link).LinkedObject.Name, check_pl(link), GOLD))
+TARGETS["inner wall with the boards and the coxas"] = inner
+TARGETS["inner wall"] = [("Body_Wall", None, (0.35, 0.6, 0.85))]
 TARGETS["fit test"] = [(o.Name, None, (0.85, 0.55, 0.2)) for o in doc.getObject("FitTest").Group] if doc.getObject("FitTest") else []
 if globals().get("ONLY"):
     TARGETS = {k: TARGETS[k] for k in ONLY}

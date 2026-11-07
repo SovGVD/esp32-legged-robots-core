@@ -197,8 +197,8 @@ def ina219(i):
     d = Dummy("INA219", i)
     t = p("ina_t")
     d.box("pcb", t, p("ina_w"), p("ina_h"), "-%s / 2" % t, "-%s / 2" % p("ina_w"), "0 mm", PCB_PURPLE)
-    d.box("parts", p("ina_parts_h"), "%s - 4 mm" % p("ina_w"), "%s - %s - 3 mm" % (p("ina_h"), p("ina_term_len")),
-          "%s / 2" % t, "-(%s - 4 mm) / 2" % p("ina_w"), "2 mm", BLACK)
+    d.box("parts", p("ina_parts_h"), "%s - 4 mm" % p("ina_w"), "%s - %s - 5 mm" % (p("ina_h"), p("ina_term_len")),
+          "%s / 2" % t, "-(%s - 4 mm) / 2" % p("ina_w"), "4 mm", BLACK)
     d.box("terminal", p("ina_term_out"), p("ina_term_w"), p("ina_term_len"), "%s / 2" % t, "-%s / 2" % p("ina_term_w"),
           "%s - %s" % (p("ina_h"), p("ina_term_len")), BLUE)
 
