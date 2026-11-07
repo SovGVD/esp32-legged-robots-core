@@ -198,6 +198,72 @@ control" window (`pip install pygame-ce`; if plain `pygame` is also installed, `
 Keyboard and pad add up. Any pad SDL knows as a game controller works
 (Xbox 360/One, most others). Linux and Windows.
 
+### Dog stance width
+
+`FirmwareCore.set_stance(x)` (and `lidar_nav.py --stance-x`) tries other neutral foot widths
+(config.h `LEG_POINT_X`; the hip roll axes are 39.5 mm out). Sweep, 2026-11-05 (trot at full
+stick, ToF terrain walks, a 0.1 s sideways push while trotting in place):
+
+| feet out, mm | push that tips it | 20 mm step (1.0 / 0.8 speed) | trot roll p2p, deg |
+|---|---|---|---|
+| 39.5 (legs vertical) | 4 N | stuck / stuck | 4.4 |
+| 50 | 5 N | ok / ok | 2.9 |
+| 56 (old) | 6 N | ok / ok | 3.8 |
+| 60 | 8 N | ok / stuck | 4.0 |
+| 64 (new) | 10 N | ok / ok (447 mm) | 4.4 |
+| 68 | > 10 N | ok / ok | 2.0 |
+| 74-80 | > 10 N | stuck / stuck | 3 |
+
+Speeds (150 mm/s forward, 50 sideways, 33 deg/s turning) and servo loads barely change.
+Vertical legs fail the step (the front feet reach the edge and the body pitches); over ~70 mm
+the same. 64 mm is the middle of the range that climbs, with most of the push margin.
+Gaps (30 / 40 mm) vary run to run at every width.
+
+## Hardware in the loop: a real ESP32 as the brain
+
+The ESP32 runs the whole firmware (motion task at its own rate, WiFi AP, web
+UI, CLI, failsafe, battery protection, ToF map, room scans, navigation),
+while the servos, IMU, battery, ToF sensors and foot switches are this
+simulation, over the USB cable. Any ESP32 board works, with nothing connected
+to it.
+
+```
+pio run -e robot-dog-hil -t upload           # or robot-hexapod-hil
+pip install pyserial pygame-ce
+python examples/hil.py --port /dev/ttyUSB0   # Windows: --port COM5
+python examples/hil.py --port /dev/ttyUSB0 --rooms              # map + tap to walk on the phone
+python examples/hil.py --port /dev/ttyUSB0 --terrain bridge     # foot switches: CLI `feet on`
+python examples/hil.py --fake                                    # no board, to try the window
+```
+
+Drive it from the web UI: join the board's WiFi (SmallDogV1 / 1234567890 by
+default), open http://192.168.1.1. Or from the PC: the "robot control"
+window takes the keyboard / gamepad like `drive.py` and sends move commands
+over the cable (they feed the failsafe; let go and the web UI has it again).
+`R` puts the robot back on its feet. The board's serial text is printed in
+the terminal; CLI `hil` (web UI CLI tab) shows the link from the board's side.
+
+How it works (`lib/robot_core/src/hil_link.h`, `src/esp32-legged-robot/hil.cpp`,
+`legsim/hil.py`): the HIL build (`-DHIL`) swaps the device drivers for ones
+that talk to the PC (servo bus, IMU, power sensor, ToF array, foot input,
+the interfaces in `hardware.h`). Every motion tick the board sends its pulses
+and the time the tick took, the sim steps that long and answers with the
+accelerometer, gyro, magnetometer, foot switches and battery; ToF frames at
+15 Hz. So the board's own timer is the clock, and the sensors are a tick old
+like a real I2C read. The IMU readings go through the same TiltEstimator /
+HeadingEstimator as on the robot. Frames have a CRC, the firmware's text
+goes between them, 921600 baud (`HIL_BAUD`).
+
+| | |
+|---|---|
+| Simulated | servos (pulses -> the sim's servo model), MPU9250 accel / gyro (+0.5 deg/s drift, `--gyro-bias`), AK8963 magnetometer (`--no-mag`), INA219 battery voltage (`--battery`, constant), VL53L5CX frames, a microswitch under every foot (the dog too) |
+| Not simulated | the LD06 lidar (HIL builds use the ToF room scans), the camera, battery drain and current |
+| Kept apart | the HIL build stores its settings in NVS namespace `robot_hil`, so flashing the robot's own ESP32 doesn't touch its servo trims (the sim needs none) |
+
+If the PC can't keep up, the sim runs slower than real time ("sim/wall" in
+the window < 1); a PC does ~800 dog / ~430 hexapod ticks a second, the board
+sends 227 / 143.
+
 ## Hexapod
 
 | | |

@@ -276,6 +276,118 @@ Imu &imu()
 	static Mpu9250Imu dev;
 	return dev;
 }
+#elif defined(IMU_TYPE) && IMU_TYPE == HIL_SIM
+
+/**
+ * Hardware in the loop: the simulator's accelerometer, gyro and magnetometer
+ * (body frame, hil.cpp) through the same TiltEstimator and HeadingEstimator
+ * as the MPU9250. No mounting settings: the sim sends body axes.
+ */
+class HilImu : public Imu {
+	public:
+		const char *name() const override { return "HIL (simulated)"; }
+
+		bool begin() override
+		{
+			_heading.begin({ HEADING_MAG_TAU, HEADING_FIELD_TOLERANCE });
+			_ready = true;
+			return true;
+		}
+
+		bool ready() const override { return _ready; }
+
+		bool read(LR_angle &angle) override
+		{
+			HilSensors s;
+			bool magFresh = false;
+			if (!_ready || !hilSensors(s, magFresh)) {
+				return false;
+			}
+			uint32_t now = micros();
+			float dt = _last ? (now - _last) / 1000000.0f : 0.0f;
+			_last = now;
+
+			_tilt.update(dt, s.accel, s.gyro);
+			angle.pitch = _tilt.aboutY();   // lean about the forward axis
+			angle.roll  = _tilt.aboutX();   // nose up / down
+			angle.yaw   = 0;
+
+			const float *mag = nullptr;
+			if (magFresh) {
+				if (_calibrating) {
+					_cal.add(s.mag);
+				}
+				mag = s.mag;
+				_mag = true;
+			}
+			_yawRate = lrHeadingRate(s.gyro, angle, _heading.gyroBias());
+			for (int i = 0; i < 3; i++) _gyro[i] = s.gyro[i];
+			_heading.update(dt, _yawRate, angle, mag);
+			return true;
+		}
+
+		bool heading(float &rad) const override
+		{
+			if (!_ready) {
+				return false;
+			}
+			rad = _heading.heading();
+			return true;
+		}
+
+		bool hasMagnetometer() const override { return _mag; }
+		float yawRate() const override { return _yawRate; }
+		bool gyro(float out[3]) const override
+		{
+			for (int i = 0; i < 3; i++) out[i] = _gyro[i];
+			return _ready;
+		}
+		float gyroBias() const override { return _heading.gyroBias(); }
+		bool headingAbsolute() const override { return _heading.absolute(); }
+
+		float magField(bool &accepted) const override
+		{
+			accepted = _heading.magAccepted();
+			return _heading.field();
+		}
+
+		// kept until the next reboot (no NVS: the simulated field never changes)
+		void magCalibrationStart() override
+		{
+			_cal.reset();
+			_calibrating = true;
+		}
+
+		bool magCalibrationFinish() override
+		{
+			_calibrating = false;
+			float offset[3], scale[3];
+			if (!_cal.result(offset, scale)) {
+				return false;
+			}
+			_heading.setMagCalibration(offset, scale, _cal.fieldStrength(offset, scale));
+			return true;
+		}
+
+		void calibrate() override { _tilt.reset(); }
+
+	private:
+		TiltEstimator    _tilt;
+		HeadingEstimator _heading;
+		MagCalibrator    _cal;
+		uint32_t         _last = 0;
+		float            _yawRate = 0;
+		float            _gyro[3] = { 0, 0, 0 };
+		bool             _ready = false;
+		bool             _mag = false;
+		volatile bool    _calibrating = false;
+};
+
+Imu &imu()
+{
+	static HilImu dev;
+	return dev;
+}
 #else
 Imu &imu()
 {
@@ -324,6 +436,32 @@ class Ina219PowerSensor : public PowerSensor {
 PowerSensor &powerSensor()
 {
 	static Ina219PowerSensor dev;
+	return dev;
+}
+#elif defined(POWER_SENSOR) && POWER_SENSOR == HIL_SIM
+
+// Hardware in the loop: the battery the simulator reports (hil.cpp)
+class HilPowerSensor : public PowerSensor {
+	public:
+		const char *name() const override { return "HIL (simulated)"; }
+		bool begin() override { return true; }
+		bool ready() const override { return true; }
+		bool read(float &voltage, float &current) override
+		{
+			HilSensors s;
+			bool magFresh;   // left for the IMU
+			if (!hilSensors(s, magFresh, false)) {
+				return false;
+			}
+			voltage = s.voltage;
+			current = s.current;
+			return true;
+		}
+};
+
+PowerSensor &powerSensor()
+{
+	static HilPowerSensor dev;
 	return dev;
 }
 #else

@@ -180,7 +180,7 @@ const GaitParams GAIT_PARAMS = {
 	600,      // max acceleration, mm/s^2
 	6,        // max yaw acceleration, rad/s^2
 	3,        // idle tolerance, mm
-	false,    // foot switches: set by the terrain mode
+	false,    // foot switches: `feet on` (FOOT_SWITCH_PINS in config.h)
 	false,    // no static stability shift: a tripod always stands on three legs
 	0.1,      // (stability blend)
 	{ 1, 1, 0 },  // (stability gain)
@@ -205,7 +205,7 @@ const GaitParams GAIT_PARAMS_ROUGH = {
 	400,      // max acceleration, mm/s^2
 	4,        // max yaw acceleration, rad/s^2
 	3,        // idle tolerance, mm
-	false,    // foot switches: set by the terrain mode
+	false,    // foot switches: `feet on` (FOOT_SWITCH_PINS in config.h)
 	false,    // no static stability shift
 	0.1,      // (stability blend)
 	{ 1, 1, 0 },  // (stability gain)

@@ -73,6 +73,39 @@ class PowerSensor {
 		virtual bool read(float &voltage, float &current) = 0;   // V, A
 };
 
+/**
+ * Multizone ToF sensors (8x8 zones). The driver measures in its own time
+ * (a task, or frames arriving from the simulator) and hands every new frame
+ * to the sink given to begin(): 64 distances in mm, terrain map zone order
+ * (TofSensor: row 0 at the top, col 0 on the left), 0 = no target.
+ */
+typedef void (*TofFrameSink)(uint8_t sensor, const int16_t *mm);
+
+class TofArray {
+	public:
+		virtual ~TofArray() {}
+		virtual const char *name() const = 0;
+		// count sensors (MODEL_TERRAIN.tof); may return before they are up
+		virtual void begin(uint8_t count, TofFrameSink sink) = 0;
+		virtual bool started() const = 0;          // done trying to start them
+		virtual bool ok(uint8_t sensor) const = 0;  // sends frames
+};
+
+/**
+ * Foot contact switches, raw (FootSwitches debounces them). Bit i = leg i
+ * pressed. read() runs on every motion tick.
+ */
+class FootInput {
+	public:
+		virtual ~FootInput() {}
+		virtual const char *name() const = 0;
+		virtual uint8_t count() const = 0;   // 0 = no switches
+		virtual void begin() = 0;
+		virtual uint32_t read() = 0;
+		// GPIO of switch i, -1 if it has none (simulated)
+		virtual int pin(uint8_t i) const { (void)i; return -1; }
+};
+
 // Used when a model has no IMU or power sensor
 class NoImu : public Imu {
 	public:

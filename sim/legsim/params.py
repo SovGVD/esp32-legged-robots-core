@@ -44,7 +44,7 @@ class Geometry:
     hip_y_hind: float = 70.5
     hip_z: float = 0.0
     # Default (neutral) foot point [code]
-    foot_x: float = 56.0
+    foot_x: float = 64.0         # config.h LEG_POINT_X
     foot_y_front: float = 70.5
     foot_y_hind: float = 70.5
     foot_z: float = 80.0        # body height above the foot point

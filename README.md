@@ -52,6 +52,13 @@ pio device monitor                   # serial CLI, 115200
 `./build.sh cli [port]`) and still builds the web client (`./build.sh build-client-env`, needs Node.js),
 which regenerates `src/esp32-legged-robot/web/index.html.gz.h`.
 
+### Hardware in the loop
+
+`robot-dog-hil` / `robot-hexapod-hil` build the full firmware for a bare ESP32 board whose servos, IMU, battery,
+ToF sensors and foot switches are simulated in MuJoCo on the PC over the USB cable
+(`python sim/examples/hil.py --port /dev/ttyUSB0`). The web UI, CLI and WiFi work as on the robot. See
+[sim/README.md](sim/README.md#hardware-in-the-loop-a-real-esp32-as-the-brain).
+
 ### Flash from the browser
 
 Every merge into `main` builds the firmware for all robots and publishes a flasher page on GitHub Pages
@@ -118,6 +125,16 @@ while you turn it by hand), and the result is saved in NVS. `heading on` holds t
 with the stick the target follows, and when you let go the robot keeps the heading it has then.
 `turnto <deg>` turns to a compass heading and holds it (`heading off` stops). `heading state` prints the
 heading, the field strength and whether it is used. The hold pauses while the failsafe is on (no client).
+
+**Foot switches.** A lever microswitch per foot on its own GPIO pin (`FOOT_SWITCH_PINS` in `config.h`, leg
+id order; hexapod default LF LM LR RF RM RR = GPIO 16 17 18 19 23 25). Wire each switch's NO contact between the
+pin and GND: the internal pull-up makes a pressed foot read LOW (`FOOT_SWITCH_ACTIVE_HIGH` for the opposite).
+Keep them off the strapping pins (0, 2, 5, 12, 15: the robot boots standing, switches closed) and the input-only
+pins 34-39 (no pull-up). Reads are debounced over `FOOT_SWITCH_DEBOUNCE` motion ticks (default 2, ~9 ms).
+`feet state` shows each foot, its pin, raw and debounced state and how often it changed (a foot that never
+changes while walking has a broken wire or a stuck lever). `feet on` (applied once standing) makes the gait use
+them: a swing ends early once its foot touches, and in terrain mode a foot that hasn't touched keeps reaching
+down. Off by default (timed steps); `FOOT_SWITCH_ON` starts with them on. Not tested on the real robot yet.
 
 **Terrain (ToF).** `terrain on` (once standing) switches to the rough gait (`GAIT_PARAMS_ROUGH`, slower and
 higher steps), turns leveling on and feeds the VL53L5CX frames into the terrain map: feet step onto

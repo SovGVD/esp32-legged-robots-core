@@ -3,3 +3,4 @@ numpy>=1.24
 pytest>=7
 pygame-ce>=2.5   # only for examples/drive.py (keyboard / gamepad); "import pygame", has wheels for new Pythons
 pillow>=9        # examples/drive.py --nav (map panel), lidar_nav.py, sensor_videos.py
+pyserial>=3.5     # only for examples/hil.py (a real ESP32 over USB)

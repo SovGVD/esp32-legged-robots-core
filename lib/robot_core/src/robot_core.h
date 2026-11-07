@@ -25,5 +25,7 @@
 #include "body_leveler.h"
 #include "tilt_estimator.h"
 #include "battery_monitor.h"
+#include "foot_switches.h"
+#include "hil_link.h"
 
 #endif

@@ -70,6 +70,7 @@ static void robotSetup()
 		vTaskDelay(100);
 
 		initMotion();
+		initFeet();
 		vTaskDelay(100);
 
 		initIMU();
@@ -220,6 +221,10 @@ static void robotStep(uint32_t missed)
 	}
 	memset(tickStage, 0, sizeof(tickStage));
 
+	#ifdef HIL
+		hilReceive();   // the simulated sensors (and PC move commands) for this tick
+	#endif
+
 	uint32_t t = micros();
 	updateFailsafe();
 	loopProfileMark(LOOP_STAGE_FAILSAFE, micros() - t);
@@ -246,6 +251,10 @@ static void robotStep(uint32_t missed)
 		t = micros();
 		doHAL();
 		loopProfileMark(LOOP_STAGE_HAL, micros() - t);
+	#endif
+
+	#ifdef HIL
+		hilSend(period);   // the pulses to the simulator; it moves on by the time since the last tick
 	#endif
 
 	loopTime = micros() - currentTime;
@@ -341,7 +350,15 @@ void setup()
 	#ifdef IGNORE_BROWNOUT_CONDITION
 		WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
 	#endif
+	#ifdef HIL
+		// a ToF frame is 135 bytes, the default 256 byte RX buffer overflows within a tick
+		Serial.setRxBufferSize(4096);
+		Serial.setTxBufferSize(2048);
+	#endif
 	Serial.begin(SERIAL_BAUD);
+	#ifdef HIL
+		initHil();
+	#endif
 	cliStreamObj.setStreamPrefix(P_CLI);
 
 	initSettings();
