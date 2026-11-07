@@ -72,12 +72,14 @@ hw = v("tip_hole_w") / 2
 cz0, cz1 = v("tip_cavity_z0"), v("tip_cavity_z1")
 body_z, top_z = v("switch_body_z"), v("switch_top_z")
 cx = v("tip_cavity_x") / 2
-bx = v("switch_btn_bore") / 2
+pw = v("switch_pocket_w") / 2
+# The switch sits on 2 ledges across the split (its pocket is wider than the flange cavity in Y), each
+# solid down to the tip, so nothing thin hangs over the cavity. The flange's ends (|x| > pw) stop it.
 tip_cuts = [
     rod(v("tip_hole_w"), cz0 - end_z + 1, (0, 0, end_z - 1), "z"),   # round, for a thick wall around it
-    block(-cx, cx, -hw, hw, cz0, cz1),
-    block(-bx, bx, -hw, hw, cz1, body_z),
-    block(-hw, hw, -hw, hw, body_z, top_z),
+    block(-cx, cx, -hw, hw, cz0, cz1),                                # the flange's room
+    block(-pw, pw, -hw, hw, cz1, body_z + 0.01),                      # the button's end, above the stop
+    block(-pw, pw, -pw, pw, body_z, top_z),                           # the switch
     block(-v("wire_void_x") / 2, v("wire_void_x") / 2, -v("wire_void_y") / 2, v("wire_void_y") / 2, top_z, v("wire_exit_z") + 8),
 ]
 # 2 screws on a diagonal hold the halves (4 crowded the tip with head recesses)
@@ -110,7 +112,7 @@ edge_r = v("coxa_edge_r")
 def keep_sharp(e):
     bb = e.BoundBox
     on_split = bb.YLength < 1e-4 and abs(bb.YMin) < 1e-4
-    inside_tip = abs(bb.XMin) <= cx + 0.2 and abs(bb.XMax) <= cx + 0.2 and abs(bb.YMin) <= hw + 0.2 and abs(bb.YMax) <= hw + 0.2
+    inside_tip = abs(bb.XMin) <= cx + 0.2 and abs(bb.XMax) <= cx + 0.2 and abs(bb.YMin) <= max(hw, pw) + 0.2 and abs(bb.YMax) <= max(hw, pw) + 0.2
     pocket_area = abs(bb.XMin) <= v("horn_hub_d") / 2 + 0.2 and abs(bb.XMax) <= v("horn_hub_d") / 2 + 0.2 and bb.YMin > low_y - 0.1 and bb.ZMin > -v("horn_reach") - 0.2
     near_knee = bb.YMax < y1 + 0.1 and abs(bb.XMin) <= 7 and abs(bb.XMax) <= 7 and abs(bb.ZMin) <= 7 and abs(bb.ZMax) <= 7
     screw = e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 3
@@ -130,7 +132,10 @@ def split_face(e):
         small_hole = e.Curve.TypeId == "Part::GeomCircle" and 2 * e.Curve.Radius <= v("lead_small_d") + 1e-6
     except Exception:
         small_hole = False
-    return bb.YLength < 1e-4 and abs(bb.YMin) < 1e-4 and not small_hole
+    # inside the tip (flange cavity, the switch's ledges, its pocket) stays sharp: a lead-in there eats the ledges
+    in_tip = (abs(bb.XMin) <= cx + 0.2 and abs(bb.XMax) <= cx + 0.2 and abs(bb.YMin) <= pw + 0.2 and abs(bb.YMax) <= pw + 0.2
+              and bb.ZMin > cz0 - 0.1 and bb.ZMax < top_z + 0.1)
+    return (bb.YLength < 1e-4 and abs(bb.YMin) < 1e-4 and not small_hole) or in_tip
 
 
 print("lead-ins")
