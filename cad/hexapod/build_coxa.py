@@ -88,6 +88,7 @@ tip_w = v("horn_tip_w")
 pocket = v("horn_hub_h") + v("horn_fit")      # the horn plus a little room for glue
 arm = v("horn_reach") - tip_w / 2
 through = a_y1 - a_y0 + 1
+horn_way = pocket + 0.3                       # the horn's way in, in front of its pocket
 cuts = [
     block(-near, far, -hw, hw, floor_in, z1 + 1),                # the servo's body, down to the floor
     block(-tab_near, tab_far, -hw, hw, seat, z1 + 1),            # its tabs
@@ -95,6 +96,10 @@ cuts = [
     rod(v("mg90_screw_pilot_d"), v("coxa_plate_floor") + 1, (v("mg90_hole_far"), 0, z0 - 1), "z"),
     # the femur servo's horn, its arm toward the coxa axis
     common["horn_pocket"](v("horn_pocket_d") / 2, v("horn_pocket_w") / 2, arm, pocket, (fl, a_y0, 0), (-1, 0, 0), (0, 1, 0)),
+    # its way in: the arm's tip lies under the fork's crotch, so the same outline goes one layer deeper into
+    # the crotch. The horn slides in from the open end of the fork, then sideways into its pocket.
+    common["horn_pocket"](v("horn_pocket_d") / 2, v("horn_pocket_w") / 2, arm, horn_way + 0.01, (fl, a_y0 - horn_way, 0),
+                          (-1, 0, 0), (0, 1, 0)),
     rod(5.0, through, (fl, a_y0, 0), "y"),
     # the femur's bearing
     rod(v("bearing_seat_d"), b_y1 - v("tib_bear_seat_end") + 1, (fl, v("tib_bear_seat_end"), 0), "y"),
@@ -145,7 +150,7 @@ print("raw solids", len(shape.Solids), shape.isValid())
 def keep_sharp(e):
     bb = e.BoundBox
     servo = abs(bb.YMin) <= hw + 0.2 and abs(bb.YMax) <= hw + 0.2 and bb.ZMin >= floor_in - 0.2 and bb.XMin >= -tab_near - 0.2 and bb.XMax <= tab_far + 0.2
-    horn = bb.YMin >= a_y0 - 0.1 and bb.YMax <= a_y0 + pocket + 0.1 and bb.XMin >= fl - v("horn_reach") - 0.2
+    horn = bb.YMin >= a_y0 - horn_way - 0.1 and bb.YMax <= a_y0 + pocket + 0.1 and bb.XMin >= fl - v("horn_reach") - 0.2
     bearing = bb.YMax < b_y1 + 0.1 and abs(bb.XMin - fl) <= 7 and abs(bb.XMax - fl) <= 7 and abs(bb.ZMin) <= 7 and abs(bb.ZMax) <= 7
     groove = bb.YMin >= g_y0 - 0.2 and bb.YMax <= g_y1 + 0.2 and bb.ZMin >= z1 - v("coxa_groove_d") - 0.2
     small_round = e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 5
@@ -188,6 +193,27 @@ def shaft_or_joint(e):
 
 body_shape = common["lead_ins"](body_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), shaft_or_joint)
 arm_shape = common["lead_ins"](arm_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), joint_face)
+# the shaft's own chamfers: a lead-in on its tip (into the bearing), and only a small one on the spacer's
+# outer edge, which must still bear on the inner ring (8 to 9 mm across, the ring's own bore chamfer eats the inner part)
+spacer_z = floor_z0 - v("fem_boss_h")
+tip_z = spacer_z - v("fem_shaft_len")
+
+
+def ring_edge(r, z):
+    for e in body_shape.Edges:
+        if abs(e.BoundBox.ZMin - z) > 1e-4 or abs(e.BoundBox.ZMax - z) > 1e-4:
+            continue
+        try:
+            c = e.Curve
+            if c.TypeId == "Part::GeomCircle" and abs(c.Radius - r) < 1e-4 and abs(c.Center.x) < 1e-4 and abs(c.Center.y) < 1e-4:
+                return e
+        except Exception:                       # edges without a plain curve
+            continue
+    raise RuntimeError("no shaft edge r %.2f at z %.2f" % (r, z))
+
+
+body_shape = body_shape.makeChamfer(v("lead_big"), [ring_edge(v("coxa_shaft_d") / 2, tip_z)])
+body_shape = body_shape.makeChamfer(v("lead_small"), [ring_edge(v("fem_boss_d") / 2, spacer_z)])
 # alignment pins on the coxa's joint face, holes for them in the arm (the arm still prints flat on that face)
 body_shape, arm_shape, pin_sites = common["align_pins"](
     body_shape, arm_shape, [(v("coxa_pin_a_x"), v("coxa_pin_a_z")), (v("coxa_pin_b_x"), v("coxa_pin_b_z"))], b_y1, -1,
