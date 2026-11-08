@@ -90,7 +90,7 @@ class HexGeometry:
     femur_axis_z: float = -BOTTOM_Z  # body origin above the bottom of the body [design]
     torso_size: tuple = (110.0, 150.0, TOP_Z + 3 - BOTTOM_Z)   # collision box [design]
     torso_z: float = (TOP_Z + 3 + BOTTOM_Z) / 2                # box centre relative to the body origin
-    foot_radius: float = 6.0        # half-sphere foot [CAD]
+    foot_radius: float = 4.0        # half-sphere foot, the old TibiaTip presser [CAD]
     femur_width: float = 7.0        # collision capsule radius, only the floor collides [est]
     tibia_width: float = 5.0
 

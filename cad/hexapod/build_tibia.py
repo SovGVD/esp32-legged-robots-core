@@ -1,12 +1,15 @@
 """The tibia: 2 halves split on the leg plane, joined with the stock MG90S screws, and
 a presser. A real shape, not stacked boxes: from the front a rounded triangle from
 the knee circle to the tip circle; from the side a solid wedge from each knee arm down
-to the foot; the tip itself round, the same circle as the half-sphere foot. The switch sits inside the tip; its leads bend up into a hollow in the
-middle of the split, which opens into the fork, so no slot cuts an outer wall.
+to the foot; the tip itself round. The foot switch and its presser are the old (gear)
+hexapod's, copied as they are because they work after printing: the empty space around
+the switch in the old tibia, and its TibiaTip presser (import_old_tip.py, old_tip/*.brep),
+moved onto this tip. The switch's leads bend up into its lead slots and on into a hollow
+in the middle of the split, which opens into the fork, so no slot cuts an outer wall.
 
   Tibia_Horn     +Y half, the tibia servo's horn is glued in its pocket
   Tibia_Bearing  -Y half, the femur's knee shaft runs in the bearing in it
-  Tibia_Presser  the half-sphere foot, trapped between the halves by its flange
+  Tibia_Presser  the old TibiaTip: half-sphere foot, held between the halves by a pin through its slot
 
 Each half prints flat on its split face. Right leg; the _L mirrors are the left leg's.
 Tibia frame: origin on the knee axis, -Z down the tibia, horn on +Y.
@@ -46,7 +49,7 @@ check.setExpression("Placement.Base.y", "Params.catalog_row2_y * 3")
 prism, block, rod = common["prism"], common["block"], common["rod"]
 
 w = v("tib_arm_w") / 2
-foot_r, foot_z, end_z = v("tip_foot_r"), v("tip_foot_z"), v("tib_shank_end_z")
+foot_r, foot_z, end_z = v("tib_tip_end_r"), v("tip_foot_z"), v("tib_shank_end_z")
 half_t = v("tib_half_t")
 low_y = v("tib_horn_low_y")
 top_y = v("joint_horn_y") + v("tib_horn_roof")
@@ -68,19 +71,22 @@ solid_a = front.common(side_a).common(round_tip).removeSplitter()
 solid_b = front.common(side_b).common(round_tip).removeSplitter()
 
 # ------------------------------------------------------------ the tip's insides, in both halves
-hw = v("tip_hole_w") / 2
-cz0, cz1 = v("tip_cavity_z0"), v("tip_cavity_z1")
-body_z, top_z = v("switch_body_z"), v("switch_top_z")
-cx = v("tip_cavity_x") / 2
-pw = v("switch_pocket_w") / 2
-# The switch sits on 2 ledges across the split (its pocket is wider than the flange cavity in Y), each
-# solid down to the tip, so nothing thin hangs over the cavity. The flange's ends (|x| > pw) stop it.
+
+
+def old_tip(name, dy):
+    """A shape from old_tip/, moved from the old tibia's frame onto this tip."""
+    sh = Part.Shape()
+    sh.read(os.path.join(HERE, "old_tip", name))
+    sh.translate(App.Vector(0, dy, v("tip_old_dz")))
+    return sh
+
+
+voids = old_tip("voids.brep", -12.0)        # the old tibia's axis was at y 12
+vb = voids.BoundBox
+top_z = v("switch_top_z")
 tip_cuts = [
-    rod(v("tip_hole_w"), cz0 - end_z + 1, (0, 0, end_z - 1), "z"),   # round, for a thick wall around it
-    block(-cx, cx, -hw, hw, cz0, cz1),                                # the flange's room
-    block(-pw, pw, -hw, hw, cz1, body_z + 0.01),                      # the button's end, above the stop
-    block(-pw, pw, -pw, pw, body_z, top_z),                           # the switch
-    block(-v("wire_void_x") / 2, v("wire_void_x") / 2, -v("wire_void_y") / 2, v("wire_void_y") / 2, top_z, v("wire_exit_z") + 8),
+    voids,
+    block(-v("wire_void_x") / 2, v("wire_void_x") / 2, -v("wire_void_y") / 2, v("wire_void_y") / 2, v("tip_wire_z0"), v("wire_exit_z") + 8),
 ]
 # 2 screws on a diagonal hold the halves (4 crowded the tip with head recesses)
 screws = [(v("tib_screw_a_x"), v("tib_screw_a_z")), (-v("tib_screw_b_x"), v("tib_screw_b_z"))]
@@ -112,7 +118,7 @@ edge_r = v("coxa_edge_r")
 def keep_sharp(e):
     bb = e.BoundBox
     on_split = bb.YLength < 1e-4 and abs(bb.YMin) < 1e-4
-    inside_tip = abs(bb.XMin) <= cx + 0.2 and abs(bb.XMax) <= cx + 0.2 and abs(bb.YMin) <= max(hw, pw) + 0.2 and abs(bb.YMax) <= max(hw, pw) + 0.2
+    inside_tip = bb.XMin >= vb.XMin - 0.01 and bb.XMax <= vb.XMax + 0.01 and bb.YMin >= vb.YMin - 0.01 and bb.YMax <= vb.YMax + 0.01
     pocket_area = abs(bb.XMin) <= v("horn_hub_d") / 2 + 0.2 and abs(bb.XMax) <= v("horn_hub_d") / 2 + 0.2 and bb.YMin > low_y - 0.1 and bb.ZMin > -v("horn_reach") - 0.2
     near_knee = bb.YMax < y1 + 0.1 and abs(bb.XMin) <= 7 and abs(bb.XMax) <= 7 and abs(bb.ZMin) <= 7 and abs(bb.ZMax) <= 7
     screw = e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 3
@@ -133,8 +139,8 @@ def split_face(e):
     except Exception:
         small_hole = False
     # inside the tip (flange cavity, the switch's ledges, its pocket) stays sharp: a lead-in there eats the ledges
-    in_tip = (abs(bb.XMin) <= cx + 0.2 and abs(bb.XMax) <= cx + 0.2 and abs(bb.YMin) <= pw + 0.2 and abs(bb.YMax) <= pw + 0.2
-              and bb.ZMin > cz0 - 0.1 and bb.ZMax < top_z + 0.1)
+    in_tip = (bb.XMin >= vb.XMin - 0.01 and bb.XMax <= vb.XMax + 0.01 and bb.YMin >= vb.YMin - 0.01 and bb.YMax <= vb.YMax + 0.01
+              and bb.ZMin > end_z + 0.1 and bb.ZMax < vb.ZMax + 0.01)
     return (bb.YLength < 1e-4 and abs(bb.YMin) < 1e-4 and not small_hole) or in_tip
 
 
@@ -147,10 +153,7 @@ common["add_mirror"](doc, part, horn, COL_A)
 common["add_mirror"](doc, part, bear, COL_B)
 
 # ------------------------------------------------------------ the presser
-stem = v("tip_stem_w") / 2
-ball = Part.makeSphere(foot_r, App.Vector(0, 0, foot_z), App.Vector(0, 0, 1), -90, 0, 360)
-presser_shape = ball.fuse([rod(v("tip_stem_w"), v("tip_flange_top") - foot_z, (0, 0, foot_z), "z"),
-                           block(-v("tip_flange_x") / 2, v("tip_flange_x") / 2, -stem, stem, cz0, v("tip_flange_top"))]).removeSplitter()
+presser_shape = old_tip("presser.brep", 0.0)     # its axis was already at y 0
 presser = common["as_part"](doc, part, "Tibia_Presser", presser_shape, COL_TIP)
 common["save"](doc)
 
@@ -183,9 +186,9 @@ a_s, b_s, t_s = solids_of(doc, ["Tibia_Horn"]), solids_of(doc, ["Tibia_Bearing"]
 Pl = lambda x, y, z, rot=None: App.Placement(App.Vector(x, y, z), rot or App.Rotation())
 sw_place = Pl(0, 0, top_z, SWITCH_DOWN)
 d = v("pla_density")
-print("horn half %.1f g, bearing half %.1f g, presser %.1f g solid; valid %s %s %s; foot bottom %.2f; press travel %.2f" % (
+print("horn half %.1f g, bearing half %.1f g, presser %.1f g solid; valid %s %s %s; foot bottom %.2f" % (
     horn_shape.Volume / 1000 * d, bear_shape.Volume / 1000 * d, presser_shape.Volume / 1000 * d,
-    horn_shape.isValid(), bear_shape.isValid(), presser_shape.isValid(), presser_shape.BoundBox.ZMin, v("tip_travel") - v("tip_gap")))
+    horn_shape.isValid(), bear_shape.isValid(), presser_shape.isValid(), presser_shape.BoundBox.ZMin))
 print("overlap mm3: halves %.3f, switch %.3f, presser %.3f, switch/presser %.3f, servo horn %.3f, knee bearing %.3f" % (
     clash(a_s, b_s), clash(solids_of(doc, SWITCH, sw_place), a_s + b_s), clash(t_s, a_s + b_s), clash(solids_of(doc, SWITCH, sw_place), t_s),
     clash(solids_of(doc, HORN, Pl(0, s_y, 0, HORN_DOWN)), a_s + b_s),

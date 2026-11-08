@@ -20,27 +20,35 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
+import Part
 
-z0, z1 = v("tip_foot_z") - v("tip_foot_r") - 1, v("switch_top_z") + 3
-fig, axes = plt.subplots(1, 2, figsize=(12, 7))
-for ax, (normal, title, ix) in zip(axes, ((App.Vector(0, 1, 0.0), "across the split (cut at y 0.01)", 0),
-                                          (App.Vector(1, 0, 0), "along the split (cut at x 0)", 1))):
-    d = 0.01 if ix == 0 else 0.0
+z0, z1 = v("tip_foot_z") - v("tip_foot_r") - 1, v("tip_wire_z0") + 6
+fig, axes = plt.subplots(1, 3, figsize=(16, 7))
+for ax, (normal, d, title, ix) in zip(axes, ((App.Vector(0, 1, 0), 0.01, "across the split (y 0.01)", 0),
+                                             (App.Vector(0, 1, 0), 0.6, "across, y 0.6 (the lead slots)", 0),
+                                             (App.Vector(1, 0, 0), 0.05, "along the split (x 0.05)", 1))):
     for name, solids, col in parts:
         for s in solids:
-            for w in s.slice(normal, d):
-                pts = [(p.x if ix == 0 else p.y, p.z) for p in w.discretize(Distance=0.1)]
-                ax.add_patch(Polygon(pts, closed=True, facecolor=col, edgecolor="k", lw=0.4, alpha=0.9))
+            # the cut as filled faces (holes open), drawn as triangles: no outline tricks
+            box = Part.makeBox(40, 40, 120, App.Vector(-20, -20, -100))
+            plane = Part.makePlane(200, 200, App.Vector(-100, d, 50) if ix == 0 else App.Vector(d, -100, -150),
+                                   normal, App.Vector(1, 0, 0) if ix == 0 else App.Vector(0, 1, 0))
+            cut = s.common(plane)
+            for f in cut.Faces:
+                pts, tris = f.tessellate(0.02)
+                for t in tris:
+                    ax.add_patch(Polygon([((pts[k].x if ix == 0 else pts[k].y), pts[k].z) for k in t], closed=True,
+                                         facecolor=col, edgecolor=col, lw=0.2))
+                for w in f.Wires:
+                    q = [((p_.x if ix == 0 else p_.y), p_.z) for p_ in w.discretize(Distance=0.05)]
+                    ax.plot([c[0] for c in q], [c[1] for c in q], color="k", lw=0.4)
     ax.set_xlim(-9, 9)
     ax.set_ylim(z0, z1)
     ax.set_aspect("equal")
     ax.grid(alpha=0.25)
     ax.set_title(title, fontsize=10)
     ax.set_xlabel("x, mm" if ix == 0 else "y, mm")
-fig.suptitle("Tibia tip, foot hanging: gap %.2f to the button, presses it %.2f, then the flange stops on the plastic\n"
-             "stem %.1f in a %.2f hole, flange %.1f in %.2f; switch ledges %.2f a side" % (
-                 v("tip_gap"), v("tip_press"), v("tip_stem_w"), v("tip_hole_w"), v("tip_flange_x"), v("tip_cavity_x"),
-                 v("sw_w") / 2 - v("tip_hole_w") / 2), fontsize=10)
+fig.suptitle("Tibia tip, foot hanging: the old hexapod's switch pocket, lead slots, pin and TibiaTip presser, copied as they are", fontsize=10)
 path = os.path.join(HERE, "views", "tip_section.png")
 fig.savefig(path, dpi=110, bbox_inches="tight")
 print(path)

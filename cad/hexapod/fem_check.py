@@ -267,8 +267,8 @@ def build(case, load, bonded):
         probe = (fl, 0.0, lever)
     elif case == "tibia":
         held = cyl_faces(val("bearing_seat_d") / 2, 0) + cyl_faces(val("horn_pocket_d") / 2, 0)
-        # the presser pushes on the ledge at the top of its cavity: small faces, so by position
-        top = ("near", val("tip_cavity_z1"), val("tip_cavity_x") / 2 + 0.1, val("tip_hole_w") / 2 + 0.1)
+        # the presser (old TibiaTip) stops under the top of its pocket: small faces, so by position
+        top = ("near", val("tip_stop_z"), 3.1, 3.1)
         loads = [("foot up", top, up, Z)]
         if side:
             loads += [("side", top, side, Y), ("forward", top, side, X)]
