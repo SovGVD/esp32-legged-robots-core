@@ -270,8 +270,8 @@ sends 227 / 143.
 |---|---|
 | ![Hexapod standing](docs/hexapod_standing.png) | ![Hexapod walking with the firmware gait](docs/hexapod_walking.png) |
 | Neutral stance, the CAD parts (`cad/hexapod`) | Walking forward, driven by the firmware's own gait and `HexapodLegIK` |
-| ![Hexapod mapping and navigating with the lidar](docs/hexapod_navigation.png) | ![Hexapod on the obstacle course](docs/hexapod_obstacles.png) |
-| Lidar map and walk to a point (`examples/lidar_nav.py --model hexapod`) | Obstacle course with the ToF terrain map (`examples/terrain_walk.py --hexapod`) |
+| ![Hexapod mapping and navigating with its ToF sensors](docs/hexapod_navigation.png) | ![Hexapod on the obstacle course](docs/hexapod_obstacles.png) |
+| ToF room scans: map and walk to a point (`examples/lidar_nav.py --model hexapod --tof`) | Obstacle course with the ToF terrain map (`examples/terrain_walk.py --hexapod`) |
 
 The 2026-11 design ("Recommended" in the body study), not built yet: hexagon
 body, coxa / femur / tibia 60 / 50 / 60 mm, 18 MG90S straight on the joints
