@@ -4,9 +4,9 @@ every joint, no gears). The 2026-11 design ("Recommended" in the body study),
 not built yet: hexagon body, 2x 18650 at the bottom centre, a PCA9685 + 3
 Mini360 board standing along each side, the ESP32 standing across the front,
 GY-91 under the top cover in the middle, 2 VL53L5CX at the front, lever switch
-feet. There are no CAD parts yet, so the sim model is simple shapes
-(simple_parts.py) sized like the design concept (artifact "Direct-drive
-hexapod concept").
+feet. It looks like the CAD (cad/hexapod, meshes exported by export_sim_meshes.py);
+its masses are simple shapes (simple_parts.py) placed like the design concept
+(artifact "Direct-drive hexapod concept").
 
 Units follow the firmware: mm, g, degrees/radians as noted. The MJCF builder
 converts to SI. Every number says where it comes from:

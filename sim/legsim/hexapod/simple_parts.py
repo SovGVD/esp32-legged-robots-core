@@ -1,6 +1,7 @@
 """
-Visual and mass parts of the hexapod, which has no CAD parts yet: boxes and
-cylinders sized like the design concept (params.py). Everything in mm and g
+Mass parts of the hexapod: boxes and cylinders sized like the design concept
+(params.py), the masses from the CAD. The look is the CAD's own meshes (mjcf.py);
+these boxes show only when those meshes are missing. Everything in mm and g
 here, converted to the MJCF's m and kg.
 
 Link frames as in mjcf.py: X along the leg (neutral direction), Z up, joint
