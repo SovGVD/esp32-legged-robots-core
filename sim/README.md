@@ -310,7 +310,7 @@ in the firmware leg order LF, LM, LR, RF, RM, RR (not the PCA9685 channel).
 | Body: hexagon plates 14 mm past the coxa axes, 28 mm under and 16 mm over the femur axis | design concept | `legsim/hexapod/simple_parts.py`: boxes and cylinders |
 | MG90S at 5 V: 1.87 kg cm stall, 0.093 s/60 deg | datasheet (1.8 @ 4.8 V, 2.2 @ 6 V) | Not measured; clones are often weaker |
 | Pulse -> angle: 500-2500 us over 0-180 deg | `model_data.h` | Linear until measured |
-| Masses: 1132 g | prints from `cad/hexapod` (solid PLA), the rest a design estimate | Per leg: coxa 48.9, femur 47.9, tibia 17.1 g (servos 13.4 g each; the femur carries 2) |
+| Masses: 1144 g | prints from `cad/hexapod` (solid PLA), the rest a design estimate | Per leg: coxa 49.1, femur 49.8, tibia 17.1 g (servos 13.4 g each; the femur carries 2) |
 | Servo directions | the inverse flags (right legs mirrored) | Nothing to check against until it is built |
 
 What the sim says (`tests/test_hexapod.py`):

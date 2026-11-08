@@ -9,7 +9,10 @@ Print with the rim on the bed; the strap floors are then short bridges.
 
 Both servo cables leave into the open gap between the servos and run in a channel on
 the +Z face to the hip, threaded under 3 bridges across the channel. Thin cable only:
-the connector is removed, so no big holes.
+the connector is removed, so no big holes. The foot switch's lead comes out of the
+tibia's fork under the knee: a narrower channel on the -Z face takes it from under the
+knee axis back to the gap, where it goes round to the +Z channel and lies on the servo
+cables.
 
 Right leg; Femur_Main_L is the left leg's. Femur frame: origin on the femur axis,
 +X to the knee, Z up with the femur level.
@@ -102,6 +105,19 @@ finger_z = "%s + %s" % (half, depth_c)
 for n in range(3):
     x = "%s + %d * ((%s) - %s) / 2" % (p("chan_x0"), n, chan_len, p("chan_finger_len"))
     solid.append(box("bridge_%d" % n, p("chan_finger_len"), "(%s) - (%s)" % (y1, y0), p("chan_finger_t"), x, y0, finger_z))
+
+# the foot switch's lead on the -Z face: same bridges, a narrower channel from the knee to the gap
+low_w, low_d = p("chan_low_w"), p("chan_low_depth")
+low_lo, low_hi = "%s - %s / 2" % (chan_mid, low_w), "%s + %s / 2" % (chan_mid, low_w)
+low_len = "%s - (%s)" % (p("chan_low_x1"), p("chan_low_x0"))
+solid += [
+    box("rail_low_a", low_len, "%s - (%s)" % (low_lo, y0), low_d, p("chan_low_x0"), y0, "-%s - %s" % (half, low_d)),
+    box("rail_low_b", low_len, "(%s) - (%s)" % (y1, low_hi), low_d, p("chan_low_x0"), low_hi, "-%s - %s" % (half, low_d)),
+]
+for n in range(3):
+    x = "%s + %d * ((%s) - %s) / 2" % (p("chan_low_x0"), n, low_len, p("chan_finger_len"))
+    solid.append(box("bridge_low_%d" % n, p("chan_finger_len"), "(%s) - (%s)" % (y1, y0), p("chan_finger_t"), x, y0,
+                     "-%s - %s - %s" % (half, low_d, p("chan_finger_t"))))
 
 win_h = "%s + 2 * %s" % (p("mg90_body_w"), p("mg90_fit_w"))
 win_len = "%s + 2 * %s" % (p("mg90_body_len"), fit)

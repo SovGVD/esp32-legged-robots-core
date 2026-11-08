@@ -5,7 +5,8 @@ femur; from the side an arch under it. The servo sits in a pocket cut into that.
 The servo's horn fixes to the body's top plate. A floor under the servo carries a shaft
 that runs in the bearing in the body's bottom plate. Horns are glued into their pockets.
 In the fork the femur servo's horn sits in the +Y arm and the femur's shaft runs in a bearing in the -Y arm. The cables of
-the 3 servos lie in a groove in the top face, held by 2 small bridges.
+the femur's 2 servos and the foot switch lie in a groove in the top face, held by 2 small bridges; with the coxa
+servo's own cable they go on to the slot in the body's inner wall.
 
 The -Y (bearing) side is a separate print, screwed on with 2 stock MG90S screws like the
 tibia halves: a one-piece fork can't take the femur, whose spline and shaft both point
@@ -118,7 +119,11 @@ g_x0 = v("coxa_groove_x0")
 # one U-shaped outline, with a rounded floor: square corners here were the link's highest
 # stress. (A cylinder tangent to a box crashes FreeCAD's rounding step.)
 g_floor = z1 - v("coxa_groove_d")
-cuts.append(prism([(g_y0, g_floor, 1.5), (g_y1, g_floor, 1.5), (g_y1, arm_r + 2, 0), (g_y0, arm_r + 2, 0)], "yz", g_x0, fork_x + 1))
+# it ramps up out of the top face before the fork wall: the femur's tail sweeps past the wall
+g_x1 = v("coxa_groove_x1")
+g_ramp = g_x1 - v("coxa_groove_ramp")
+cuts.append(prism([(g_y0, g_floor, 1.5), (g_y1, g_floor, 1.5), (g_y1, arm_r + 2, 0), (g_y0, arm_r + 2, 0)], "yz", g_x0, g_x1 + 1).common(
+    prism([(g_x0 - 1, g_floor - 1, 0), (g_ramp, g_floor - 1, 0), (g_x1, arm_r + 2, 0), (g_x0 - 1, arm_r + 2, 0)], "xz", g_y0 - 1, g_y1 + 1)))
 # solid otherwise: the slicer's infill fills it, with no overhangs inside to support
 # (the -Y side is solid behind the bearing arm's joint face this far, for its screws)
 j_y = v("coxa_joint_y")
@@ -128,7 +133,7 @@ skirt = block(-rear - 1, v("coxa_arch_x0") + 1, -rear - 8, rear + 8, floor_z0 - 
 cuts.append(skirt)
 shape = shape.cut(Part.makeCompound(cuts)).removeSplitter()
 # 2 small bridges over the groove
-bridges = [block(x, x + 3, g_y0 - 0.1, g_y1 + 0.1, z1 - 1.4, z1) for x in (g_x0 + 6, g_x0 + 16)]
+bridges = [block(x, x + 3, g_y0 - 0.1, g_y1 + 0.1, z1 - 1.4, z1) for x in (g_x0 + 5, g_ramp - 3)]
 # the shaft under the floor, on its spacer
 shaft = rod(v("fem_boss_d"), v("fem_boss_h"), (0, 0, floor_z0 - v("fem_boss_h")), "z").fuse(
     rod(v("coxa_shaft_d"), v("fem_shaft_len"), (0, 0, floor_z0 - v("fem_boss_h") - v("fem_shaft_len")), "z"))

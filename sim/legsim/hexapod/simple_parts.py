@@ -108,12 +108,12 @@ def leg(p, leg):
     off = SERVO_LEN / 2 - SHAFT_FROM_END
 
     cx = _Parts(n + "_")
-    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 35.5, PLA)
+    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 35.7, PLA)
     cx.box("coxa_servo", (off, 0, -8), (SERVO_LEN / 2, SERVO_WID / 2, SERVO_HGT / 2), SERVO_MASS, SERVO)
     cx.lump(m.coxa, (geo.coxa / 2, 0, -5), "coxa_misc")
 
     fe = _Parts(n + "_")
-    fe.box("femur_arm", (geo.femur / 2, 0, 0), (geo.femur / 2, 2, 6), 21.1, PLA)
+    fe.box("femur_arm", (geo.femur / 2, 0, 0), (geo.femur / 2, 2, 6), 23.0, PLA)
     fe.box("femur_servo", (off, 0, 0), servo_half, SERVO_MASS, SERVO)
     fe.box("tibia_servo", (geo.femur - off, 0, 0), servo_half, SERVO_MASS, SERVO)
     fe.lump(m.femur, (geo.femur / 2, 0, 0), "femur_misc")
