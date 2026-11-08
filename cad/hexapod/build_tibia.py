@@ -84,8 +84,10 @@ def old_tip(name, dy):
 voids = old_tip("voids.brep", -12.0)        # the old tibia's axis was at y 12
 vb = voids.BoundBox
 top_z = v("switch_top_z")
-# only the -X lead slot: the +X one ran up next to the lower screw (the switch's pins on that side get cut off)
-voids = voids.cut(block(1.65, vb.XMax + 1, vb.YMin - 1, vb.YMax + 1, top_z + 0.1, vb.ZMax + 1)).removeSplitter()
+# only the -X lead slot: the +X one ran up next to the lower screw (the switch's pins on that side get cut off).
+# Solid from the middle of the old tongue over the switch to the +X side, level with the tongue's bottom
+# on the split face (0.71 above the switch), so the tongue blends into the body
+voids = voids.cut(block(0.0, vb.XMax + 1, vb.YMin - 1, vb.YMax + 1, top_z + 0.71, vb.ZMax + 1)).removeSplitter()
 tip_cuts = [
     voids,
     block(-v("wire_void_x") / 2, v("wire_void_x") / 2, -v("wire_void_y") / 2, v("wire_void_y") / 2, v("tip_wire_z0"), v("wire_exit_z") + 8),
