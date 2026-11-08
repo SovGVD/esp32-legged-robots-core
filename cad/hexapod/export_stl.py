@@ -49,9 +49,15 @@ def lay_flat(shape, down=None):
     s.Placement = App.Placement()
     rot = App.Rotation(n, App.Vector(0, 0, -1))
     s.rotate(App.Vector(0, 0, 0), rot.Axis, rot.Angle * 180 / 3.141592653589793)
-    bb = s.BoundBox
+    # placed by its mesh: a shape's BoundBox can stand off curved faces (2.7 mm off the coxa's rounded fork end,
+    # so its STL floated over the bed and the slicer put supports under the joint face)
+    bb = mesh_of(s).BoundBox
     s.translate(App.Vector(-bb.Center.x, -bb.Center.y, -bb.ZMin))
     return s
+
+
+def mesh_of(s):
+    return MeshPart.meshFromShape(Shape=s, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
 
 
 out_dir = os.path.join(HERE, "stl")
@@ -62,9 +68,9 @@ for name, filename in PARTS.items():
         print("%s: not built, skipped" % name)
         continue
     s = lay_flat(obj.Shape, DOWN.get(name))
-    mesh = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
+    mesh = mesh_of(s)
     mesh.write(os.path.join(out_dir, filename))
-    bb = s.BoundBox
+    bb = mesh.BoundBox
     print("%-30s %5.1f x %5.1f x %5.1f mm  %4.1f g  valid %s" % (filename, bb.XLength, bb.YLength, bb.ZLength,
                                                               s.Volume / 1000 * density, s.isValid()))
 
@@ -80,9 +86,9 @@ for name, filename, down, keep in (("Tibia_Horn", "tmp_tibia_tip_horn_half.stl",
                                    ("Tibia_Presser", "tmp_tibia_tip_presser.stl", (0, 0, -1), None)):
     sh = doc.getObject(name).Shape
     sh = lay_flat(sh.common(keep) if keep else sh, down)
-    mesh = MeshPart.meshFromShape(Shape=sh, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
+    mesh = mesh_of(sh)
     mesh.write(os.path.join(out_dir, filename))
-    bb = sh.BoundBox
+    bb = mesh.BoundBox
     print("%-30s %5.1f x %5.1f x %5.1f mm  %4.1f g" % (filename, bb.XLength, bb.YLength, bb.ZLength, sh.Volume / 1000 * density))
 old = os.path.join(out_dir, "tmp_tibia_tip_test.stl")
 if os.path.exists(old):
