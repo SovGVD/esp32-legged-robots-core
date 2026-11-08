@@ -7,6 +7,15 @@ that runs in the bearing in the body's bottom plate. Horns are glued into their 
 In the fork the femur servo's horn sits in the +Y arm and the femur's shaft runs in a bearing in the -Y arm. The cables of
 the 3 servos lie in a groove in the top face, held by 2 small bridges.
 
+The -Y (bearing) arm is a separate print, screwed on with 2 stock MG90S screws like the
+tibia halves: a one-piece fork can't take the femur, whose spline and shaft both point
+outward. Assembly: glue the horn into the +Y arm, put the bearing on the femur's shaft in
+the loose arm, push the femur's servo onto the horn, then screw the arm on.
+
+  Coxa_Body  the coxa with the servo and the +Y (horn) arm
+  Coxa_Arm   the -Y (bearing) arm
+  Coxa_Main  both together, for the checks, the body and the FEA
+
 Right leg; Coxa_Main_L is the left leg's. Leg frame: origin on the coxa axis at femur axis
 height, +X out along the link, Z up. Sizes come from Params when this script runs:
 re-run it after changing them.
@@ -103,7 +112,10 @@ cuts.append(prism([(g_y0, g_floor, 1.5), (g_y1, g_floor, 1.5), (g_y1, arm_r + 2,
 t = v("coxa_shell_t")
 hx0, hx1 = v("coxa_hollow_x0"), v("coxa_hollow_x1")
 hy = v("coxa_hollow_y0")
-cuts.append(prism([(hx0, g_y0 - t, 3), (hx1, g_y0 - t, 3), (hx1, b_y0 + t, 5), (hx0, -hy, 4)], "xy", floor_z0 - 2, z1 - t))
+# (on the -Y side it stops at coxa_joint_y: solid behind the bearing arm's joint, for its screws)
+j_y = v("coxa_joint_y")
+diag = lambda y: hx0 + (y + hy) / ((b_y0 + t) + hy) * (hx1 - hx0)      # where the old slanted side reaches y
+cuts.append(prism([(hx0, g_y0 - t, 3), (hx1, g_y0 - t, 3), (hx1, j_y, 3), (diag(j_y), j_y, 4), (hx0, -hy, 4)], "xy", floor_z0 - 2, z1 - t))
 # under the plate the rear is narrower: it swings next to the board's pins
 skirt = block(-rear - 1, v("coxa_arch_x0") + 1, -rear - 8, rear + 8, floor_z0 - 2, z0).cut(
     prism([(-v("coxa_skirt_x"), 9.2, 4), (v("coxa_arch_x0") + 2, 9.2, 0), (v("coxa_arch_x0") + 2, -9.2, 0), (-v("coxa_skirt_x"), -9.2, 4)], "xy", floor_z0 - 3, z0 + 1))
@@ -142,10 +154,45 @@ def keep_sharp(e):
 
 
 main_shape = common["smooth"](shape, v("coxa_edge_r"), keep_sharp)
-main_shape = common["lead_ins"](main_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), lambda e: (
+# ------------------------------------------------------------ the bearing arm comes off
+split_x = v("coxa_split_x")
+arm_box = block(split_x, end_x + 5, b_y0 - 5, b_y1, floor_z0 - 5, arm_r + 30)
+body_shape = main_shape.cut(arm_box).removeSplitter()
+arm_shape = main_shape.common(arm_box).removeSplitter()
+head_y = v("tib_screw_head_y")                       # the head seats this far from the joint face, as in the tibia
+for x, z in ((v("coxa_screw_a_x"), v("coxa_screw_a_z")), (v("coxa_screw_b_x"), v("coxa_screw_b_z"))):
+    arm_shape = arm_shape.cut(Part.makeCompound([
+        rod(v("tib_screw_clear"), b_y1 - b_y0 + 2, (x, b_y0 - 1, z), "y"),
+        rod(v("tib_screw_head_d"), (b_y1 - head_y) - b_y0 + 1, (x, b_y0 - 1, z), "y")]))
+    body_shape = body_shape.cut(rod(v("tib_screw_d"), j_y - b_y1 + 1, (x, b_y1 - 1, z), "y"))
+
+
+def joint_face(e):
+    """Edges in the joint stay sharp (the pieces meet there), except the screw holes' mouths."""
+    bb = e.BoundBox
+    try:
+        small_hole = e.Curve.TypeId == "Part::GeomCircle" and 2 * e.Curve.Radius <= v("lead_small_d") + 1e-6
+    except Exception:
+        small_hole = False
+    on_y = bb.YLength < 1e-4 and abs(bb.YMin - b_y1) < 1e-4 and bb.XMin >= split_x - 1e-4
+    on_x = bb.XLength < 1e-4 and abs(bb.XMin - split_x) < 1e-4 and bb.YMax <= b_y1 + 1e-4
+    return (on_y or on_x) and not small_hole
+
+
+def shaft_or_joint(e):
     # the shaft and its spacer under the floor stay as they are: the spacer presses on the bearing's inner ring
-    e.BoundBox.Center.Length <= 99 and (e.BoundBox.Center.x ** 2 + e.BoundBox.Center.y ** 2) ** 0.5 <= v("fem_boss_d") / 2 + 0.2
-    and e.BoundBox.ZMax <= floor_z0 + 0.01))
+    c = e.BoundBox.Center
+    shaft = (c.x ** 2 + c.y ** 2) ** 0.5 <= v("fem_boss_d") / 2 + 0.2 and e.BoundBox.ZMax <= floor_z0 + 0.01
+    return shaft or joint_face(e)
+
+
+body_shape = common["lead_ins"](body_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), shaft_or_joint)
+arm_shape = common["lead_ins"](arm_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), joint_face)
+body = common["as_part"](doc, part, "Coxa_Body", body_shape, PLA)
+arm_part = common["as_part"](doc, part, "Coxa_Arm", arm_shape, (0.95, 0.75, 0.3))
+common["add_mirror"](doc, part, body, PLA)
+common["add_mirror"](doc, part, arm_part, (0.95, 0.75, 0.3))
+main_shape = Part.makeCompound([body_shape, arm_shape])
 main = common["as_part"](doc, part, "Coxa_Main", main_shape, PLA)
 common["add_mirror"](doc, part, main, PLA)
 common["save"](doc)
@@ -175,8 +222,10 @@ main_s = solids_of(doc, ["Coxa_Main"])
 s_y = v("joint_seat_y")
 b_y = v("fem_floor_y0") - v("fem_boss_h") - v("bearing_t")
 bb = main_shape.BoundBox
-print("coxa %.1f g solid; valid %s; solids %d; x %.1f to %.1f, y %.1f to %.1f, z %.1f to %.1f" % (
-    main_shape.Volume / 1000 * v("pla_density"), main_shape.isValid(), len(main_shape.Solids), bb.XMin, bb.XMax, bb.YMin, bb.YMax, bb.ZMin, bb.ZMax))
+print("coxa %.1f g solid (body %.1f, arm %.1f); valid %s %s; solids %d %d; x %.1f to %.1f, y %.1f to %.1f, z %.1f to %.1f" % (
+    main_shape.Volume / 1000 * v("pla_density"), body_shape.Volume / 1000 * v("pla_density"), arm_shape.Volume / 1000 * v("pla_density"),
+    body_shape.isValid(), arm_shape.isValid(), len(body_shape.Solids), len(arm_shape.Solids), bb.XMin, bb.XMax, bb.YMin, bb.YMax, bb.ZMin, bb.ZMax))
+print("overlap mm3: body and arm %.3f" % clash(body_shape.Solids, arm_shape.Solids))
 print("overlap mm3: coxa servo %.3f, coxa horn %.3f, coxa bearing %.3f, femur horn %.3f, femur bearing %.3f" % (
     clash(solids_of(doc, SERVO, Pl(0, 0, seat, SERVO_ROT)), main_s), clash(solids_of(doc, HORN, Pl(0, 0, seat, HORN_IN)), main_s),
     clash(solids_of(doc, ["Bearing_body"], Pl(0, 0, bz)), main_s),

@@ -361,6 +361,12 @@ TABLE = [
     ("coxa_hollow_y0", "8 mm", DESIGN, "hollow's half width at its inner end"),
     ("coxa_side_wall", "2 mm", DESIGN, "pockets in the solid sides next to the servo, open from below: walls left to the servo and outside"),
     ("coxa_side_roof", "2 mm", DESIGN, "those pockets' roof under the top face"),
+    ("coxa_split_x", "28 mm", DESIGN, "the bearing arm is its own print from here out (the femur can't go into a one-piece fork)"),
+    ("coxa_joint_y", "=coxa_arm_b_y1 + 5.5 mm", CALC, "solid behind the arm's joint face, for the screws (the hollow stops here)"),
+    ("coxa_screw_a_x", "31.5 mm", DESIGN, "arm screws, along Y through the arm into the coxa, on a diagonal like the tibia's"),
+    ("coxa_screw_a_z", "3.5 mm", DESIGN, "those screws"),
+    ("coxa_screw_b_x", "39.5 mm", DESIGN, "those screws"),
+    ("coxa_screw_b_z", "-3.5 mm", DESIGN, "those screws"),
 
     "Body: 2 plates. The bottom one holds the 6 coxa bearings and stands the boards and cells; the top one holds the 6 coxa horns. Columns join them, screwed with the stock servo screws (body frame: origin on the centre at femur axis height, X right, Y forward)",
     ("body_cx", "=coxa_front_x + coxa_front_x / sqrt(coxa_front_x^2 + coxa_front_y^2) * plate_inflate", CALC, "hexagon corner, plate_outline() in params.py"),

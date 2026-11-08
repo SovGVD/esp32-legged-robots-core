@@ -13,8 +13,10 @@ S = doc.getObject("Params")
 density = float(getattr(S.get("pla_density"), "Value", S.get("pla_density")))
 
 PARTS = {                           # object -> file name
-    "Coxa_Main": "coxa_R_x3.stl",
-    "Coxa_Main_L": "coxa_L_x3.stl",
+    "Coxa_Body": "coxa_R_x3.stl",
+    "Coxa_Body_L": "coxa_L_x3.stl",
+    "Coxa_Arm": "coxa_bearing_arm_R_x3.stl",
+    "Coxa_Arm_L": "coxa_bearing_arm_L_x3.stl",
     "Femur_Main": "femur_R_x3.stl",
     "Femur_Main_L": "femur_L_x3.stl",
     "Tibia_Horn": "tibia_horn_half_R_x3.stl",

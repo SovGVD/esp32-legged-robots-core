@@ -144,6 +144,8 @@ def build(case, load, bonded):
             raise ValueError("the plates did not join: %d solids" % len(shape.Solids))
     else:
         shape = src.getObject("Coxa_Main").Shape.copy()
+        if len(shape.Solids) > 1:                    # the screwed-on bearing arm, taken as glued on
+            shape = shape.Solids[0].fuse(shape.Solids[1:]).removeSplitter()
         if bonded:
             shape = with_servos(shape, (App.Placement(App.Vector(0, 0, val("coxa_seat_z")), App.Rotation(App.Vector(0, 0, 1), 90)),))
     # through STEP and back: gmsh then meshes shapes it otherwise leaves empty (the tibia's apex
