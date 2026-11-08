@@ -156,6 +156,15 @@ def footprint2d(shapes, levels):
     return slabs[0].fuse(slabs[1:]).removeSplitter() if len(slabs) > 1 else slabs[0]
 
 
+def fuse_tree(shapes):
+    """Joined two at a time: one multi-fuse of the 17 turned copies of the left middle coxa's outline lost
+    nearly all of it (4 mm3 of 6500), and the wall then ran through that coxa."""
+    shapes = list(shapes)
+    while len(shapes) > 1:
+        shapes = [shapes[i].fuse(shapes[i + 1]).removeSplitter() if i + 1 < len(shapes) else shapes[i] for i in range(0, len(shapes), 2)]
+    return shapes[0]
+
+
 print("inner wall path")
 SERVO_NAMES = ("MG90S_body", "MG90S_tabs", "MG90S_turret", "MG90S_shaft")
 w_seat = v("coxa_seat_z")
@@ -176,8 +185,11 @@ for _, x, y, yaw, side in AXES:
         t = base.copy()
         t.rotate(App.Vector(x, y, 0), App.Vector(0, 0, 1), deg)
         turns.append(t)
-    swings.append(turns[0].fuse(turns[1:]).removeSplitter())
-swing2d = flat2d(swings[0].fuse(swings[1:]).removeSplitter())
+    swing = fuse_tree(turns)
+    if swing.Volume < base.Volume:
+        raise RuntimeError("a coxa's swing came out smaller than the coxa: %.0f mm3 against %.0f" % (swing.Volume, base.Volume))
+    swings.append(swing)
+swing2d = flat2d(fuse_tree(swings))
 # the tighter clearance where the wall squeezes past: the middle legs (PCA9685 pins), the rear legs (battery
 # cartridge's corners) and the front legs (the ESP32's ends)
 mid_boxes = Part.makeCompound([Part.makeBox(60, 60, 4, App.Vector(20 if sx > 0 else -80, -30, -1)) for sx in (1, -1)] +

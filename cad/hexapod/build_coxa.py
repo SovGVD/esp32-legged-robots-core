@@ -7,13 +7,15 @@ that runs in the bearing in the body's bottom plate. Horns are glued into their 
 In the fork the femur servo's horn sits in the +Y arm and the femur's shaft runs in a bearing in the -Y arm. The cables of
 the 3 servos lie in a groove in the top face, held by 2 small bridges.
 
-The -Y (bearing) arm is a separate print, screwed on with 2 stock MG90S screws like the
+The -Y (bearing) side is a separate print, screwed on with 2 stock MG90S screws like the
 tibia halves: a one-piece fork can't take the femur, whose spline and shaft both point
-outward. Assembly: glue the horn into the +Y arm, put the bearing on the femur's shaft in
-the loose arm, push the femur's servo onto the horn, then screw the arm on.
+outward. It comes off on a plane next to the servo (coxa_cut_y) from coxa_cut_x out, a
+flat plate printed on its outer face; the coxa prints on its +Y face. Assembly: glue the
+horn into the +Y arm, put the bearing on the femur's shaft in the loose side, push the
+femur's servo onto the horn, then screw the side on.
 
   Coxa_Body  the coxa with the servo and the +Y (horn) arm
-  Coxa_Arm   the -Y (bearing) arm
+  Coxa_Arm   the -Y (bearing) side
   Coxa_Main  both together, for the checks, the body and the FEA
 
 Right leg; Coxa_Main_L is the left leg's. Leg frame: origin on the coxa axis at femur axis
@@ -68,13 +70,13 @@ seat = v("coxa_seat_z")
 
 # the horseshoe from above: around the servo only a wall wide (the rest of the coxa takes the load)
 straight = v("coxa_straight_x")
-# on the -Y side the bearing arm is a flat plate from split_x out (it prints flat), square to the line of the
-# coxa's side, which runs on to the joint plane as if the arm curved out of it (the arm's corner at waist_x)
-split_x = v("coxa_split_x")
-side_at_split = -side_y + (b_y0 + side_y) * (split_x - straight) / (waist_x - straight)
+cut_x, cut_y = v("coxa_cut_x"), v("coxa_cut_y")
 above = prism([(-rear, side_y, rear_r), (straight, side_y, 25), (waist_x, a_y1, 25), (end_x, a_y1, 0), (end_x, a_y0, 0), (fork_x, a_y0, fork_r),
-               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (split_x, b_y0, 3), (split_x, side_at_split, 0), (straight, -side_y, 25), (-rear, -side_y, rear_r)],
+               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (waist_x, b_y0, 25), (straight, -side_y, 25), (-rear, -side_y, rear_r)],
               "xy", floor_z0 - 1, arm_r + 1)
+# the bearing side is a square plate from cut_x out: its outer face flat to there, so it prints on it
+# (the curve's corner fillet reaches the arm's face only at x ~41)
+above = above.fuse(block(cut_x, fork_x - 3, b_y0, cut_y, floor_z0 - 1, arm_r + 1)).removeSplitter()
 # the arch from the side, with a round end around the femur axis
 side = prism([(-rear, z1, 3), (v("coxa_top_x"), z1, 20), (fork_x, arm_r, 20), (end_x, arm_r, arm_r), (end_x, -arm_r, arm_r),
               (fork_x, -arm_r, 12), (v("coxa_arch_x1"), z0, 10), (v("coxa_arch_x0"), floor_z0, 6), (-rear, floor_z0, 4)],
@@ -148,19 +150,19 @@ def keep_sharp(e):
 
 
 main_shape = common["smooth"](shape, v("coxa_edge_r"), keep_sharp)
-# ------------------------------------------------------------ the bearing arm comes off
-# the joint plane cuts the whole coxa: nothing of the coxa is left past it, so it prints flat on that face;
-# the arm is the plate from split_x out (the bit of the side's curve past the plane in front of it goes)
-past = block(-rear - 5, end_x + 5, b_y0 - 5, b_y1, floor_z0 - 5, arm_r + 30)
-arm_box = block(split_x, end_x + 5, b_y0 - 5, b_y1, floor_z0 - 5, arm_r + 30)
-body_shape = main_shape.cut(past).removeSplitter()
-arm_shape = main_shape.common(arm_box).removeSplitter()
+# ------------------------------------------------------------ the bearing side comes off
+# on the plane cut_y, from cut_x out: a plate with the bearing arm, printed on its outer face. In front of
+# cut_x the flare below the plane stays on the coxa (it braces the servo's far tab screw), so the coxa
+# prints on its +Y (horn arm) face
+side_box = block(cut_x, end_x + 5, b_y0 - 5, cut_y, -100, 100)
+arm_shape = main_shape.common(side_box).removeSplitter()
+body_shape = main_shape.cut(side_box).removeSplitter()
 head_y = v("tib_screw_head_y")                       # the head seats this far from the joint face, as in the tibia
 for x, z in ((v("coxa_screw_a_x"), v("coxa_screw_a_z")), (v("coxa_screw_b_x"), v("coxa_screw_b_z"))):
     arm_shape = arm_shape.cut(Part.makeCompound([
-        rod(v("tib_screw_clear"), b_y1 - b_y0 + 2, (x, b_y0 - 1, z), "y"),
-        rod(v("tib_screw_head_d"), (b_y1 - head_y) - b_y0 + 1, (x, b_y0 - 1, z), "y")]))
-    body_shape = body_shape.cut(rod(v("tib_screw_d"), j_y - b_y1 + 1, (x, b_y1 - 1, z), "y"))
+        rod(v("tib_screw_clear"), cut_y - b_y0 + 2, (x, b_y0 - 1, z), "y"),
+        rod(v("tib_screw_head_d"), (cut_y - head_y) - b_y0 + 1, (x, b_y0 - 1, z), "y")]))
+    body_shape = body_shape.cut(rod(v("tib_screw_d"), j_y - cut_y + 1, (x, cut_y - 1, z), "y"))
 
 
 def joint_face(e):
@@ -170,8 +172,9 @@ def joint_face(e):
         small_hole = e.Curve.TypeId == "Part::GeomCircle" and 2 * e.Curve.Radius <= v("lead_small_d") + 1e-6
     except Exception:
         small_hole = False
-    on_y = bb.YLength < 1e-4 and abs(bb.YMin - b_y1) < 1e-4
-    return on_y and not small_hole
+    on_y = bb.YLength < 1e-4 and abs(bb.YMin - cut_y) < 1e-4
+    on_x = bb.XLength < 1e-4 and abs(bb.XMin - cut_x) < 1e-4 and bb.YMax <= cut_y + 1e-4
+    return (on_y or on_x) and not small_hole
 
 
 def shaft_or_joint(e):
@@ -204,10 +207,10 @@ def ring_edge(r, z):
 
 body_shape = body_shape.makeChamfer(v("lead_big"), [ring_edge(v("coxa_shaft_d") / 2, tip_z)])
 body_shape = body_shape.makeChamfer(v("lead_small"), [ring_edge(v("fem_boss_d") / 2, spacer_z)])
-# alignment pins on the arm's joint face, holes for them in the coxa: the coxa prints on its joint face,
-# the arm on its outer face
+# alignment pins on the bearing side's joint face, holes for them in the coxa: the bearing side prints on
+# its outer face, pins up
 arm_shape, body_shape, pin_sites = common["align_pins"](
-    arm_shape, body_shape, [(v("coxa_pin_a_x"), v("coxa_pin_a_z")), (v("coxa_pin_b_x"), v("coxa_pin_b_z"))], b_y1, 1,
+    arm_shape, body_shape, [(v("coxa_pin_a_x"), v("coxa_pin_a_z")), (v("coxa_pin_b_x"), v("coxa_pin_b_z"))], cut_y, 1,
     v("align_pin_d"), v("align_pin_h"), v("align_hole_d"), v("align_hole_h"), v("align_hole_ch"), v("align_pin_ch"))
 print("alignment pins, (hole site solid, pin base solid) each, 1.0 is good: %s" % pin_sites)
 body = common["as_part"](doc, part, "Coxa_Body", body_shape, PLA)

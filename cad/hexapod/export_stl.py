@@ -15,8 +15,8 @@ density = float(getattr(S.get("pla_density"), "Value", S.get("pla_density")))
 PARTS = {                           # object -> file name
     "Coxa_Body": "coxa_R_x3.stl",
     "Coxa_Body_L": "coxa_L_x3.stl",
-    "Coxa_Arm": "coxa_bearing_arm_R_x3.stl",
-    "Coxa_Arm_L": "coxa_bearing_arm_L_x3.stl",
+    "Coxa_Arm": "coxa_bearing_side_R_x3.stl",
+    "Coxa_Arm_L": "coxa_bearing_side_L_x3.stl",
     "Femur_Main": "femur_R_x3.stl",
     "Femur_Main_L": "femur_L_x3.stl",
     "Tibia_Horn": "tibia_horn_half_R_x3.stl",
@@ -30,7 +30,7 @@ PARTS = {                           # object -> file name
 # parts split on a plane print on that face: the outward normal of the face that goes down
 DOWN = {
     "Tibia_Horn": (0, -1, 0), "Tibia_Horn_L": (0, 1, 0), "Tibia_Bearing": (0, 1, 0), "Tibia_Bearing_L": (0, -1, 0),
-    "Coxa_Body": (0, -1, 0), "Coxa_Body_L": (0, 1, 0), "Coxa_Arm": (0, -1, 0), "Coxa_Arm_L": (0, 1, 0),
+    "Coxa_Body": (0, 1, 0), "Coxa_Body_L": (0, -1, 0), "Coxa_Arm": (0, -1, 0), "Coxa_Arm_L": (0, 1, 0),
 }
 
 
