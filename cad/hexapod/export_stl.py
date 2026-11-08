@@ -27,13 +27,24 @@ PARTS = {                           # object -> file name
 }
 
 
-def lay_flat(shape):
-    """Turn the shape so its biggest flat face points down, then put it on z 0 around the origin."""
-    flat = [f for f in shape.Faces if f.Surface.TypeId == "Part::GeomPlane"]
-    face = max(flat, key=lambda f: f.Area)
-    n = face.normalAt(*face.Surface.parameter(face.CenterOfMass))
-    if face.Orientation == "Reversed":
-        n = -n
+# parts split on a plane print on that face: the outward normal of the face that goes down
+DOWN = {
+    "Tibia_Horn": (0, -1, 0), "Tibia_Horn_L": (0, 1, 0), "Tibia_Bearing": (0, 1, 0), "Tibia_Bearing_L": (0, -1, 0),
+    "Coxa_Arm": (0, 1, 0), "Coxa_Arm_L": (0, -1, 0),
+}
+
+
+def lay_flat(shape, down=None):
+    """Turn the shape so the given face direction (else its biggest flat face) points down, then put it
+    on z 0 around the origin."""
+    if down:
+        n = App.Vector(*down)
+    else:
+        flat = [f for f in shape.Faces if f.Surface.TypeId == "Part::GeomPlane"]
+        face = max(flat, key=lambda f: f.Area)
+        n = face.normalAt(*face.Surface.parameter(face.CenterOfMass))
+        if face.Orientation == "Reversed":
+            n = -n
     s = shape.copy()
     s.Placement = App.Placement()
     rot = App.Rotation(n, App.Vector(0, 0, -1))
@@ -50,7 +61,7 @@ for name, filename in PARTS.items():
     if obj is None:
         print("%s: not built, skipped" % name)
         continue
-    s = lay_flat(obj.Shape)
+    s = lay_flat(obj.Shape, DOWN.get(name))
     mesh = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
     mesh.write(os.path.join(out_dir, filename))
     bb = s.BoundBox
