@@ -378,7 +378,7 @@ TABLE = [
     ("coxa_groove_x0", "23 mm", DESIGN, "groove start, just past the servo's tab pocket"),
     ("coxa_edge_r", "1.2 mm", DESIGN, "rounding on the outer edges"),
     ("coxa_skirt_x", "11.5 mm", DESIGN, "under the plate the rear is narrower: it swings next to the PCA9685's pins"),
-    ("coxa_split_x", "28 mm", DESIGN, "the bearing arm is its own print from here out (the femur can't go into a one-piece fork)"),
+    ("coxa_split_x", "28 mm", DESIGN, "the bearing arm is its own print from here out, a flat plate (the femur can't go into a one-piece fork)"),
     ("coxa_joint_y", "=coxa_arm_b_y1 + 5.5 mm", CALC, "how deep the screws go into the coxa behind the arm's joint face"),
     ("coxa_pin_a_x", "31.5 mm", DESIGN, "alignment pins on the coxa's joint face, into the bearing arm, diagonal to the screws"),
     ("coxa_pin_a_z", "-3.5 mm", DESIGN, "those pins"),
