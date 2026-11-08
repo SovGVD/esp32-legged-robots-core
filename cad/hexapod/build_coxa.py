@@ -188,6 +188,11 @@ def shaft_or_joint(e):
 
 body_shape = common["lead_ins"](body_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), shaft_or_joint)
 arm_shape = common["lead_ins"](arm_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), joint_face)
+# alignment pins on the coxa's joint face, holes for them in the arm (the arm still prints flat on that face)
+body_shape, arm_shape, pin_sites = common["align_pins"](
+    body_shape, arm_shape, [(v("coxa_pin_a_x"), v("coxa_pin_a_z")), (v("coxa_pin_b_x"), v("coxa_pin_b_z"))], b_y1, -1,
+    v("align_pin_d"), v("align_pin_h"), v("align_hole_d"), v("align_hole_h"), v("align_hole_ch"), v("align_pin_ch"))
+print("alignment pins, (hole site solid, pin base solid) each, 1.0 is good: %s" % pin_sites)
 body = common["as_part"](doc, part, "Coxa_Body", body_shape, PLA)
 arm_part = common["as_part"](doc, part, "Coxa_Arm", arm_shape, (0.95, 0.75, 0.3))
 common["add_mirror"](doc, part, body, PLA)

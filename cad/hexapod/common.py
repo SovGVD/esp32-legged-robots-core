@@ -351,6 +351,31 @@ def rod(d, length, base, direction):
     return Part.makeCylinder(d / 2.0, length, App.Vector(*base), axis)
 
 
+def align_pins(pin_shape, hole_shape, sites, face_y, toward, pin_d, pin_h, hole_d, hole_h, hole_ch, pin_ch):
+    """Alignment pins on pin_shape's split face (the plane y = face_y), sticking out toward the other part
+    (toward +1 or -1 in Y), each with a chamfered tip, and the holes for them in hole_shape, each with a lead-in
+    at its mouth. sites: (x, z) of each. Returns both shapes and, per site, how much of the hole's volume found
+    solid to cut and how much of the pin's base found solid to stand on (both 1.0 when the site is good)."""
+    import Part
+    V = App.Vector
+    d = V(0, toward, 0)
+    pins, holes, report = [], [], []
+    for x, z in sites:
+        r, rh = pin_d / 2.0, hole_d / 2.0
+        body = Part.makeCylinder(r, 0.05 + pin_h - pin_ch, V(x, face_y - toward * 0.05, z), d)
+        tip = Part.makeCone(r, r - pin_ch, pin_ch, V(x, face_y + toward * (pin_h - pin_ch), z), d)
+        pins.append(body.fuse(tip))
+        hole = Part.makeCylinder(rh, hole_h + 0.5, V(x, face_y - toward * 0.5, z), d).fuse(
+            Part.makeCone(rh + hole_ch + 0.01, rh, hole_ch + 0.01, V(x, face_y - toward * 0.01, z), d))
+        holes.append(hole)
+        need = Part.makeCylinder(rh + hole_ch, hole_h + 0.3, V(x, face_y, z), d)      # the hole, a bit around it, solid now?
+        base = Part.makeCylinder(r + 0.5, 1.5, V(x, face_y - toward * 1.5, z), d)      # behind the pin
+        report.append((round(hole_shape.common(need).Volume / need.Volume, 3), round(pin_shape.common(base).Volume / base.Volume, 3)))
+    pin_out = pin_shape.fuse(pins).removeSplitter()
+    hole_out = hole_shape.cut(Part.makeCompound(holes)).removeSplitter()
+    return pin_out, hole_out, report
+
+
 def smooth(shape, size, skip):
     """Round the edges, except those skip(edge) says must stay sharp. Whatever the kernel
     refuses to round gets a chamfer if it can; the rest stay sharp, and are counted."""

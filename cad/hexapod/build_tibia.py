@@ -151,6 +151,11 @@ def split_face(e):
 print("lead-ins")
 horn_shape = common["lead_ins"](horn_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), split_face)
 bear_shape = common["lead_ins"](bear_shape, v("lead_small"), v("lead_big"), v("lead_small_d"), split_face)
+# alignment pins on the bearing half's split face, holes for them in the horn half (as in the old tibia)
+bear_shape, horn_shape, pin_sites = common["align_pins"](
+    bear_shape, horn_shape, [(v("tib_pin_a_x"), v("tib_pin_a_z")), (v("tib_pin_b_x"), v("tib_pin_b_z"))], 0.0, 1,
+    v("align_pin_d"), v("align_pin_h"), v("align_hole_d"), v("align_hole_h"), v("align_hole_ch"), v("align_pin_ch"))
+print("alignment pins, (hole site solid, pin base solid) each, 1.0 is good: %s" % pin_sites)
 horn = common["as_part"](doc, part, "Tibia_Horn", horn_shape, COL_A)
 bear = common["as_part"](doc, part, "Tibia_Bearing", bear_shape, COL_B)
 common["add_mirror"](doc, part, horn, COL_A)
