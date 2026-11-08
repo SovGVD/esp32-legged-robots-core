@@ -174,14 +174,20 @@ common["add_mirror"](doc, part, horn, COL_A)
 common["add_mirror"](doc, part, bear, COL_B)
 
 # ------------------------------------------------------------ the presser
-# the old TibiaTip above its foot (its axis was already at y 0), on a foot as big as the shank's end:
-# the old one was a ball of 4 cut flat 1 mm above its centre (old z -105), this one the same with tip_foot_r
+# the old TibiaTip above its foot (its axis was already at y 0) on a stem tip_foot_drop longer, on a foot as big
+# as the shank's end: the old foot was a ball of 4 cut flat 1 mm above its centre (old z -105), this one the
+# same with tip_foot_r, its top at old z -105 - drop
 _old = Part.Shape()
 _old.read(os.path.join(HERE, "old_tip", "presser.brep"))
-# (|y| <= 2.95: drops its "forPrinter" pad, a 0.1 x 0.1 x 3 sliver that pokes out of the stem into the tibia)
-_top = _old.common(Part.makeBox(20, 5.9, 20, App.Vector(-10, -2.95, -105.0)))
-_ball = Part.makeSphere(v("tip_foot_r"), App.Vector(0, 0, -106.0)).common(Part.makeBox(30, 30, 30, App.Vector(-15, -15, -135.0)))
-presser_shape = _top.fuse(_ball).removeSplitter()
+_drop = v("tip_foot_drop")
+# (|y| <= 2.95: drops its "forPrinter" pad, a 0.1 x 0.1 x 3 sliver that pokes out of the stem into the tibia;
+# from z -104.5 up: the stem's flare into the old foot goes, the stem runs straight down to the new foot)
+_top = _old.common(Part.makeBox(20, 5.9, 20, App.Vector(-10, -2.95, -104.5)))
+_stem = Part.Face(max(_old.slice(App.Vector(0, 0, 1), -104.4), key=lambda w: w.Area if hasattr(w, "Area") else w.BoundBox.DiagonalLength))
+_stem.translate(App.Vector(0, 0, -105.0 - _drop - (-104.4)))
+_stem = _stem.extrude(App.Vector(0, 0, 0.6 + _drop + 0.01)).common(Part.makeBox(20, 5.9, 20, App.Vector(-10, -2.95, -120)))  # (no sliver)
+_ball = Part.makeSphere(v("tip_foot_r"), App.Vector(0, 0, -106.0 - _drop)).common(Part.makeBox(30, 30, 30, App.Vector(-15, -15, -135.0 - _drop)))
+presser_shape = _top.fuse([_stem, _ball]).removeSplitter()
 presser_shape.translate(App.Vector(0, 0, v("tip_old_dz")))
 presser = common["as_part"](doc, part, "Tibia_Presser", presser_shape, COL_TIP)
 common["save"](doc)
