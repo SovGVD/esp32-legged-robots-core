@@ -9,7 +9,7 @@ in the middle of the split, which opens into the fork, so no slot cuts an outer 
 
   Tibia_Horn     +Y half, the tibia servo's horn is glued in its pocket
   Tibia_Bearing  -Y half, the femur's knee shaft runs in the bearing in it
-  Tibia_Presser  the old TibiaTip: half-sphere foot, held between the halves by a pin through its slot
+  Tibia_Presser  the old TibiaTip on a bigger foot, held between the halves by a pin through its slot
 
 Each half prints flat on its split face. Right leg; the _L mirrors are the left leg's.
 Tibia frame: origin on the knee axis, -Z down the tibia, horn on +Y.
@@ -84,6 +84,8 @@ def old_tip(name, dy):
 voids = old_tip("voids.brep", -12.0)        # the old tibia's axis was at y 12
 vb = voids.BoundBox
 top_z = v("switch_top_z")
+# only the -X lead slot: the +X one ran up next to the lower screw (the switch's pins on that side get cut off)
+voids = voids.cut(block(1.65, vb.XMax + 1, vb.YMin - 1, vb.YMax + 1, top_z + 0.1, vb.ZMax + 1)).removeSplitter()
 tip_cuts = [
     voids,
     block(-v("wire_void_x") / 2, v("wire_void_x") / 2, -v("wire_void_y") / 2, v("wire_void_y") / 2, v("tip_wire_z0"), v("wire_exit_z") + 8),
@@ -153,7 +155,15 @@ common["add_mirror"](doc, part, horn, COL_A)
 common["add_mirror"](doc, part, bear, COL_B)
 
 # ------------------------------------------------------------ the presser
-presser_shape = old_tip("presser.brep", 0.0)     # its axis was already at y 0
+# the old TibiaTip above its foot (its axis was already at y 0), on a foot as big as the shank's end:
+# the old one was a ball of 4 cut flat 1 mm above its centre (old z -105), this one the same with tip_foot_r
+_old = Part.Shape()
+_old.read(os.path.join(HERE, "old_tip", "presser.brep"))
+# (|y| <= 2.95: drops its "forPrinter" pad, a 0.1 x 0.1 x 3 sliver that pokes out of the stem into the tibia)
+_top = _old.common(Part.makeBox(20, 5.9, 20, App.Vector(-10, -2.95, -105.0)))
+_ball = Part.makeSphere(v("tip_foot_r"), App.Vector(0, 0, -106.0)).common(Part.makeBox(30, 30, 30, App.Vector(-15, -15, -135.0)))
+presser_shape = _top.fuse(_ball).removeSplitter()
+presser_shape.translate(App.Vector(0, 0, v("tip_old_dz")))
 presser = common["as_part"](doc, part, "Tibia_Presser", presser_shape, COL_TIP)
 common["save"](doc)
 
