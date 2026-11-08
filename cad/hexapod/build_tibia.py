@@ -187,7 +187,16 @@ _stem = Part.Face(max(_old.slice(App.Vector(0, 0, 1), -104.4), key=lambda w: w.A
 _stem.translate(App.Vector(0, 0, -105.0 - _drop - (-104.4)))
 _stem = _stem.extrude(App.Vector(0, 0, 0.6 + _drop + 0.01)).common(Part.makeBox(20, 5.9, 20, App.Vector(-10, -2.95, -120)))  # (no sliver)
 _ball = Part.makeSphere(v("tip_foot_r"), App.Vector(0, 0, -106.0 - _drop)).common(Part.makeBox(30, 30, 30, App.Vector(-15, -15, -135.0 - _drop)))
-presser_shape = _top.fuse([_stem, _ball]).removeSplitter()
+_body = _top.fuse(_stem).removeSplitter()
+# grown tip_presser_grow_x / _y a side across (heights kept), so it doesn't wobble in its pockets: scaled across
+# about its axis (it is a 5.6 x 5.8 block around it; shifted copies fused, as for the pockets, lose volume here)
+_gx, _gy = v("tip_presser_grow_x"), v("tip_presser_grow_y")
+if _gx > 0 or _gy > 0:
+    _sec = _body.common(Part.makeBox(30, 30, 0.01, App.Vector(-15, -15, -102.0))).BoundBox
+    _m = App.Matrix()
+    _m.scale(1 + _gx / _sec.XMax, 1 + _gy / _sec.YMax, 1)
+    _body = _body.transformGeometry(_m)
+presser_shape = _body.fuse(_ball).removeSplitter()
 presser_shape.translate(App.Vector(0, 0, v("tip_old_dz")))
 presser = common["as_part"](doc, part, "Tibia_Presser", presser_shape, COL_TIP)
 common["save"](doc)

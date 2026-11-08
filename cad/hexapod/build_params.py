@@ -331,6 +331,8 @@ TABLE = [
     ("tip_foot_z", "=-tibia_len + tip_foot_r", CALC, "centre of the round end"),
     ("old_tibia_len", "110 mm", OLD1, "the old (gear) hexapod's tibia: the frame of old_tip/*.brep, the switch and presser copied as they are"),
     ("tip_fit", "0.2 mm", DESIGN, "the old tip's pockets grown this much a side across (X, Y; heights kept): as copied the switch had 0.01 a side, the presser and pin 0.1, and the print didn't fit"),
+    ("tip_presser_grow_x", "0.25 mm", DESIGN, "the presser grown this much a side in X (heights kept): it had 0.3-0.4 a side in its pockets and wobbled in the assembled tibia, 0.15 left"),
+    ("tip_presser_grow_y", "0.15 mm", DESIGN, "the same in Y (it had 0.3 there), 0.15 left"),
     ("tip_foot_drop", "0.5 mm", DESIGN, "the presser's foot sits this much lower on a longer stem than the old TibiaTip's: its top clears the shank's end by 0.85, not 0.35 (print 2 stuck)"),
     ("tip_old_dz", "=106 mm + tip_foot_drop + tip_foot_r - tibia_len", CALC, "old_tip goes up this far: the foot's top (old z -105, lowered by tip_foot_drop) 1 mm above its centre, its bottom at the tibia's end"),
     ("tip_stop_z", "=-97.6 mm + tip_old_dz", OLD1, "top of the presser's pocket (tibiaCutForTip): the presser stops under it"),
