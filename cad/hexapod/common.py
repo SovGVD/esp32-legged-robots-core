@@ -285,7 +285,8 @@ def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
         edges = match(result)
         try:
             trial = result.makeChamfer(size, edges)
-            ok = trial.isValid() and len(trial.Solids) == len(result.Solids)
+            # a chamfer only removes material: a result that grew is the kernel's garbage (a stray sheet)
+            ok = trial.isValid() and len(trial.Solids) == len(result.Solids) and trial.Volume <= result.Volume + 1e-6
         except Exception:
             ok = False
         if ok:
@@ -294,7 +295,7 @@ def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
         for e in edges:
             try:
                 trial = result.makeChamfer(size, [m for m in result.Edges if m.isSame(e)] or match_one(result, e))
-                if trial.isValid() and len(trial.Solids) == len(result.Solids):
+                if trial.isValid() and len(trial.Solids) == len(result.Solids) and trial.Volume <= result.Volume + 1e-6:
                     result, done = trial, done + 1
             except Exception:
                 pass

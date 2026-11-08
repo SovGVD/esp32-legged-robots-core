@@ -389,6 +389,11 @@ for side in (-1, 1):
     front = block(-half_w - 3, half_w + 3, -60, 60, -t_pcb, 60)        # nothing of the mount in front of a board
     front.Placement = pl
     fronts.append(front)
+    # a pocket for the parts on the board's back: the board sits on its ears
+    tof_hl, tof_hw = v("tof_len") / 2 + fit, v("tof_wid") / 2 + fit
+    parts = block(-tof_hl, tof_hl, off - tof_hw, off + tof_hw, -t_pcb - v("tof_back_parts_t") - 0.3, -t_pcb + 0.01)
+    parts.Placement = pl
+    mount_cuts.append(parts)
     for sx in (-1, 1):
         pilot = rod(v("mg90_screw_pilot_d"), v("tof_screw_depth") + 0.5, (sx * span / 2, off, -t_pcb - v("tof_screw_depth")), "z")
         pilot.Placement = pl

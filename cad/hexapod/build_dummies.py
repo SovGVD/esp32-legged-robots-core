@@ -164,7 +164,13 @@ def vl53l5cx(i):
         d.cyl("hole_" + sub, p("tof_hole_d"), "%s + 0.1 mm" % t, x, off, "-" + t, BLACK)
     d.cbox("pin_row", p("tof_pin_row_len"), p("tof_pin_row_w"), "0.1 mm", "0 mm",
            "%s + %s" % (off, p("tof_pin_row_off")), "0 mm", GOLD)
-    d.cbox("sensor", p("tof_chip_w"), p("tof_chip_h"), p("tof_chip_t"), "0 mm", "0 mm", "0 mm", BLACK)
+    # the black cover: a base glued to the board and a narrower top, centred on the sensor
+    d.cbox("cover_base", p("tof_cover_base_w"), p("tof_cover_base_h"), p("tof_cover_base_t"), "0 mm", "0 mm", "0 mm", BLACK)
+    d.cbox("sensor", p("tof_cover_w"), p("tof_cover_h"), "%s - %s" % (p("tof_cover_t"), p("tof_cover_base_t")), "0 mm", "0 mm",
+           p("tof_cover_base_t"), BLACK)
+    # parts on the back, over most of the rectangle
+    d.cbox("back_parts", "%s - 1 mm" % p("tof_len"), "%s - 1 mm" % p("tof_wid"), p("tof_back_parts_t"), "0 mm", off,
+           "-(%s + %s)" % (t, p("tof_back_parts_t")), GREY)
 
 
 def microswitch(i):
