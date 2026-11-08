@@ -69,23 +69,22 @@ for name, filename in PARTS.items():
                                                               s.Volume / 1000 * density, s.isValid()))
 
 # ------------------------------------------------------------ tmp_: test prints, a short piece of a part
-# The tibia's tip only (both halves, from the foot up past the upper screw, so they screw together): to try
-# the switch, its lead slot, the pin and the presser before printing whole tibias. Print 1 presser from
-# tibia_presser_x6.stl with it.
+# The tibia's tip only, from the foot up past the upper screw (so the halves screw together), and its
+# presser: to try the switch, its lead slot, the pin and the presser before printing whole tibias.
+# One file each, to be placed on the bed by hand.
 import Part
 TIP_TEST_TOP = float(getattr(S.get("tib_screw_b_z"), "Value", S.get("tib_screw_b_z"))) + 3.0
-pieces, x = [], 0.0
-for name in ("Tibia_Horn", "Tibia_Bearing"):
-    sh = doc.getObject(name).Shape.common(Part.makeBox(60, 60, 60, App.Vector(-30, -30, TIP_TEST_TOP - 60)))
-    sh = lay_flat(sh, DOWN.get(name))
-    sh.translate(App.Vector(x - sh.BoundBox.XMin, -sh.BoundBox.Center.y, 0))
-    x = sh.BoundBox.XMax + 5.0
-    pieces.append(sh)
-test = Part.makeCompound(pieces)
-test.translate(App.Vector(-test.BoundBox.Center.x, 0, 0))
-mesh = MeshPart.meshFromShape(Shape=test, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
-mesh.write(os.path.join(out_dir, "tmp_tibia_tip_test.stl"))
-bb = test.BoundBox
-print("%-30s %5.1f x %5.1f x %5.1f mm  %4.1f g  (both tip halves, cut at z %.1f)" % (
-    "tmp_tibia_tip_test.stl", bb.XLength, bb.YLength, bb.ZLength, test.Volume / 1000 * density, TIP_TEST_TOP))
+cut = Part.makeBox(60, 60, 60, App.Vector(-30, -30, TIP_TEST_TOP - 60))
+for name, filename, down, keep in (("Tibia_Horn", "tmp_tibia_tip_horn_half.stl", DOWN["Tibia_Horn"], cut),
+                                   ("Tibia_Bearing", "tmp_tibia_tip_bearing_half.stl", DOWN["Tibia_Bearing"], cut),
+                                   ("Tibia_Presser", "tmp_tibia_tip_presser.stl", (0, 0, -1), None)):
+    sh = doc.getObject(name).Shape
+    sh = lay_flat(sh.common(keep) if keep else sh, down)
+    mesh = MeshPart.meshFromShape(Shape=sh, LinearDeflection=0.02, AngularDeflection=0.1, Relative=False)
+    mesh.write(os.path.join(out_dir, filename))
+    bb = sh.BoundBox
+    print("%-30s %5.1f x %5.1f x %5.1f mm  %4.1f g" % (filename, bb.XLength, bb.YLength, bb.ZLength, sh.Volume / 1000 * density))
+old = os.path.join(out_dir, "tmp_tibia_tip_test.stl")
+if os.path.exists(old):
+    os.remove(old)
 print(out_dir)
