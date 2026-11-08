@@ -82,6 +82,18 @@ def old_tip(name, dy):
 
 
 voids = old_tip("voids.brep", -12.0)        # the old tibia's axis was at y 12
+# grown tip_fit a side across (X and Y), heights kept: copies moved by +-fit in X and Y, joined (a square brush)
+_f = v("tip_fit")
+if _f > 0:
+    _moved = []
+    for dx in (-_f, 0.0, _f):
+        for dy in (-_f, 0.0, _f):
+            if dx or dy:
+                _c = voids.copy()
+                _c.translate(App.Vector(dx, dy, 0))
+                _moved.append(_c)
+    voids = voids.fuse(_moved).removeSplitter()
+    voids = max(voids.Solids, key=lambda s_: s_.Volume) if len(voids.Solids) > 1 else voids
 vb = voids.BoundBox
 top_z = v("switch_top_z")
 # only the -X lead slot: the +X one ran up next to the lower screw (the switch's pins on that side get cut off).
