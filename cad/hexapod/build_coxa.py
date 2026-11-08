@@ -57,7 +57,7 @@ end_x = fl + arm_r
 a_y0, a_y1 = v("coxa_arm_a_y0"), v("coxa_arm_a_y1")
 b_y1 = v("coxa_arm_b_y1")
 b_y0 = v("coxa_arm_b_y0")
-rear = v("coxa_rear_r")
+rear, side_y, rear_r = v("coxa_tail_x"), v("coxa_side_y"), v("coxa_rear_corner_r")
 waist_x, waist_r = v("coxa_waist_x"), v("coxa_waist_r")
 fork_x = v("coxa_cross_x1")
 fork_r = v("coxa_fork_r")
@@ -66,10 +66,10 @@ floor_z0 = v("coxa_floor_z0")
 floor_in = floor_z0 + v("coxa_floor_t")
 seat = v("coxa_seat_z")
 
-# the horseshoe from above
+# the horseshoe from above: around the servo only a wall wide (the rest of the coxa takes the load)
 straight = v("coxa_straight_x")
-above = prism([(-rear, rear, rear), (straight, rear, 25), (waist_x, a_y1, 25), (end_x, a_y1, 0), (end_x, a_y0, 0), (fork_x, a_y0, fork_r),
-               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (waist_x, b_y0, 25), (straight, -rear, 25), (-rear, -rear, rear)],
+above = prism([(-rear, side_y, rear_r), (straight, side_y, 25), (waist_x, a_y1, 25), (end_x, a_y1, 0), (end_x, a_y0, 0), (fork_x, a_y0, fork_r),
+               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (waist_x, b_y0, 25), (straight, -side_y, 25), (-rear, -side_y, rear_r)],
               "xy", floor_z0 - 1, arm_r + 1)
 # the arch from the side, with a round end around the femur axis
 side = prism([(-rear, z1, 3), (v("coxa_top_x"), z1, 20), (fork_x, arm_r, 20), (end_x, arm_r, arm_r), (end_x, -arm_r, arm_r),
@@ -113,28 +113,13 @@ g_x0 = v("coxa_groove_x0")
 # stress. (A cylinder tangent to a box crashes FreeCAD's rounding step.)
 g_floor = z1 - v("coxa_groove_d")
 cuts.append(prism([(g_y0, g_floor, 1.5), (g_y1, g_floor, 1.5), (g_y1, arm_r + 2, 0), (g_y0, arm_r + 2, 0)], "yz", g_x0, fork_x + 1))
-# hollow it from underneath, leaving walls all around and the top under the cable groove
-t = v("coxa_shell_t")
-hx0, hx1 = v("coxa_hollow_x0"), v("coxa_hollow_x1")
-hy = v("coxa_hollow_y0")
-# (on the -Y side it stops at coxa_joint_y: solid behind the bearing arm's joint, for its screws)
+# solid otherwise: the slicer's infill fills it, with no overhangs inside to support
+# (the -Y side is solid behind the bearing arm's joint face this far, for its screws)
 j_y = v("coxa_joint_y")
-diag = lambda y: hx0 + (y + hy) / ((b_y0 + t) + hy) * (hx1 - hx0)      # where the old slanted side reaches y
-cuts.append(prism([(hx0, g_y0 - t, 3), (hx1, g_y0 - t, 3), (hx1, j_y, 3), (diag(j_y), j_y, 4), (hx0, -hy, 4)], "xy", floor_z0 - 2, z1 - t))
 # under the plate the rear is narrower: it swings next to the board's pins
 skirt = block(-rear - 1, v("coxa_arch_x0") + 1, -rear - 8, rear + 8, floor_z0 - 2, z0).cut(
     prism([(-v("coxa_skirt_x"), 9.2, 4), (v("coxa_arch_x0") + 2, 9.2, 0), (v("coxa_arch_x0") + 2, -9.2, 0), (-v("coxa_skirt_x"), -9.2, 4)], "xy", floor_z0 - 3, z0 + 1))
 cuts.append(skirt)
-# pockets in the solid sides beside the servo (the stress map there is near zero), open from below
-sw_ = v("coxa_side_wall")
-keep_y = hw + sw_                                 # wall left next to the servo and its tabs
-out_r = rear - sw_                                # wall left inside the rounded rear outline
-side_x1 = v("coxa_hollow_x0") - sw_                # (ending them 4 mm short of the servo's far corner changed nothing in the FEA)
-for sg in (1, -1):
-    y_in, y_out = sg * keep_y, sg * out_r
-    pk = block(-out_r, side_x1, min(y_in, y_out), max(y_in, y_out), z0 - 1, z1 - v("coxa_side_roof")).common(
-        rod(2 * out_r, z1 - z0 + 2, (0, 0, z0 - 2), "z").fuse(block(0, side_x1 + 1, -out_r, out_r, z0 - 2, z1)))
-    cuts.append(pk)
 shape = shape.cut(Part.makeCompound(cuts)).removeSplitter()
 # 2 small bridges over the groove
 bridges = [block(x, x + 3, g_y0 - 0.1, g_y1 + 0.1, z1 - 1.4, z1) for x in (g_x0 + 6, g_x0 + 16)]

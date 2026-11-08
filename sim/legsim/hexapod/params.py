@@ -90,23 +90,23 @@ class HexGeometry:
     femur_axis_z: float = -BOTTOM_Z  # body origin above the bottom of the body [design]
     torso_size: tuple = (110.0, 150.0, TOP_Z + 3 - BOTTOM_Z)   # collision box [design]
     torso_z: float = (TOP_Z + 3 + BOTTOM_Z) / 2                # box centre relative to the body origin
-    foot_radius: float = 4.0        # half-sphere foot, the old TibiaTip presser [CAD]
+    foot_radius: float = 6.0        # half-sphere foot on the old TibiaTip presser, made as wide as the tibia [CAD]
     femur_width: float = 7.0        # collision capsule radius, only the floor collides [est]
     tibia_width: float = 5.0
 
 
 @dataclass
 class HexMasses:
-    """Grams, ~1105 g in all. Legs: coxa print 32.1 + its servo 13.4; femur print
-    20.3 + 2 servos; tibia prints 14.9 + foot switch 2 [CAD, cad/hexapod, solid PLA:
+    """Grams, ~1110 g in all. Legs: coxa print 31.9 (solid, a 3 mm wall around its servo) + its servo 13.4; femur print
+    21.1 + 2 servos; tibia prints 15.1 (halves and presser) + foot switch 2 [CAD, cad/hexapod, solid PLA:
     real prints with infill come out somewhat lighter]. Body: plates, columns, ToF mount, battery cartridge and latches 125 [CAD], cells,
     boards, screws, wires [design]."""
     torso: float = 448.1
     battery: float = 100.0      # 2x 18650 (~47 g each) + holder [ds, est]
     electronics: float = 57.0   # ESP32, 2x PCA9685, 7x Mini360, GY-91, INA219, 2x VL53L5CX, fuse, switch [est]
-    coxa: float = 45.5
-    femur: float = 47.1
-    tibia: float = 16.9
+    coxa: float = 45.3
+    femur: float = 47.9
+    tibia: float = 17.1
 
     def total(self) -> float:
         return self.torso + 6 * (self.coxa + self.femur + self.tibia)
