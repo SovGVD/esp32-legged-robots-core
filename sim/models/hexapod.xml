@@ -86,7 +86,7 @@
       <body name="LF_femur" pos="0.06 0 0">
         <joint name="LF_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="LF_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="LF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0212" rgba="0.88 0.64 0.12 1"/>
+        <geom name="LF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
 <geom name="LF_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LF_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LF_femur_look" type="mesh" mesh="cad_femur_L" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -113,7 +113,7 @@
       <body name="LM_femur" pos="0.06 0 0">
         <joint name="LM_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="LM_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="LM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0212" rgba="0.88 0.64 0.12 1"/>
+        <geom name="LM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
 <geom name="LM_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LM_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LM_femur_look" type="mesh" mesh="cad_femur_L" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -140,7 +140,7 @@
       <body name="LR_femur" pos="0.06 0 0">
         <joint name="LR_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="LR_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="LR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0212" rgba="0.88 0.64 0.12 1"/>
+        <geom name="LR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
 <geom name="LR_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LR_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LR_femur_look" type="mesh" mesh="cad_femur_L" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -167,7 +167,7 @@
       <body name="RF_femur" pos="0.06 0 0">
         <joint name="RF_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="RF_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="RF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0212" rgba="0.88 0.64 0.12 1"/>
+        <geom name="RF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
 <geom name="RF_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RF_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RF_femur_look" type="mesh" mesh="cad_femur_R" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -194,7 +194,7 @@
       <body name="RM_femur" pos="0.06 0 0">
         <joint name="RM_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="RM_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="RM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0212" rgba="0.88 0.64 0.12 1"/>
+        <geom name="RM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
 <geom name="RM_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RM_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RM_femur_look" type="mesh" mesh="cad_femur_R" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -221,7 +221,7 @@
       <body name="RR_femur" pos="0.06 0 0">
         <joint name="RR_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="RR_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="RR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0212" rgba="0.88 0.64 0.12 1"/>
+        <geom name="RR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
 <geom name="RR_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RR_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RR_femur_look" type="mesh" mesh="cad_femur_R" class="look" rgba="0.2 0.55 0.75 1"/>

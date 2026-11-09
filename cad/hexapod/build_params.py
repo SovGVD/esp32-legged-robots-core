@@ -292,7 +292,8 @@ TABLE = [
     ("sw_tube_z", "0 mm", DESIGN, "upright tube for the foot switch's lead on the femur's knee end, past the knee axis: its centre height. The lead comes up from the tibia's fork through it and back along the +Z edge to the channel (it replaces a channel along the whole -Z face)"),
     ("sw_tube_len", "8 mm", DESIGN, "the tube's length, a third of the old channel"),
     ("sw_tube_bore", "3.6 mm", DESIGN, "its bore: the 2-wire lead, 2.8 x 1.4"),
-    ("sw_tube_wall", "1.4 mm", DESIGN, "its wall"),
+    ("sw_tube_wall", "2.4 mm", DESIGN, "its wall (1.4 looked thin)"),
+    ("sw_tube_blend", "3 mm", DESIGN, "concave fillet where the tube meets the femur's end face, both sides"),
 
     "Tibia: 2 flat halves split on the leg plane and screwed together; the switch sits inside the tip and a presser trapped between the halves pushes it (tibia frame: origin on the knee axis, -Z down the tibia, horn on +Y)",
     ("tib_arm_w", "18 mm", DESIGN, "arm width in X, around the bearing seat"),

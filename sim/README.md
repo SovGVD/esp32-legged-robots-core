@@ -277,7 +277,7 @@ The 2026-11 design ("Recommended" in the body study), not built yet: hexagon
 body, coxa / femur / tibia 60 / 50 / 60 mm, 18 MG90S straight on the joints
 (no gears), 2x 18650 at the bottom centre, a PCA9685 + 3 Mini360 board along
 each side, the ESP32 across the front, GY-91 under the top cover, two VL53L5CX
-at the front (+-20 deg), switch feet, ~1138 g. The front legs open 20 deg
+at the front (+-20 deg), switch feet, ~1139 g. The front legs open 20 deg
 wider than the others so the ToFs see past them. The old geared hexapod
 (STL parts, 35 / 55 / 110 legs) is gone from the firmware and the sim.
 
@@ -313,7 +313,7 @@ in the firmware leg order LF, LM, LR, RF, RM, RR (not the PCA9685 channel).
 | Look: the CAD parts, meshes in `models/meshes/hexapod` (`cad/hexapod/export_sim_meshes.py`) | `cad/hexapod` | No mass; the masses are boxes and cylinders in `legsim/hexapod/simple_parts.py`, hidden in geom group 4 |
 | MG90S at 5 V: 1.87 kg cm stall, 0.093 s/60 deg | datasheet (1.8 @ 4.8 V, 2.2 @ 6 V) | Not measured; clones are often weaker |
 | Pulse -> angle: 500-2500 us over 0-180 deg | `model_data.h` | Linear until measured |
-| Masses: 1138 g | prints from `cad/hexapod` (solid PLA), the rest a design estimate | Per leg: coxa 50.2, femur 48.0, tibia 17.1 g (servos 13.4 g each; the femur carries 2) |
+| Masses: 1139 g | prints from `cad/hexapod` (solid PLA), the rest a design estimate | Per leg: coxa 50.2, femur 48.1, tibia 17.1 g (servos 13.4 g each; the femur carries 2) |
 | Servo directions | the inverse flags (right legs mirrored) | Nothing to check against until it is built |
 
 What the sim says (`tests/test_hexapod.py`):

@@ -107,10 +107,30 @@ for n in (0, 2):
     solid.append(box("bridge_%d" % n, p("chan_finger_len"), "(%s) - (%s)" % (y1, y0), p("chan_finger_t"), x, y0, finger_z))
 
 # the foot switch's lead: a short upright tube on the knee end, past the knee axis. The lead comes up from the
-# tibia's fork into it, then runs back along the +Z edge into the channel with the servo cables
-tube_x = "%s + %s / 2 - 0.3 mm" % (p("fem_plate_x1"), p("sw_tube_bore"))   # the bore just touches into the end face
-tube_z = "%s - %s / 2" % (p("sw_tube_z"), p("sw_tube_len"))
-solid.append(cyl("sw_tube", "%s + 2 * %s" % (p("sw_tube_bore"), p("sw_tube_wall")), p("sw_tube_len"), tube_x, chan_mid, tube_z))
+# tibia's fork into it, then runs back along the +Z edge into the channel with the servo cables. From above it is
+# a lug: the tube's round blends into the end face with a concave fillet each side
+def num(alias):
+    x = doc.getObject("Params").get(alias)
+    return float(getattr(x, "Value", x))
+
+
+import Part
+x_end, ny0, ny1 = num("fem_plate_x1"), num("fem_plate_y0"), num("fem_plate_y1")
+t_r = num("sw_tube_bore") / 2 + num("sw_tube_wall")
+t_x = x_end + num("sw_tube_bore") / 2 - 0.3                 # the bore just touches into the end face
+t_y = (ny0 + ny1) / 2
+t_z0 = num("sw_tube_z") - num("sw_tube_len") / 2
+blend = num("sw_tube_blend")
+outline = Part.Face(Part.Wire(Part.makeCircle(t_r, App.Vector(t_x, t_y, 0)))).fuse(
+    Part.makePlane(10, ny1 - ny0, App.Vector(x_end - 10, ny0, 0))).removeSplitter().Faces[0]
+outline = outline.makeOffset2D(blend, join=0).makeOffset2D(-blend, join=0)      # closing: concave fillets where they meet
+outline = outline.common(Part.makePlane(t_x + t_r + 1 - (x_end - 1), ny1 - ny0, App.Vector(x_end - 1, ny0, 0))).Faces[0]
+lug = doc.addObject("Part::Feature", "FemurPrim_sw_lug")
+part.addObject(lug)
+lug.Shape = outline.extrude(App.Vector(0, 0, num("sw_tube_len"))).translated(App.Vector(0, 0, t_z0))
+lug.ViewObject.Visibility = False
+solid.append(lug)
+tube_x, tube_z = "%.4f mm" % t_x, "%.4f mm" % t_z0
 sw_bore = cyl("sw_tube_bore", p("sw_tube_bore"), "%s + 2 mm" % p("sw_tube_len"), tube_x, chan_mid, "%s - 1 mm" % tube_z)
 
 win_h = "%s + 2 * %s" % (p("mg90_body_w"), p("mg90_fit_w"))
