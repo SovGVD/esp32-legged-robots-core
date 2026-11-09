@@ -5,13 +5,14 @@ femur; from the side an arch under it. The servo sits in a pocket cut into that.
 The servo's horn fixes to the body's top plate. A floor under the servo carries a shaft
 that runs in the bearing in the body's bottom plate. Horns are glued into their pockets.
 In the fork the femur servo's horn sits in the +Y arm and the femur's shaft runs in a bearing in the -Y arm. The cables of
-the femur's 2 servos and the foot switch lie in a groove in the top face, held by 2 small bridges; with the coxa
-servo's own cable they go on to the slot in the body's inner wall.
+the femur's 2 servos and the foot switch go down a hole through the coxa, beside the servo, to where the coxa servo's own
+cable comes out under the coxa (the servo's pocket opens through the arch there); the 4 are zip-tied together there.
 
 The -Y (bearing) side is a separate print, screwed on with 2 stock MG90S screws like the
 tibia halves: a one-piece fork can't take the femur, whose spline and shaft both point
 outward. It comes off on a plane next to the servo (coxa_cut_y) from coxa_cut_x out, a
-flat plate printed on its outer face; the coxa prints on its +Y face. Assembly: glue the
+flat plate printed on its outer face; the coxa prints on its +Y face. The coxa's outline on that side curves out
+to the plate's face before coxa_cut_x, so the two meet flush. The screw heads sit 2 mm over the joint face. Assembly: glue the
 horn into the +Y arm, put the bearing on the femur's shaft in the loose side, push the
 femur's servo onto the horn, then screw the side on.
 
@@ -72,12 +73,12 @@ seat = v("coxa_seat_z")
 # the horseshoe from above: around the servo only a wall wide (the rest of the coxa takes the load)
 straight = v("coxa_straight_x")
 cut_x, cut_y = v("coxa_cut_x"), v("coxa_cut_y")
+# the bearing side is a square plate from cut_x out, printed on its flat outer face: on that side the curve
+# reaches the face before cut_x (its round ends at x ~26), so the coxa and the plate meet flush
+flare_x = v("coxa_flare_x")
 above = prism([(-rear, side_y, rear_r), (straight, side_y, 25), (waist_x, a_y1, 25), (end_x, a_y1, 0), (end_x, a_y0, 0), (fork_x, a_y0, fork_r),
-               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (waist_x, b_y0, 25), (straight, -side_y, 25), (-rear, -side_y, rear_r)],
+               (fork_x, b_y1, fork_r), (end_x, b_y1, 0), (end_x, b_y0, 0), (flare_x, b_y0, 15), (straight, -side_y, 25), (-rear, -side_y, rear_r)],
               "xy", floor_z0 - 1, arm_r + 1)
-# the bearing side is a square plate from cut_x out: its outer face flat to there, so it prints on it
-# (the curve's corner fillet reaches the arm's face only at x ~41)
-above = above.fuse(block(cut_x, fork_x - 3, b_y0, cut_y, floor_z0 - 1, arm_r + 1)).removeSplitter()
 # the arch from the side, with a round end around the femur axis
 side = prism([(-rear, z1, 3), (v("coxa_top_x"), z1, 20), (fork_x, arm_r, 20), (end_x, arm_r, arm_r), (end_x, -arm_r, arm_r),
               (fork_x, -arm_r, 12), (v("coxa_arch_x1"), z0, 10), (v("coxa_arch_x0"), floor_z0, 6), (-rear, floor_z0, 4)],
@@ -112,18 +113,13 @@ cuts = [
     rod(v("bearing_seat_d"), b_y1 - v("tib_bear_seat_end") + 1, (fl, v("tib_bear_seat_end"), 0), "y"),
     rod(v("bearing_push_d"), v("tib_bear_roof") + 1, (fl, b_y0 - 1, 0), "y"),
 ]
-# the cable groove in the top face, running out through the fork wall
-g_y0 = v("coxa_groove_y")
-g_y1 = g_y0 + v("cable_w") + 0.2
-g_x0 = v("coxa_groove_x0")
-# one U-shaped outline, with a rounded floor: square corners here were the link's highest
-# stress. (A cylinder tangent to a box crashes FreeCAD's rounding step.)
-g_floor = z1 - v("coxa_groove_d")
-# it ramps up out of the top face before the fork wall: the femur's tail sweeps past the wall
-g_x1 = v("coxa_groove_x1")
-g_ramp = g_x1 - v("coxa_groove_ramp")
-cuts.append(prism([(g_y0, g_floor, 1.5), (g_y1, g_floor, 1.5), (g_y1, arm_r + 2, 0), (g_y0, arm_r + 2, 0)], "yz", g_x0, g_x1 + 1).common(
-    prism([(g_x0 - 1, g_floor - 1, 0), (g_ramp, g_floor - 1, 0), (g_x1, arm_r + 2, 0), (g_x0 - 1, arm_r + 2, 0)], "xz", g_y0 - 1, g_y1 + 1)))
+# the femur's cables go down a hole through the coxa, beside the servo, to the coxa servo's cable under it
+h_x0, h_x1 = v("coxa_hole_x0"), v("coxa_hole_x1")
+h_r = v("coxa_hole_w") / 2
+h_y = v("coxa_hole_y")
+hole = prism([(h_x0, h_y - h_r, h_r - 0.01), (h_x1, h_y - h_r, h_r - 0.01), (h_x1, h_y + h_r, h_r - 0.01), (h_x0, h_y + h_r, h_r - 0.01)],
+             "xy", z0 - 5, arm_r + 2)
+cuts.append(hole)
 # solid otherwise: the slicer's infill fills it, with no overhangs inside to support
 # (the -Y side is solid behind the bearing arm's joint face this far, for its screws)
 j_y = v("coxa_joint_y")
@@ -131,13 +127,13 @@ j_y = v("coxa_joint_y")
 skirt = block(-rear - 1, v("coxa_arch_x0") + 1, -rear - 8, rear + 8, floor_z0 - 2, z0).cut(
     prism([(-v("coxa_skirt_x"), 9.2, 4), (v("coxa_arch_x0") + 2, 9.2, 0), (v("coxa_arch_x0") + 2, -9.2, 0), (-v("coxa_skirt_x"), -9.2, 4)], "xy", floor_z0 - 3, z0 + 1))
 cuts.append(skirt)
+# low down the flare stays as narrow as the outline was before it: the arch swings over the bottom plate
+cuts.append(block(v("coxa_arch_x0") - 4, cut_x, b_y0 - 1, -15.0, floor_z0 - 3, v("coxa_flare_z0")))
 shape = shape.cut(Part.makeCompound(cuts)).removeSplitter()
-# 2 small bridges over the groove
-bridges = [block(x, x + 3, g_y0 - 0.1, g_y1 + 0.1, z1 - 1.4, z1) for x in (g_x0 + 5, g_ramp - 3)]
 # the shaft under the floor, on its spacer
 shaft = rod(v("fem_boss_d"), v("fem_boss_h"), (0, 0, floor_z0 - v("fem_boss_h")), "z").fuse(
     rod(v("coxa_shaft_d"), v("fem_shaft_len"), (0, 0, floor_z0 - v("fem_boss_h") - v("fem_shaft_len")), "z"))
-shape = shape.fuse(bridges + [shaft]).removeSplitter()
+shape = shape.fuse(shaft).removeSplitter()
 print("raw solids", len(shape.Solids), shape.isValid())
 
 # ------------------------------------------------------------ round the outer edges
@@ -148,10 +144,10 @@ def keep_sharp(e):
     servo = abs(bb.YMin) <= hw + 0.2 and abs(bb.YMax) <= hw + 0.2 and bb.ZMin >= floor_in - 0.2 and bb.XMin >= -tab_near - 0.2 and bb.XMax <= tab_far + 0.2
     horn = bb.YMin >= a_y0 - horn_way - 0.1 and bb.YMax <= a_y0 + pocket + 0.1 and bb.XMin >= fl - v("horn_reach") - 0.2
     bearing = bb.YMax < b_y1 + 0.1 and abs(bb.XMin - fl) <= 7 and abs(bb.XMax - fl) <= 7 and abs(bb.ZMin) <= 7 and abs(bb.ZMax) <= 7
-    groove = bb.YMin >= g_y0 - 0.2 and bb.YMax <= g_y1 + 0.2 and bb.ZMin >= z1 - v("coxa_groove_d") - 0.2
-    small_round = e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 5
+    in_hole = bb.XMin >= h_x0 - 0.2 and bb.XMax <= h_x1 + 0.2 and bb.YMin >= h_y - h_r - 0.2 and bb.YMax <= h_y + h_r + 0.2
+    small_round = e.Curve.TypeId == "Part::GeomCircle" and e.Curve.Radius < 5 and not in_hole
     shaft_area = bb.ZMax <= floor_z0 + 0.1 and abs(bb.XMin) < 6 and abs(bb.XMax) < 6
-    return servo or horn or bearing or groove or small_round or shaft_area
+    return servo or horn or bearing or small_round or shaft_area
 
 
 main_shape = common["smooth"](shape, v("coxa_edge_r"), keep_sharp)
@@ -162,7 +158,7 @@ main_shape = common["smooth"](shape, v("coxa_edge_r"), keep_sharp)
 side_box = block(cut_x, end_x + 5, b_y0 - 5, cut_y, -100, 100)
 arm_shape = main_shape.common(side_box).removeSplitter()
 body_shape = main_shape.cut(side_box).removeSplitter()
-head_y = v("tib_screw_head_y")                       # the head seats this far from the joint face, as in the tibia
+head_y = v("coxa_screw_head_y")                      # the head seats this far from the joint face
 for x, z in ((v("coxa_screw_a_x"), v("coxa_screw_a_z")), (v("coxa_screw_b_x"), v("coxa_screw_b_z"))):
     arm_shape = arm_shape.cut(Part.makeCompound([
         rod(v("tib_screw_clear"), cut_y - b_y0 + 2, (x, b_y0 - 1, z), "y"),
