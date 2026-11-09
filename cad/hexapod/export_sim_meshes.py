@@ -2,7 +2,7 @@
 Each file is in the frame of the sim link that carries it, in mm (the MJCF scales them):
 
   torso_bottom   bottom plate, columns, battery cartridge and latches   body frame (X right, Y forward,
-  torso_top      top plate, ToF mount, inner wall                        Z up, origin at the femur axis
+  torso_top      top plate, ToF mount                                    Z up, origin at the femur axis
   torso_parts    cells, boards, ToF sensors, switch, XT30, coxa horns    height), as Body_Check places them
                  and bearings
   coxa_R/_L, coxa_servo_R/_L      leg frame: coxa axis, +X out along the leg, Z up
@@ -72,7 +72,7 @@ for link in doc.getObject("Body_Check").Group:
     target = link.LinkedObject
     if target.Name in ("Body_Bottom", "Body_Column", "Battery_Cartridge", "Battery_Latch"):
         key = "torso_bottom"
-    elif target.Name in ("Body_Top", "Body_ToF_Mount", "Body_Wall"):
+    elif target.Name in ("Body_Top", "Body_ToF_Mount"):
         key = "torso_top"
     else:
         key = "torso_parts"
