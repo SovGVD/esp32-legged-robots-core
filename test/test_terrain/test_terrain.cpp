@@ -426,6 +426,49 @@ static void floorFrame(const TofSensor &s, const LR_angle &tilt, float floorZ, f
 	}
 }
 
+void test_no_floor_where_the_floor_should_be_is_a_hole()
+{
+	const TofSensor s = { { 0, 88, 0 }, 0.0f, 0.436f, 0.785f, 8, 400 };   // the dog's nose sensor
+	const LR_angle level = { 0, 0, 0 };
+	LR_figure body = {};
+	float mm[64], z;
+	// flat floor 86 mm below the body: no holes
+	floorFrame(s, level, -86, mm);
+	TerrainMap flat;
+	flat.begin(MAP);
+	flat.addHoles(s, mm, body, -86, 40);
+	TEST_ASSERT_EQUAL_UINT16(0, flat.knownCells());
+	// a table edge right below the nose: the floor far down, no target in any zone
+	for (uint8_t k = 0; k < 64; k++) mm[k] = 0;
+	TerrainMap cliff;
+	cliff.begin(MAP);
+	cliff.addHoles(s, mm, body, -86, 40);
+	TEST_ASSERT_GREATER_THAN(10, cliff.knownCells());
+	// the steepest rows (44.7 deg down) get 40 mm below the floor ~127 mm ahead of the nose
+	int marked = 0;
+	for (float x = -20; x <= 20; x += 10) {
+		for (float y = 200; y <= 230; y += 10) {
+			if (cliff.heightAt(x, y, z)) {
+				TEST_ASSERT_FLOAT_WITHIN(0.01f, -126, z);
+				marked++;
+			}
+		}
+	}
+	TEST_ASSERT_GREATER_THAN(0, marked);
+	// a real reading wins: known cells aren't overwritten
+	TerrainMap known;
+	known.begin(MAP);
+	for (float x = -300; x <= 300; x += 5) {
+		for (float y = 0; y < 600; y += 5) {
+			LR_point q = { x, y, -86 };
+			known.addPoint(q);
+		}
+	}
+	known.addHoles(s, mm, body, -86, 40);
+	TEST_ASSERT_TRUE(known.heightAt(0, 215, z));
+	TEST_ASSERT_FLOAT_WITHIN(0.01f, -86, z);
+}
+
 void test_floor_tilt_from_the_tof_zones()
 {
 	const TofSensor s = { { 0, 88, 0 }, 0.0f, 0.436f, 0.785f, 8, 400 };   // the dog's nose sensor
@@ -493,6 +536,7 @@ int main()
 	RUN_TEST(test_narrow_gap_is_stepped_over);
 	RUN_TEST(test_wide_gap_stops_the_robot_until_the_command_lets_go);
 	RUN_TEST(test_cliff_the_sensors_cannot_see_down_also_stops_it);
+	RUN_TEST(test_no_floor_where_the_floor_should_be_is_a_hole);
 	RUN_TEST(test_floor_tilt_from_the_tof_zones);
 	return UNITY_END();
 }

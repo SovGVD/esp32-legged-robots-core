@@ -392,6 +392,11 @@ static void updateTerrain(float dt, float scanTilt)
 		for (uint8_t z = 0; z < sensor.zones * sensor.zones && z < 64; z++) {
 			terrainMap.addReading(sensor, z, tofMm[z], pose);
 		}
+		// no floor where the floor should be: a cliff edge (the floor past it is out of view)
+		float floorZ, depth;
+		if (motion.gait().holeLevel(floorZ, depth)) {
+			terrainMap.addHoles(sensor, tofMm, pose, floorZ, depth);
+		}
 	}
 	loopProfileMark(LOOP_STAGE_TOF, micros() - t);
 	// tilt the gait didn't ask for: measured minus commanded (-correction)

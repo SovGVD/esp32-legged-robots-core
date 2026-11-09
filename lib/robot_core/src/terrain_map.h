@@ -93,6 +93,19 @@ class TerrainMap
 		/** Add a point (gait world frame, mm). */
 		void addPoint(const LR_point &p);
 
+		/**
+		 * Holes from one frame: a zone whose ray should have hit the floor the
+		 * robot stands on (`floorZ`, surface height in the gait world frame)
+		 * within `0.75 x maxRange`, but reached `depth` mm below it without
+		 * hitting anything (no target, or a reading past that point), saw no
+		 * floor there. The cell where the ray is `depth` mm below the floor is
+		 * marked that low (only if unknown or already that low: a real reading
+		 * wins). Without this the floor past a cliff edge stays unknown (out of
+		 * the sensor's view or range) and unknown ground counts as walkable.
+		 * @param body same pose as addReading
+		 */
+		void addHoles(const TofSensor &s, const float *mm, const LR_figure &body, float floorZ, float depth);
+
 		/** Ground height at (x, y); false if the cell is unknown or too old. */
 		bool heightAt(float x, float y, float &z) const;
 		/**

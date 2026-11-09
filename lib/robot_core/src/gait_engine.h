@@ -134,6 +134,12 @@ class GaitEngine
 		/** Body height offset from the terrain, mm. */
 		float terrainHeight() const { return _terrainZ; }
 		/**
+		 * Ground surface the robot stands on (mean of the legs' ground minus the
+		 * foot radius, gait world frame, mm) and how far below it the map marks
+		 * holes (TerrainMap::addHoles: deeper than maxStep). false: terrain off.
+		 */
+		bool  holeLevel(float &floorZ, float &depth) const;
+		/**
 		 * A leg found a gap ahead it can't step over (the map shows a hole
 		 * deeper than maxStep and no flat foothold within footholdShift):
 		 * the gait won't move further that way (body frame unit vector)

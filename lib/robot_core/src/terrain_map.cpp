@@ -139,6 +139,47 @@ void TerrainMap::addPoint(const LR_point &p)
 	c.time = _time;
 }
 
+void TerrainMap::addHoles(const TofSensor &s, const float *mm, const LR_figure &body, float floorZ, float depth)
+{
+	const uint8_t zones = s.zones ? s.zones * s.zones : 1;
+	if (depth <= 0) {
+		return;
+	}
+	LR_point origin = lrRotateBody(s.position, body.orientation);
+	origin.x += body.position.x;
+	origin.y += body.position.y;
+	origin.z += body.position.z;
+	float above = origin.z - floorZ;   // sensor height over the floor
+	if (above <= 0) {
+		return;
+	}
+	for (uint8_t z = 0; z < zones && z < 64; z++) {
+		LR_point d = lrRotateBody(zoneDirection(s, z), body.orientation);
+		if (d.z > -0.05f) {
+			continue;   // looks (nearly) level: would meet the floor far away, if ever
+		}
+		float floorAt = above / -d.z;           // along the ray to the floor
+		float holeAt  = (above + depth) / -d.z; // ... to `depth` below it
+		float limit = mm[z] > 0 ? s.maxRange : 0.75f * s.maxRange;
+		if (floorAt > limit || (mm[z] > 0 && mm[z] < holeAt)) {
+			continue;   // floor too far to expect a reading, or something was hit above the hole depth
+		}
+		LR_point p = { origin.x + d.x * holeAt, origin.y + d.y * holeAt, floorZ - depth };
+		int16_t ix = index(p.x), iy = index(p.y);
+		cell &c = _cells[slot(ix, iy)];
+		if (c.time < 0 || c.ix != ix || c.iy != iy || _time - c.time > _params.maxAge) {
+			c.ix = ix;
+			c.iy = iy;
+			c.z  = p.z;
+			c.lo = (int16_t)p.z;
+			c.wall = false;
+			c.time = _time;
+		} else if (c.z <= p.z) {
+			c.time = _time;   // still a hole
+		}
+	}
+}
+
 bool TerrainMap::heightAt(float x, float y, float &z) const
 {
 	const cell *c = find(index(x), index(y));

@@ -99,6 +99,20 @@ void GaitEngine::setTerrain(const TerrainParams *params, const TerrainMap *map)
 	}
 }
 
+bool GaitEngine::holeLevel(float &floorZ, float &depth) const
+{
+	if (!_terrain || _legCount == 0) {
+		return false;
+	}
+	float sum = 0;
+	for (uint8_t i = 0; i < _legCount; i++) {
+		sum += _state[i].ground;
+	}
+	floorZ = sum / _legCount - _terrain->footRadius;
+	depth  = _terrain->maxStep + 10.0f;
+	return true;
+}
+
 /**
  * Where a foot at `at` (world XY) should land: the mapped ground if the map
  * knows it and it is within reach of the leg's own ground, else the ground
@@ -153,7 +167,8 @@ bool GaitEngine::dropsAway(float x, float y, float dx, float dy, float own) cons
  * ground (the bottom of a wide gap, the floor past a cliff), or a low reading
  * with level ground right behind it (the far wall of a narrow gap). An
  * unknown cell before level ground is just a spot no zone hit; one before
- * lower ground that stays low is the shadow of a step down.
+ * lower ground that stays low is the shadow of a step down. Deep ground counts
+ * even without known ground before the cell; the far wall needs it.
  */
 bool GaitEngine::isShadow(float x, float y, float dx, float dy, float own) const
 {
@@ -162,9 +177,9 @@ bool GaitEngine::isShadow(float x, float y, float dx, float dy, float own) const
 	for (float d = cs; d <= 8.0f * cs + 1e-3f && !before; d += cs) {
 		before = _map->heightAt(x - dx * d, y - dy * d, z);
 	}
-	if (!before) {
-		return false;
-	}
+	// no known ground before it: still a hole if deep ground follows (a cliff
+	// edge beside the sensor's view, where the floor up to the edge was never
+	// seen: the dog's feet stand wider than its sensor sees near the nose)
 	float surface = own - _terrain->footRadius;
 	float deep = surface - _terrain->maxStep;
 	float low  = surface - _terrain->clearance;
@@ -176,6 +191,9 @@ bool GaitEngine::isShadow(float x, float y, float dx, float dy, float own) const
 			return true;
 		}
 		if (z >= low) {
+			return false;
+		}
+		if (!before) {
 			return false;
 		}
 		// lower than the foot's ground: a gap's far wall if level ground follows
