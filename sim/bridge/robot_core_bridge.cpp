@@ -59,6 +59,7 @@ static bool floorTiltOn = true;    // ToF frames placed with the floor's own til
 static FrameTilt frameTilt;
 static float frameGain = 1.0f;    // FrameTilt gain; rc_set_frame_gain
 static float regDeadband = 2.0f;
+static bool holesOn = true;       // cliff edges: TerrainMap::addHoles; rc_set_holes
 static bool registerOn = true;    // frames placed at the map's height (TerrainMap::frameOffset); rc_set_frame_register
 static float biasTau = 1.5f;
 static float unplannedTau = 0.3f;
@@ -599,6 +600,11 @@ RC_API void rc_tof_frame(int i, const float *distances)
 	for (uint8_t z = 0; z < t.zones * t.zones && !scanning; z++) {
 		terrainMap.addReading(t, z, distances[z], pose);
 	}
+	// no floor where the floor should be: a cliff edge (motion.cpp updateTerrain)
+	float floorZ, depth;
+	if (!scanning && holesOn && motion.gait().holeLevel(floorZ, depth)) {
+		terrainMap.addHoles(t, distances, pose, floorZ, depth);
+	}
 	if (tofNavOn) {
 		LR_angle tilt = { lastImu.pitch, lastImu.roll, 0 };
 		tofNav.addFrame(t, distances, odom.pose(), tilt, legs[0].defaultFoot.z);
@@ -656,6 +662,7 @@ RC_API void rc_set_floor_tilt(int on) { floorTiltOn = on != 0; }
 
 RC_API void rc_set_frame_register(int on, float deadband) { registerOn = on != 0; regDeadband = deadband; }
 RC_API void rc_set_frame_gain(float g) { frameGain = g; }
+RC_API void rc_set_holes(int on) { holesOn = on != 0; }
 
 /**
  * Experiments: body tilt for the terrain map. m 0..2: mode (see mapTiltMode);

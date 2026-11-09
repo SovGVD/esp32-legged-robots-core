@@ -190,3 +190,21 @@ def test_hexapod_stops_at_a_gap_too_wide_to_step_over():
     r = run("hexapod", t, "tof", gait=d["gait"], speed=d["speed"], duration=10,
             frame_cb=lambda robot, fw, _: blocked.append(fw.terrain_state()["blocked"]), frame_dt=0.5)
     assert blocked[-1] and r.distance < 450 and not r.fell
+
+
+@needs_cxx
+@pytest.mark.parametrize("model", ["dog", "hexapod"])
+def test_stops_at_a_deep_cliff_edge(model):
+    """A table edge: the floor past it is far below, out of the ToF's view or
+    range. The zones that should have hit the floor and didn't mark holes
+    (TerrainMap::addHoles), so the robot stops before a foot goes over."""
+    from legsim.scenario import DEFAULTS, run
+    d = DEFAULTS[model]
+    edge = 200.0 if model == "dog" else 300.0
+    t = terrain.Terrain("cliff300").add_box(0, edge - 1000, 300, 2000, 2000)
+    t.start_height = 300
+    blocked = []
+    r = run(model, t, "tof", gait=d["gait"], speed=d["speed"], duration=6,
+            frame_cb=lambda robot, fw, _: blocked.append(fw.terrain_state()["blocked"]), frame_dt=0.5)
+    assert blocked[-1] and not r.fell and r.max_tilt < 10
+    assert r.distance < edge - 100   # the body centre stays well back from the edge
