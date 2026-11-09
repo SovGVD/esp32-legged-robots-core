@@ -10,8 +10,8 @@ Print with the rim on the bed; the strap floors are then short bridges.
 Both servo cables leave into the open gap between the servos and run in a channel on
 the +Z face to the hip, threaded under 2 bridges across the channel, one at each end. Thin
 cable only: the connector is removed, so no big holes. The foot switch's lead comes out of
-the tibia's fork under the knee into a short tube on the -Z face under the knee axis, then
-runs along the side to the gap, round to the +Z channel, and lies on the servo cables.
+the tibia's fork up through a short upright tube on the knee end, then back along the +Z edge into
+the channel, where it lies on the servo cables.
 
 Right leg; Femur_Main_L is the left leg's. Femur frame: origin on the femur axis,
 +X to the knee, Z up with the femur level.
@@ -106,12 +106,12 @@ for n in (0, 2):
     x = "%s + %d * ((%s) - %s) / 2" % (p("chan_x0"), n, chan_len, p("chan_finger_len"))
     solid.append(box("bridge_%d" % n, p("chan_finger_len"), "(%s) - (%s)" % (y1, y0), p("chan_finger_t"), x, y0, finger_z))
 
-# the foot switch's lead: a short tube on the -Z face under the knee axis (the lead's loop to the tibia's fork
-# changes length least there); from it the lead runs along the side to the gap and round to the +Z channel
-tube_x = "%s - %s / 2" % (p("sw_tube_x"), p("sw_tube_len"))
-tube_z = "-%s - %s / 2 + 0.3 mm" % (half, p("sw_tube_bore"))       # the bore just touches into the edge
-solid.append(cyl("sw_tube", "%s + 2 * %s" % (p("sw_tube_bore"), p("sw_tube_wall")), p("sw_tube_len"), tube_x, chan_mid, tube_z, along_x=True))
-sw_bore = cyl("sw_tube_bore", p("sw_tube_bore"), "%s + 2 mm" % p("sw_tube_len"), "%s - 1 mm" % tube_x, chan_mid, tube_z, along_x=True)
+# the foot switch's lead: a short upright tube on the knee end, past the knee axis. The lead comes up from the
+# tibia's fork into it, then runs back along the +Z edge into the channel with the servo cables
+tube_x = "%s + %s / 2 - 0.3 mm" % (p("fem_plate_x1"), p("sw_tube_bore"))   # the bore just touches into the end face
+tube_z = "%s - %s / 2" % (p("sw_tube_z"), p("sw_tube_len"))
+solid.append(cyl("sw_tube", "%s + 2 * %s" % (p("sw_tube_bore"), p("sw_tube_wall")), p("sw_tube_len"), tube_x, chan_mid, tube_z))
+sw_bore = cyl("sw_tube_bore", p("sw_tube_bore"), "%s + 2 mm" % p("sw_tube_len"), tube_x, chan_mid, "%s - 1 mm" % tube_z)
 
 win_h = "%s + 2 * %s" % (p("mg90_body_w"), p("mg90_fit_w"))
 win_len = "%s + 2 * %s" % (p("mg90_body_len"), fit)

@@ -289,7 +289,7 @@ TABLE = [
     ("chan_x1", "30 mm", DESIGN, "channel end, in the gap between the servos"),
     ("chan_finger_len", "8 mm", DESIGN, "cable bridge along X (4 x 1.2 fingers broke off, print 1)"),
     ("chan_finger_t", "2.4 mm", DESIGN, "cable bridge thickness, across the whole channel; prints as a short bridge"),
-    ("sw_tube_x", "=femur_len", CALC, "tube for the foot switch's lead on the -Z face, centred under the knee axis: the lead's loop to the tibia's fork changes length least there (it replaces a channel along the whole -Z face)"),
+    ("sw_tube_z", "0 mm", DESIGN, "upright tube for the foot switch's lead on the femur's knee end, past the knee axis: its centre height. The lead comes up from the tibia's fork through it and back along the +Z edge to the channel (it replaces a channel along the whole -Z face)"),
     ("sw_tube_len", "8 mm", DESIGN, "the tube's length, a third of the old channel"),
     ("sw_tube_bore", "3.6 mm", DESIGN, "its bore: the 2-wire lead, 2.8 x 1.4"),
     ("sw_tube_wall", "1.4 mm", DESIGN, "its wall"),
