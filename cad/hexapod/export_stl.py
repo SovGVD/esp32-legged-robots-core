@@ -1,4 +1,4 @@
-"""STL files of the leg parts, one file per part, into stl/ (not in git). Each part is laid on its
+"""STL files of the printed parts (legs and body), one file per part, into stl/ (not in git). Each part is laid on its
 biggest flat face, sitting on z 0 and centred on the origin, ready for the slicer.
 The file name says how many to print (right legs and left legs are mirrored parts).
 Run inside FreeCAD after build_all.py (the parts must be built)."""
@@ -24,6 +24,12 @@ PARTS = {                           # object -> file name
     "Tibia_Bearing": "tibia_bearing_half_R_x3.stl",
     "Tibia_Bearing_L": "tibia_bearing_half_L_x3.stl",
     "Tibia_Presser": "tibia_presser_x6.stl",
+    "Body_Bottom": "body_bottom_plate_x1.stl",
+    "Body_Top": "body_top_plate_x1.stl",
+    "Body_Column": "body_column_x8.stl",
+    "Body_ToF_Mount": "tof_mount_x1.stl",
+    "Battery_Cartridge": "battery_cartridge_x1.stl",
+    "Battery_Latch": "battery_latch_x2.stl",
 }
 
 
@@ -31,6 +37,8 @@ PARTS = {                           # object -> file name
 DOWN = {
     "Tibia_Horn": (0, -1, 0), "Tibia_Horn_L": (0, 1, 0), "Tibia_Bearing": (0, 1, 0), "Tibia_Bearing_L": (0, -1, 0),
     "Coxa_Body": (0, 1, 0), "Coxa_Body_L": (0, -1, 0), "Coxa_Arm": (0, -1, 0), "Coxa_Arm_L": (0, 1, 0),
+    # the plates print on their skins: the bottom one's is its underside, the top one's its top (the ribs hang from it)
+    "Body_Bottom": (0, 0, -1), "Body_Top": (0, 0, 1), "Body_Column": (0, 0, -1), "Battery_Cartridge": (0, 0, -1),
 }
 
 
