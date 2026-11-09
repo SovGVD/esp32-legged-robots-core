@@ -215,6 +215,13 @@ duties.
 **Settings** are stored in NVS (`Preferences`, namespace `robot`) with a version and per-field defaults; the first
 boot after updating imports the trims saved by the old EEPROM code.
 
+**Web Settings tab.** The same settings without typing commands, grouped as Move (leg servos, walk, level,
+terrain mode, foot switches with a live pressed/released view), Compass (heading hold, a dial to tap a heading
+to turn to, magnetometer calibration with a live plot of the readings, raw and corrected), Sensors (IMU tilt dot
+and `calib imu`, ToF status), Servos (calibration pose and per joint trims, Save), Map, Info (one tap reports:
+`loop`, `wifi`, `heading state`, ...) and App. The robot reports its state in the `S` package while the tab is
+open; every change is sent as the CLI command you would type, and the robot's replies show under the tab.
+
 Servos on plain ESP32 boards (`PWM_CONTROLLER_TYPE ESP32PWM`) are driven by the LEDC hardware PWM
 peripheral (up to 16 servos, 50Hz by default, override with `ESP32PWM_SERVO_FREQ`).
 

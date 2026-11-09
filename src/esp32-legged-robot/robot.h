@@ -118,6 +118,7 @@ void initFeet();
 void updateFeet(leg *legsOut, uint8_t legCount, bool apply);   // motion task, every tick
 bool footSwitchesFitted();                    // FOOT_SWITCH_PINS set
 bool footSwitchesInUse();                     // fitted and `feet on`
+uint32_t footPressedBits();                   // debounced, bit i = leg i pressed
 void cliFeet();                               // CLI: feet on|off|state
 FootInput &footInput();                       // GPIO switches (feet.cpp), or the simulated ones (HIL)
 // Odometry for the lidar / ToF room scans (motion.cpp): gait velocity turned by the gyro, any task
@@ -175,6 +176,10 @@ struct MotionStatus {
 	bool     headingHold;
 	bool     headingTarget;  // the hold has a target (turnto, or the heading when the stick was let go)
 	float    target;         // rad, compass
+	bool     terrainPending; // `terrain on|off` waits for the robot to stand still
+	uint8_t  calState;       // magnetometer calibration: 0 not run, 1 turning, 2 by hand, 3 saved, 4 failed, 5 stopped
+	float    calTurned;      // rad turned since the calibration started (two turns = 4 pi)
+	float    calTime;        // s since the calibration started
 };
 MotionStatus motionStatus();
 
@@ -271,6 +276,7 @@ void pGait(uint8_t *data, size_t len);
 void pLevel(uint8_t *data, size_t len);
 void pGoto(uint8_t *data, size_t len);
 size_t pTof(uint8_t *out);   // fills a P_TOF package, returns its length (0: no ToF on this model)
+size_t pSetup(uint8_t *out, size_t room);   // fills a P_SETUP package (Settings tab state), returns its length
 
 /**
  * CLI (cli.cpp, cli_commands.cpp)

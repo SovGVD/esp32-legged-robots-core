@@ -10,7 +10,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const input = resolve(root, 'dist/index.html');
 const output = resolve(root, '../esp32-legged-robot/web/index.html.gz.h');
 // Fail the build if the page grows unexpectedly: it lives in flash.
-const MAX_GZ_BYTES = 16 * 1024;
+const MAX_GZ_BYTES = 24 * 1024;
 
 const html = readFileSync(input);
 const gz = gzipSync(html, { level: constants.Z_BEST_COMPRESSION });

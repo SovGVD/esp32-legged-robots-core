@@ -266,6 +266,10 @@ MotionStatus motionStatus()
 	st.headingHold   = headingHold.enabled();
 	st.headingTarget = headingHold.hasTarget();
 	st.target        = headingHold.target();
+	st.terrainPending = terrainRequest >= 0;
+	st.calState      = calState;
+	st.calTurned     = calTurned;
+	st.calTime       = calTime;
 	st.gaitActive  = motion.gait().isActive();
 	st.staticGait  = motion.gait().params().staticStability;
 	st.sitting     = sitting;

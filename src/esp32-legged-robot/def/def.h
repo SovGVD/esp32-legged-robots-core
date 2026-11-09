@@ -69,6 +69,9 @@
 #define P_MAP          80  //       "P" [id] request: lidar map (lidar.cpp pMap)
 #define P_NAV          78  //       "N" [id] request: lidar pose, goal, path, scan (lidar.cpp pNav)
 #define P_GOTO         87  //       "W" [id, x i16, y i16] walk to map point (mm, big-endian); [id] alone stops
+#define P_SETUP        83  //       "S" [id] request: Settings tab state (packages.cpp pSetup)
+#define P_SETUP_VERSION 1
+#define P_SETUP_MAX_LEN 160
 #define P_MAP_MAX_LEN  (6 + 200 * 200 / 4)
 #define P_NAV_MAX_LEN  (19 + 4 * 64 + 4 * 180)
 #define P_TOF_MAX_SENSORS 2

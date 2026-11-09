@@ -99,8 +99,10 @@ void HeadingEstimator::update(float dt, float yawRate, const LR_angle &tilt, con
 	}
 	float m[3];
 	for (uint8_t i = 0; i < 3; i++) {
+		_raw[i] = mag[i];
 		m[i] = (mag[i] - _offset[i]) * _scale[i];
 	}
+	_haveRaw = true;
 	_lastField = sqrtf(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
 	if (_lastField < 1.0f) {
 		return;   // no reading

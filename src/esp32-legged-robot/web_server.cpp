@@ -226,6 +226,14 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 			case P_GOTO:
 				pGoto(data, len);
 				break;
+			case P_SETUP: {
+				static uint8_t setupPackage[P_SETUP_MAX_LEN];
+				size_t n = pSetup(setupPackage, sizeof(setupPackage));
+				if (client->canSend()) {
+					client->binary(setupPackage, n);
+				}
+				break;
+			}
 			#ifdef CAMERAENABLED
 			case P_START_VIDEO:
 				mainCameraStream = true;

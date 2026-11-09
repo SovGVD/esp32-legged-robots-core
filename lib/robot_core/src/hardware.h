@@ -31,6 +31,8 @@ class ServoBus {
 		virtual const char *checkChannel(uint8_t channel) const { (void)channel; return nullptr; }
 };
 
+class HeadingEstimator;
+
 class Imu {
 	public:
 		virtual ~Imu() {}
@@ -62,6 +64,8 @@ class Imu {
 		// collect magnetometer readings while the robot turns, then fit and save the calibration
 		virtual void magCalibrationStart() {}
 		virtual bool magCalibrationFinish() { return false; }
+		// raw magnetometer reading and calibration, for the web client's compass view; nullptr: none
+		virtual const HeadingEstimator *headingEstimator() const { return nullptr; }
 };
 
 class PowerSensor {

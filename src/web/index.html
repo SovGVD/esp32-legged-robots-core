@@ -40,25 +40,31 @@
       </section>
       <section class="pane page" id="pane-settings" data-pane="settings">
         <div class="settings">
-          <label class="row" id="walk-label" hidden>
-            <input type="checkbox" id="walk" />
-            <span><b>Walk</b><span class="dim">Statically stable walk instead of trot. Switches when the robot stands still.</span></span>
-          </label>
-          <label class="row" id="level-label" hidden>
-            <input type="checkbox" id="level" />
-            <span><b>Level</b><span class="dim">IMU leveling: keep the body horizontal on a slope.</span></span>
-          </label>
-          <label class="row">
-            <input type="checkbox" id="rotate" />
-            <span><b>Tilt mode</b><span class="dim">The right stick tilts the body instead of walking (also the button above the right stick).</span></span>
-          </label>
-          <div class="row">
-            <span><b>Stick size</b></span>
-            <span class="seg" id="stick-size">
-              <button type="button" data-size="s">S</button><button type="button" data-size="m">M</button><button type="button" data-size="l">L</button>
-            </span>
+          <nav class="seg tabs2" id="set-nav"></nav>
+          <div data-sec="move">
+            <label class="row" id="walk-label" hidden>
+              <input type="checkbox" id="walk" />
+              <span><b>Walk</b><span class="dim">Statically stable walk instead of trot. Switches when the robot stands still.</span></span>
+            </label>
+            <label class="row" id="level-label" hidden>
+              <input type="checkbox" id="level" />
+              <span><b>Level</b><span class="dim">IMU leveling: keep the body horizontal on a slope.</span></span>
+            </label>
+            <label class="row">
+              <input type="checkbox" id="rotate" />
+              <span><b>Tilt mode</b><span class="dim">The right stick tilts the body instead of walking (also the button above the right stick).</span></span>
+            </label>
           </div>
-          <p class="dim small" id="about"></p>
+          <div data-sec="app">
+            <div class="row">
+              <span><b>Stick size</b></span>
+              <span class="seg" id="stick-size">
+                <button type="button" data-size="s">S</button><button type="button" data-size="m">M</button><button type="button" data-size="l">L</button>
+              </span>
+            </div>
+            <p class="dim small" id="about"></p>
+          </div>
+          <pre id="set-log" class="mono small" title="Robot replies"></pre>
         </div>
       </section>
       <div class="stick" id="stick-left"><span class="hint">turn</span></div>

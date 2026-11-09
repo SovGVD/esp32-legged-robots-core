@@ -141,6 +141,17 @@ bool footSwitchesInUse()
 	return footCount() > 0 && feetUse;
 }
 
+uint32_t footPressedBits()
+{
+	uint32_t bits = 0;
+	for (uint8_t i = 0; i < footCount(); i++) {
+		if (feet.pressed(i)) {
+			bits |= 1u << i;
+		}
+	}
+	return bits;
+}
+
 void updateFeet(leg *legsOut, uint8_t legCount, bool apply)
 {
 	if (footCount() == 0) {

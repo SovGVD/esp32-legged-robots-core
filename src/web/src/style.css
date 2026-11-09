@@ -338,6 +338,94 @@ label.row {
   border-radius: 0;
   padding: 6px 14px;
 }
+/* settings categories, a scrolling chip bar */
+.tabs2 {
+  display: flex;
+  overflow-x: auto;
+  margin-bottom: 4px;
+}
+.tabs2 button {
+  flex: 1 0 auto;
+}
+.settings h4 {
+  margin: 18px 4px 4px;
+}
+.settings p {
+  margin: 8px 4px;
+}
+.tools,
+.chips,
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+.buttons {
+  justify-content: flex-start;
+  padding: 4px;
+}
+.buttons button {
+  flex: 1 0 40%;
+}
+.chip {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.plot {
+  display: block;
+  width: min(100%, 320px);
+  aspect-ratio: 1;
+  margin: 10px auto 0;
+  touch-action: none;
+}
+.plot.level {
+  width: 150px;
+}
+.center {
+  text-align: center;
+}
+.seg.wide {
+  display: flex;
+  margin: 8px 0 0;
+}
+.seg.wide button {
+  flex: 1;
+}
+.joint .tools button {
+  padding: 6px 9px;
+}
+.trim {
+  min-width: 4.5em;
+  text-align: center;
+}
+.trim.pending {
+  opacity: 0.5;
+}
+#set-log {
+  min-height: 3em;
+  max-height: 14em;
+  overflow: auto;
+  margin: 16px 0 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  user-select: text;
+}
+#set-log:empty::before {
+  content: 'Robot replies show here';
+  color: var(--dim);
+}
 label:has(input:disabled) {
   color: var(--dim);
 }

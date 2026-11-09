@@ -160,6 +160,7 @@ class Mpu9250Imu : public Imu {
 			return _ready;
 		}
 		float gyroBias() const override { return _heading.gyroBias(); }
+		const HeadingEstimator *headingEstimator() const override { return &_heading; }
 		bool headingAbsolute() const override { return _heading.absolute(); }
 
 		float magField(bool &accepted) const override
@@ -343,6 +344,7 @@ class HilImu : public Imu {
 			return _ready;
 		}
 		float gyroBias() const override { return _heading.gyroBias(); }
+		const HeadingEstimator *headingEstimator() const override { return &_heading; }
 		bool headingAbsolute() const override { return _heading.absolute(); }
 
 		float magField(bool &accepted) const override

@@ -9,15 +9,22 @@ void cliCalibrate()
 {
 	char* mode = CLI_readWord();
 	if (strcmp(mode, TITLE_IMU) == 0) {
+		if (!imu().ready()) {
+			cliSerial->println("No IMU.");
+			return;
+		}
+		cliSerial->println("IMU: calibrating in 5 s, keep the robot still on a flat level surface.");
 		calibrateIMU();
+		cliSerial->println("IMU calibrated.");
 		return;
 	}
 	if (strcmp(mode, TITLE_LEG) == 0) {
 		setMotorsToCalibratePosition();	// all servos to init robot position
+		cliSerial->println("Servos at the calibration pose (`hal off` first, or the gait moves them back).");
 		return;
 	}
 	
-	Serial.println("Unknown calibration hardware");
+	cliSerial->println("Usage: calib imu|leg");
 }
 
 static int getAngleIdByAngleTitle(char* angleTitle)

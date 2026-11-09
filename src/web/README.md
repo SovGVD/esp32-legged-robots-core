@@ -13,6 +13,10 @@ embedded into the firmware as `src/esp32-legged-robot/web/index.html.gz.h`.
 | --- | --- | --- |
 | ![ToF view on a phone](docs/phone-view.png) | ![Map tab](docs/phone-map.png) | ![Status tab](docs/phone-status.png) |
 
+| Settings: compass calibration | Settings: servo trims |
+| --- | --- |
+| ![Magnetometer calibration plot](docs/phone-settings-compass.png) | ![Servo trims](docs/phone-settings-servos.png) |
+
 ![Landscape: the sticks stay on top of the view](docs/phone-landscape.png)
 
 Screenshots are from the demo build (`npm run build:demo`), which has a mock
@@ -35,7 +39,7 @@ Requires Node.js 22.18 or newer.
 
 Commit the regenerated `index.html.gz.h` together with the web changes, the
 firmware build does not run Node. The build fails if the gzipped page grows
-over 16 KB (see `scripts/embed.mjs`).
+over 24 KB (see `scripts/embed.mjs`).
 
 The dev server listens on the local network too, so you can open it from a
 phone. `?ws=ws://<host>/ws` in the page URL overrides the robot address.
@@ -50,6 +54,8 @@ src/connection.ts     websocket with reconnect
 src/joystick.ts       round pointer-event thumb stick (multi-touch)
 src/demo.ts           demo build only: in-page socket to the mock robot
 src/cli.ts            robot CLI terminal
+src/settings.ts       Settings tab: categories, switches, trims, reports (changes go as CLI commands)
+src/compass.ts        Settings drawings: magnetometer calibration plot, heading dial, tilt dot
 mock/sim.ts           mock robot: drives around a two room flat, ToF rays, map, battery
 mock/robot.ts         mock robot behind a websocket for the dev/preview servers
 scripts/embed.mjs     dist/index.html -> gzip -> C header
@@ -60,7 +66,10 @@ test/                 node:test unit tests
 
 See the header comment in `src/protocol.ts`. In short: the page sends a 14
 byte move package (`M`) every 50 ms, which also feeds the firmware failsafe;
-`T` asks for telemetry once a second; `C` carries CLI text both ways. The
+`T` asks for telemetry once a second; `C` carries CLI text both ways; `S`
+asks for the Settings tab state (switches, magnetometer readings and
+calibration, foot switches, servo trims) five times a second while that tab is
+open, and the tab changes things by sending the matching CLI command. The
 firmware allows one controlling client: when another device connects, this
 page shows "Another device took control" and stops reconnecting until you tap
 "Take control".
