@@ -188,6 +188,123 @@ void pGoto(uint8_t *data, size_t len)
   lidarGoto(x, y);
 }
 
+static uint8_t *putU16(uint8_t *p, int v)
+{
+  p[0] = (v >> 8) & 0xFF;
+  p[1] = v & 0xFF;
+  return p + 2;
+}
+
+/**
+ * Settings tab state, answer to [P_SETUP]. The web client asks a few times a
+ * second only while its Settings tab is open; changes go back as CLI commands
+ * (`terrain on`, `heading cal`, `trim LF alpha 1.5`, ...), so the CLI stays
+ * the one place that changes settings.
+ *
+ * offset | type   | length | description
+ * -------|--------|--------|-------------
+ *      0 | char   |      1 | 'S' (P_SETUP)
+ *      1 | u8     |      1 | version (P_SETUP_VERSION)
+ *      2 | u8     |      1 | has: 1 terrain mode, 2 foot switches, 4 magnetometer, 8 walk gait,
+ *        |        |        |      16 IMU, 32 HAL on, 64 HIL build, 128 raw magnetometer reading below
+ *      3 | u8     |      1 | on: 1 terrain, 2 terrain switch pending, 4 feet, 8 gait uses the feet,
+ *        |        |        |     16 heading hold, 32 leveling, 64 walk gait, 128 last mag reading trusted
+ *      4 | u8     |      1 | magnetometer calibration: 0 not run, 1 turning, 2 by hand, 3 saved, 4 failed, 5 stopped
+ *      5 | u8     |      1 | calibration: turned so far, deg/4 (180 = two turns)
+ *      6 | u8     |      1 | calibration: seconds since start
+ *      7 | u8     |      1 | ToF running, bit per sensor
+ *      8 | u16    |      2 | feet pressed, bit per leg
+ *     10 | i16 x3 |      6 | raw magnetometer, body frame (x right, y forward, z up), uT*10
+ *     16 | i16 x3 |      6 | magnetometer calibration offset, uT*10
+ *     22 | u16 x3 |      6 | magnetometer calibration scale*1000
+ *     28 | u16    |      2 | calibrated field strength, uT*10 (0: not calibrated)
+ *     30 | u16    |      2 | field strength of the last reading, uT*10
+ *     32 | u8     |      1 | legs n
+ *     33 | u8     |      1 | joints per leg d (0: no servo trims, tracks)
+ *     34 | per leg: u8 title length, title chars, d x i16 servo trim deg*100 (alpha, beta, gamma, ...)
+ * Big-endian, like telemetry.
+ */
+size_t pSetup(uint8_t *out, size_t room)
+{
+  MotionStatus m = motionStatus();
+  const HeadingEstimator *he = imu().headingEstimator();
+  float raw[3] = { 0, 0, 0 }, offset[3] = { 0, 0, 0 }, scale[3] = { 1, 1, 1 }, calField = 0;
+  bool haveRaw = he != nullptr && he->magRaw(raw);
+  if (he != nullptr) {
+    he->magCalibration(offset, scale, calField);
+  }
+  bool trusted = false;
+  float field = imu().magField(trusted);
+
+  uint8_t has = 0, on = 0;
+  if (MODEL_TERRAIN.terrain != nullptr) has |= 1;
+  if (footSwitchesFitted())             has |= 2;
+  if (imu().hasMagnetometer())          has |= 4;
+  if (MODEL_WALK_GAIT != nullptr)       has |= 8;
+  if (imu().ready())                    has |= 16;
+  if (isHALEnabled())                   has |= 32;
+  #ifdef HIL
+    has |= 64;
+  #endif
+  if (haveRaw)                          has |= 128;
+  if (m.terrain)                        on |= 1;
+  if (m.terrainPending)                 on |= 2;
+  if (footSwitchesInUse())              on |= 4;
+  if (motionUsesContacts())             on |= 8;
+  if (m.headingHold)                    on |= 16;
+  if (levelingEnabled())                on |= 32;
+  if (m.staticGait)                     on |= 64;
+  if (trusted)                          on |= 128;
+  uint8_t tof = 0;
+  for (uint8_t i = 0; i < tofSensorCount() && i < 8; i++) {
+    if (tofReady(i)) tof |= 1 << i;
+  }
+  float turned = fabsf(m.calTurned) * RADTODEG / 4;
+  auto u8 = [](float v) { return (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v); };
+  auto uT = [](float v) { return (int)constrain(lroundf(v * 10), -32767L, 32767L); };
+
+  out[0] = P_SETUP;
+  out[1] = P_SETUP_VERSION;
+  out[2] = has;
+  out[3] = on;
+  out[4] = m.calState;
+  out[5] = u8(turned);
+  out[6] = u8(m.calTime);
+  out[7] = tof;
+  uint8_t *p = putU16(out + 8, footPressedBits() & 0xFFFF);
+  for (int i = 0; i < 3; i++) p = putU16(p, uT(raw[i]));
+  for (int i = 0; i < 3; i++) p = putU16(p, uT(offset[i]));
+  for (int i = 0; i < 3; i++) p = putU16(p, (int)constrain(lroundf(scale[i] * 1000), 0L, 65535L));
+  p = putU16(p, (int)constrain(lroundf(calField * 10), 0L, 65535L));
+  p = putU16(p, (int)constrain(lroundf(field * 10), 0L, 65535L));
+
+  #if PWM_CONTROLLER_TYPE == DCMOTOR
+    const uint8_t dof = 0;   // tracks: no servos to trim
+  #else
+    const uint8_t dof = LEG_DOF;
+  #endif
+  *p++ = LEG_NUM;
+  *p++ = dof;
+  for (uint8_t i = 0; i < LEG_NUM; i++) {
+    size_t len = strnlen(legs[i].id.title, 8);
+    if ((size_t)(p - out) + 1 + len + dof * 2 > room) {
+      break;
+    }
+    *p++ = len;
+    memcpy(p, legs[i].id.title, len);
+    p += len;
+    if (dof == 0) {
+      continue;
+    }
+    const LR_legAngle &t = legs[i].hal.trim;
+    const float trims[6] = { t.alpha, t.beta, t.gamma, t.delta, t.epsilon, t.zeta };
+    for (uint8_t j = 0; j < dof; j++) {
+      p = putU16(p, (int)constrain(lroundf(radToDeg(trims[j]) * 100), -32767L, 32767L));
+    }
+  }
+  return p - out;
+}
+
 void int16ToBytes(int value, uint8_t _offset)
 {
   telemetryPackage[_offset]   = (value >> 8) & 0xFF;

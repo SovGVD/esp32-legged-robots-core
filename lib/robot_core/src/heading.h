@@ -95,6 +95,21 @@ class HeadingEstimator {
 		float field() const { return _lastField; }
 		/** the last magnetometer reading was used (strength within tolerance) */
 		bool magAccepted() const { return _magOk; }
+		/** the last raw (uncalibrated) body frame reading, uT; false before the first one */
+		bool magRaw(float out[3]) const
+		{
+			for (int i = 0; i < 3; i++) out[i] = _raw[i];
+			return _haveRaw;
+		}
+		/** the calibration in use; field 0 = not calibrated */
+		void magCalibration(float offset[3], float scale[3], float &field) const
+		{
+			for (int i = 0; i < 3; i++) {
+				offset[i] = _offset[i];
+				scale[i]  = _scale[i];
+			}
+			field = _field;
+		}
 
 	private:
 		HeadingParams _params = { 2.0f, 0.25f };
@@ -104,6 +119,8 @@ class HeadingEstimator {
 		float _heading   = 0;
 		float _bias      = 0;
 		float _lastField = 0;
+		float _raw[3]    = { 0, 0, 0 };
+		bool  _haveRaw   = false;
 		bool  _ready     = false;
 		bool  _absolute  = false;
 		bool  _magOk     = false;

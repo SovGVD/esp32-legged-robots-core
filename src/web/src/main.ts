@@ -12,6 +12,7 @@ import {
   encodeGait,
   encodeGoto,
   encodeScan,
+  encodeSetupRequest,
   encodeMapRequest,
   encodeNavRequest,
   encodeLevel,
@@ -23,6 +24,7 @@ import {
   type Telemetry,
 } from './protocol.ts';
 import { MapPanel } from './map.ts';
+import { SettingsPanel } from './settings.ts';
 import { RemoteToggle } from './toggle.ts';
 import { TofPanel } from './tof.ts';
 
@@ -38,6 +40,8 @@ const LEVEL_CONFIRM_MS = 2500;
 // Map tab (lidar / ToF room scans): pose, path and scan 4 times a second, the map (10 KB) once a second
 const NAV_INTERVAL_MS = 250;
 const MAP_INTERVAL_MS = 1000;
+// Settings tab: switch states, magnetometer readings for the calibration plot
+const SETUP_INTERVAL_MS = 200;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -93,6 +97,8 @@ function showTab(next: Tab): void {
   panes.forEach((p) => (p.hidden = p.dataset.pane !== next));
   document.body.dataset.tab = next;
   tof.show(next === 'view');
+  settings.show(next === 'settings');
+  if (next === 'settings') connection.send(encodeSetupRequest());
   if (next === 'map') {
     connection.send(encodeMapRequest());
     connection.send(encodeNavRequest());
@@ -124,6 +130,7 @@ const connection = new Connection(
         nav = null;
         tof.clear();
         map.clear();
+        settings.setState(null);
       }
       renderTelemetry();
     },
@@ -138,8 +145,11 @@ const connection = new Connection(
       } else if (msg.type === 'nav') {
         nav = msg.nav;
         if (tab === 'map') map.setNav(msg.nav);
+      } else if (msg.type === 'setup') {
+        settings.setState(msg.setup);
       } else if (msg.type === 'cli') {
         cli.write(msg.text);
+        settings.log(msg.text);
       }
     },
   },
@@ -158,6 +168,10 @@ const walk = new RemoteToggle($<HTMLInputElement>('walk'), (on) => sendSetting(e
 const level = new RemoteToggle($<HTMLInputElement>('level'), (on) => sendSetting(encodeLevel(on)), LEVEL_CONFIRM_MS);
 $('walk-label').hidden = !config.gaitToggle;
 $('level-label').hidden = !config.levelToggle;
+
+const settings = new SettingsPanel($('pane-settings'), config, (cmd) => {
+  connection.send(encodeCli(cmd));
+});
 
 const tof = new TofPanel($('tof'), $('pane-view'), config.tofSensors, config.tofRange, config.tofMounts);
 const map = new MapPanel(
@@ -260,6 +274,7 @@ function renderTelemetry(): void {
     cards.nav(nav ? `${(nav.x / 1000).toFixed(2)}, ${(nav.y / 1000).toFixed(2)} m` : dash, nav ? NAV_STATES[nav.state] ?? '' : 'open the Map tab');
   }
 
+  settings.setTelemetry(t);
   walk.sync(t ? (st & TS.gaitStatic) !== 0 : null, !sitting);
   level.sync(t ? (st & TS.leveling) !== 0 : null, !!t && (st & TS.imu) !== 0 && !sitting);
   $('tof').classList.toggle('gap', !!t && (st & TS.gapBlocked) !== 0);
@@ -329,6 +344,12 @@ setInterval(() => connection.send(encodeTelemetryRequest()), TELEMETRY_INTERVAL_
 setInterval(() => tab === 'view' && visible() && connection.send(encodeTofRequest()), TOF_INTERVAL_MS);
 setInterval(() => tab === 'map' && visible() && connection.send(encodeNavRequest()), NAV_INTERVAL_MS);
 setInterval(() => tab === 'map' && visible() && connection.send(encodeMapRequest()), MAP_INTERVAL_MS);
+setInterval(() => {
+  if (tab !== 'settings' || !visible()) return;
+  connection.send(encodeSetupRequest());
+  // the heading dial and the tilt dot move with telemetry: faster than once a second here
+  if (settings.active === 'compass' || settings.active === 'sensors') connection.send(encodeTelemetryRequest());
+}, SETUP_INTERVAL_MS);
 window.addEventListener('resize', () => tab === 'map' && map.draw());
 
 const about = $('about');

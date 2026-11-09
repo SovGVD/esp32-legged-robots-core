@@ -127,6 +127,29 @@ void test_estimator_ignores_disturbed_field()
 	TEST_ASSERT_FLOAT_WITHIN(0.5f, 10, est.heading() / DEG);
 }
 
+// the web client's compass view plots the raw readings and the calibration
+void test_estimator_reports_raw_reading_and_calibration()
+{
+	HeadingEstimator est;
+	est.begin({ 0.5f, 0.25f });
+	float raw[3];
+	TEST_ASSERT_FALSE(est.magRaw(raw));
+	const float off[3] = { 5, -3, 1 }, scale[3] = { 1.1f, 0.9f, 1 };
+	est.setMagCalibration(off, scale, 44);
+	const LR_angle level = { 0, 0, 0 };
+	const float m[3] = { 12, 30, -40 };
+	est.update(0.004f, 0, level, m);
+	TEST_ASSERT_TRUE(est.magRaw(raw));
+	TEST_ASSERT_EQUAL_FLOAT(12, raw[0]);
+	TEST_ASSERT_EQUAL_FLOAT(30, raw[1]);
+	TEST_ASSERT_EQUAL_FLOAT(-40, raw[2]);
+	float o[3], s[3], field;
+	est.magCalibration(o, s, field);
+	TEST_ASSERT_EQUAL_FLOAT(-3, o[1]);
+	TEST_ASSERT_EQUAL_FLOAT(1.1f, s[0]);
+	TEST_ASSERT_EQUAL_FLOAT(44, field);
+}
+
 void test_hold_keeps_the_heading_after_the_stick()
 {
 	HeadingHold hold;
@@ -208,6 +231,7 @@ int main()
 	RUN_TEST(test_calibrator_finds_hard_and_soft_iron);
 	RUN_TEST(test_estimator_gyro_then_magnetometer);
 	RUN_TEST(test_estimator_ignores_disturbed_field);
+	RUN_TEST(test_estimator_reports_raw_reading_and_calibration);
 	RUN_TEST(test_hold_keeps_the_heading_after_the_stick);
 	RUN_TEST(test_hold_turns_to_a_target_the_short_way);
 	RUN_TEST(test_terrain_tilt_modes_and_aging);

@@ -19,6 +19,7 @@
  *   'P' map        [0x50] request, answered with a map package (lidar / ToF room scan builds)
  *   'N' nav        [0x4E] request, answered with a nav package (lidar / ToF room scan builds)
  *   'W' goto       [0x57, x:i16, y:i16] walk to a map point (mm); [0x57] alone stops; [0x57, 'S'] scans the room (ToF)
+ *   'S' setup      [0x53] request, answered with a setup package (Settings tab; changes go as CLI commands)
  *
  * Robot -> client
  *   text "Ok"      sent once after connecting
@@ -35,6 +36,10 @@
  *                  mm and deg (counter-clockwise, 0 = facing +y) in the map frame; scan points in the
  *                  robot frame (x right, y forward). flags: 1 sensor data, 2 frozen, 4 blocked, 8 no memory,
  *                  16 ToF scan running, 32 ToF room scans (no lidar)
+ *   'S' setup      [0x53, version:u8, has:u8, on:u8, calState:u8, calTurned/4:u8 (deg), calTime:u8 (s), tof:u8,
+ *                  feet:u16, magRaw x3:i16, magOffset x3:i16 (uT*10), magScale x3:u16 (*1000), calField:u16,
+ *                  field:u16 (uT*10), legs:u8, dof:u8, per leg: nameLen:u8, name, dof x trim:i16 (deg*100)]
+ *                  bits: see SH / SO below; magnetometer axes are the body frame (x right, y forward, z up)
  *   'C' cli        [0x43, ...utf8 output]
  */
 
@@ -47,6 +52,7 @@ export const P_TOF = 0x44; // 'D'
 export const P_MAP = 0x50; // 'P'
 export const P_NAV = 0x4e; // 'N'
 export const P_GOTO = 0x57; // 'W'
+export const P_SETUP = 0x53; // 'S'
 export const P_START_VIDEO = 0x56; // 'V'
 export const P_STOP_VIDEO = 0x76; // 'v'
 
@@ -150,11 +156,36 @@ export interface NavInfo {
   scan: [number, number][];
 }
 
+/** Setup package `has` bits: what the robot has. */
+export const SH = { terrain: 1, feet: 2, mag: 4, walk: 8, imu: 16, hal: 32, hil: 64, raw: 128 } as const;
+/** Setup package `on` bits: what is switched on. */
+export const SO = { terrain: 1, terrainPending: 2, feet: 4, feetGait: 8, hold: 16, level: 32, walk: 64, magTrusted: 128 } as const;
+/** Magnetometer calibration states (firmware HeadingCalState). */
+export const CAL_STATES = ['not run', 'turning', 'turn it by hand', 'saved', 'failed', 'stopped'] as const;
+
+export type Vec3Tuple = [number, number, number];
+
+export interface SetupState {
+  has: number;
+  on: number;
+  cal: { state: number; turned: number; time: number };
+  /** bit per ToF sensor: running */
+  tof: number;
+  /** bit per leg: foot switch pressed */
+  feet: number;
+  /** uT; raw = null before the first reading */
+  mag: { raw: Vec3Tuple | null; offset: Vec3Tuple; scale: Vec3Tuple; calField: number; field: number };
+  /** joints per leg, 0 = no servo trims */
+  dof: number;
+  legs: { name: string; trim: number[] }[];
+}
+
 export type Incoming =
   | { type: 'telemetry'; telemetry: Telemetry }
   | { type: 'map'; map: LidarMap }
   | { type: 'nav'; nav: NavInfo }
   | { type: 'tof'; sensors: TofSensorFrame[] }
+  | { type: 'setup'; setup: SetupState }
   | { type: 'cli'; text: string }
   | { type: 'unknown'; id: number };
 
@@ -223,6 +254,10 @@ export function encodeGoto(x?: number, y?: number): Uint8Array {
 /** One ToF room scan (stop, nose up, turn around). */
 export function encodeScan(): Uint8Array {
   return Uint8Array.of(P_GOTO, 0x53);
+}
+
+export function encodeSetupRequest(): Uint8Array {
+  return Uint8Array.of(P_SETUP);
 }
 
 export function encodeVideo(start: boolean): Uint8Array {
@@ -332,6 +367,42 @@ export function decodeNav(data: Uint8Array): NavInfo | null {
   };
 }
 
+export function decodeSetup(data: Uint8Array): SetupState | null {
+  if (data.length < 34) return null;
+  const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const vec = (o: number, k: number, signed = true): Vec3Tuple =>
+    [0, 2, 4].map((i) => (signed ? v.getInt16(o + i) : v.getUint16(o + i)) / k) as Vec3Tuple;
+  const dof = data[33];
+  const legs: SetupState['legs'] = [];
+  let o = 34;
+  for (let i = 0; i < data[32]; i++) {
+    const n = data[o];
+    if (o + 1 + n + dof * 2 > data.length) return null;
+    const name = String.fromCharCode(...data.subarray(o + 1, o + 1 + n));
+    o += 1 + n;
+    const trim: number[] = [];
+    for (let j = 0; j < dof; j++, o += 2) trim.push(v.getInt16(o) / 100);
+    legs.push({ name, trim });
+  }
+  const has = data[2];
+  return {
+    has,
+    on: data[3],
+    cal: { state: data[4], turned: data[5] * 4, time: data[6] },
+    tof: data[7],
+    feet: v.getUint16(8),
+    mag: {
+      raw: has & SH.raw ? vec(10, 10) : null,
+      offset: vec(16, 10),
+      scale: vec(22, 1000, false),
+      calField: v.getUint16(28) / 10,
+      field: v.getUint16(30) / 10,
+    },
+    dof,
+    legs,
+  };
+}
+
 export function decode(data: Uint8Array): Incoming | null {
   if (data.length === 0) return null;
   switch (data[0]) {
@@ -350,6 +421,10 @@ export function decode(data: Uint8Array): Incoming | null {
     case P_NAV: {
       const nav = decodeNav(data);
       return nav ? { type: 'nav', nav } : null;
+    }
+    case P_SETUP: {
+      const setup = decodeSetup(data);
+      return setup ? { type: 'setup', setup } : null;
     }
     case P_CLI:
       return { type: 'cli', text: decoder.decode(data.subarray(1), { stream: true }) };
