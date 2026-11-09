@@ -55,13 +55,15 @@ class Prims:
         obj.setExpression("Height", lz)
         return obj
 
-    def cyl(self, name, d, h, x, y, z, along_y=False):
-        """From x, y, z along +Z, or along +Y."""
+    def cyl(self, name, d, h, x, y, z, along_y=False, along_x=False):
+        """From x, y, z along +Z, or along +Y, or along +X."""
         obj = self._prim("Part::Cylinder", name, x, y, z)
         obj.setExpression("Radius", "(%s) / 2" % d)
         obj.setExpression("Height", h)
         if along_y:
             obj.Placement = App.Placement(obj.Placement.Base, App.Rotation(App.Vector(1, 0, 0), -90))
+        if along_x:
+            obj.Placement = App.Placement(obj.Placement.Base, App.Rotation(App.Vector(0, 1, 0), 90))
         return obj
 
     def sphere(self, name, r, x, y, z):
@@ -268,6 +270,10 @@ def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
         if e.Length < 3 * size:
             continue
         picked.setdefault(size, []).append(i)
+    def sane(trial, before):
+        return (trial.isValid() and len(trial.Solids) == len(before.Solids)
+                and 0.9 * before.Volume <= trial.Volume <= before.Volume + 1e-6)
+
     result, done, tried = shape, 0, 0
     for size, idx in sorted(picked.items(), reverse=True):
         # edges of the current result that match the picked ones (indices change after each chamfer)
@@ -285,8 +291,9 @@ def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
         edges = match(result)
         try:
             trial = result.makeChamfer(size, edges)
-            # a chamfer only removes material: a result that grew is the kernel's garbage (a stray sheet)
-            ok = trial.isValid() and len(trial.Solids) == len(result.Solids) and trial.Volume <= result.Volume + 1e-6
+            # a chamfer only removes material, and only a little: a result that grew, or lost most of the part (once a
+            # negative volume, -33e6 mm3, that still said valid), is the kernel's garbage
+            ok = sane(trial, result)
         except Exception:
             ok = False
         if ok:
@@ -295,7 +302,7 @@ def lead_ins(shape, small, big, small_d, keep=lambda e: False, min_len=0.0):
         for e in edges:
             try:
                 trial = result.makeChamfer(size, [m for m in result.Edges if m.isSame(e)] or match_one(result, e))
-                if trial.isValid() and len(trial.Solids) == len(result.Solids) and trial.Volume <= result.Volume + 1e-6:
+                if sane(trial, result):
                     result, done = trial, done + 1
             except Exception:
                 pass
