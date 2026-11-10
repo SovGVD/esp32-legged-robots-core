@@ -128,7 +128,10 @@ skirt = block(-rear - 1, v("coxa_arch_x0") + 1, -rear - 8, rear + 8, floor_z0 - 
     prism([(-v("coxa_skirt_x"), 9.2, 4), (v("coxa_arch_x0") + 2, 9.2, 0), (v("coxa_arch_x0") + 2, -9.2, 0), (-v("coxa_skirt_x"), -9.2, 4)], "xy", floor_z0 - 3, z0 + 1))
 cuts.append(skirt)
 # low down the flare stays as narrow as the outline was before it: the arch swings over the bottom plate
-cuts.append(block(v("coxa_arch_x0") - 4, cut_x, b_y0 - 1, -15.0, floor_z0 - 3, v("coxa_flare_z0")))
+# a slope, not a step: under it from y -12.5 the underside rises to coxa_flare_z0 by y -16
+fz = v("coxa_flare_z0")
+cuts.append(prism([(-12.5, floor_z0 - 5, 0), (-12.5, fz - 6, 0), (-16.0, fz, 0), (b_y0 - 1, fz, 0), (b_y0 - 1, floor_z0 - 5, 0)],
+                  "yz", v("coxa_arch_x0") - 4, cut_x))
 shape = shape.cut(Part.makeCompound(cuts)).removeSplitter()
 # the shaft under the floor, on its spacer
 shaft = rod(v("fem_boss_d"), v("fem_boss_h"), (0, 0, floor_z0 - v("fem_boss_h")), "z").fuse(
@@ -150,6 +153,18 @@ def keep_sharp(e):
     return servo or horn or bearing or small_round or shaft_area
 
 
+# the flare's top edge, the whole chain along the bearing side from the servo wall out, gets a bigger round than
+# the rest of the outline (the kernel takes up to 1.5 here: larger runs into the rising top past x 26)
+flare_edges = [e for e in shape.Edges if e.BoundBox.ZLength < 0.01 and abs(e.BoundBox.ZMin - z1) < 0.01 and e.BoundBox.YMax < -9.0]
+for r_ in (v("coxa_flare_edge_r"), 2.0, 1.5):
+    try:
+        trial = shape.makeFillet(r_, flare_edges)
+        if trial.isValid() and len(trial.Solids) == 1 and 0.97 * shape.Volume < trial.Volume <= shape.Volume:
+            print("flare top edge rounded r %.1f (%d edges)" % (r_, len(flare_edges)))
+            shape = trial
+            break
+    except Exception:
+        print("flare top edge: r %.1f refused" % r_)
 main_shape = common["smooth"](shape, v("coxa_edge_r"), keep_sharp)
 # ------------------------------------------------------------ the bearing side comes off
 # on the plane cut_y, from cut_x out: a plate with the bearing arm, printed on its outer face. In front of

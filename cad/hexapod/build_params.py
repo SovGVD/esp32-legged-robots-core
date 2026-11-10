@@ -394,6 +394,7 @@ TABLE = [
     ("coxa_screw_head_y", "2 mm", DESIGN, "the bearing side's screw heads seat this far from the joint face: at the tibia's 4 the stock screws were too short to pull it tight (print 1)"),
     ("coxa_flare_x", "21 mm", DESIGN, "on the bearing side the outline's curve reaches the side's flat outer face by here (corner, its round runs to x 26): with the waist at 36, as on the horn side, the side's square plate stood out 5 mm past the coxa at coxa_cut_x (print 1)"),
     ("coxa_flare_z0", "-17.5 mm", DESIGN, "under this the flare stays inside y -15 (the old outline): lower down, the arch hit the bottom plate with the middle and rear coxas at -40 deg"),
+    ("coxa_flare_edge_r", "3 mm", DESIGN, "round wanted on the flare's top edge (the rest of the outline 1.2); the kernel refuses more than 1.5 there, the build falls back"),
     ("coxa_pin_a_x", "31.5 mm", DESIGN, "alignment pins on the coxa's joint face, into the bearing arm, diagonal to the screws"),
     ("coxa_pin_a_z", "-3.5 mm", DESIGN, "those pins"),
     ("coxa_pin_b_x", "39.5 mm", DESIGN, "those pins"),
