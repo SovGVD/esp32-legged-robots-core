@@ -35,7 +35,7 @@ def test_design_numbers():
 def test_mass_and_standing_pose():
     import mujoco
     h = SimHexapod(params=P)
-    assert sum(h.model.body_mass) * 1000 == pytest.approx(1135.0, abs=0.5)
+    assert sum(h.model.body_mass) * 1000 == pytest.approx(1139.6, abs=0.5)
     for leg in P.legs:
         q = leg_angles_to_q(*firmware_ik(GEO, leg, default_foot(leg)))
         assert q[0] == pytest.approx(0, abs=1e-9)

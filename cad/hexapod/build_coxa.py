@@ -97,6 +97,9 @@ through = a_y1 - a_y0 + 1
 horn_way = pocket + 0.3                       # the horn's way in, in front of its pocket
 cuts = [
     block(-near, far, -hw, hw, floor_in, z1 + 1),                # the servo's body, down to the floor
+    # the servo's cable leaves the bottom of its far end: a slot through the floor there takes it down and out
+    # under the coxa, so it isn't trapped under the servo (as in the femur, print 1)
+    block(far - v("coxa_cable_slot_x"), far, -v("coxa_cable_slot_w") / 2, v("coxa_cable_slot_w") / 2, floor_z0 - 10, floor_in + 1),
     block(-tab_near, tab_far, -hw, hw, seat, z1 + 1),            # its tabs
     rod(v("mg90_screw_pilot_d"), v("coxa_plate_floor") + 1, (-v("mg90_hole_near"), 0, z0 - 1), "z"),
     rod(v("mg90_screw_pilot_d"), v("coxa_plate_floor") + 1, (v("mg90_hole_far"), 0, z0 - 1), "z"),
