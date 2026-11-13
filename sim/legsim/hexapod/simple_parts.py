@@ -109,19 +109,19 @@ def leg(p, leg):
     off = SERVO_LEN / 2 - SHAFT_FROM_END
 
     cx = _Parts(n + "_")
-    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 34.6, PLA)
+    cx.box("coxa_bracket", (geo.coxa / 2, 0, 0), (geo.coxa / 2 - 4, 7, 2), 35.4, PLA)
     cx.box("coxa_servo", (off, 0, -8), (SERVO_LEN / 2, SERVO_WID / 2, SERVO_HGT / 2), SERVO_MASS, SERVO)
     cx.lump(m.coxa, (geo.coxa / 2, 0, -5), "coxa_misc")
 
     fe = _Parts(n + "_")
-    fe.box("femur_arm", (geo.femur / 2, 0, 0), (geo.femur / 2, 2, 6), 21.3, PLA)
+    fe.box("femur_arm", (geo.femur / 2, 0, 0), (geo.femur / 2, 2, 6), 21.8, PLA)
     fe.box("femur_servo", (off, 0, 0), servo_half, SERVO_MASS, SERVO)
     fe.box("tibia_servo", (geo.femur - off, 0, 0), servo_half, SERVO_MASS, SERVO)
     fe.lump(m.femur, (geo.femur / 2, 0, 0), "femur_misc")
 
     ti = _Parts(n + "_")
     L = geo.tibia
-    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 15.1, PLA)
+    ti.box("tibia_arm", (0, 0, -L / 2), (4, 4, L / 2 - 3), 15.3, PLA)
     ti.box("foot_switch", (5, 0, -L + 12), (3, 3, 6), 2.0, "0.76 0.23 0.23 1")   # switch in the tibia tip
     ti.lump(m.tibia, (0, 0, -L / 2), "tibia_misc")
     return str(cx), str(fe), str(ti)

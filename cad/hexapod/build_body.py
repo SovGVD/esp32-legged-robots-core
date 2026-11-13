@@ -231,7 +231,7 @@ for x, y in COLUMNS:
     top_parts.append(rod(v("col_ring_d"), v("col_ring_h"), (x, y, top0 - v("col_ring_h")), "z"))
 tip_w = v("horn_tip_w")
 arm = v("horn_reach") - tip_w / 2
-pocket = v("horn_hub_h") + v("horn_fit")      # the horn plus a little room for glue
+pocket = v("top_pocket_h") + v("horn_fit")    # as printed: the horn is a little thicker and sticks out 0.3 below
 hub_z = v("top_boss_z0")
 for _, x, y, yaw, __ in AXES:
     top_parts.append(rod(v("top_boss_d"), boss_h, (x, y, hub_z), "z"))

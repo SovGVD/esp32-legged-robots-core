@@ -71,7 +71,7 @@
 <geom name="tof_l" type="box" class="mass" size="0.0065 0.0015 0.0045" pos="-0.014 0.074 0.022" euler="0 0 0.35" mass="0.003" rgba="0.48 0.25 0.69 1"/>
 <geom name="tof_r" type="box" class="mass" size="0.0065 0.0015 0.0045" pos="0.014 0.074 0.022" euler="0 0 -0.35" mass="0.003" rgba="0.48 0.25 0.69 1"/>
 <geom name="electronics_misc" type="box" class="mass" size="0.006 0.004 0.002" pos="0 -0.03 -0.024" euler="0 0 0" mass="0.006" rgba="0.2 0.2 0.2 1"/>
-<geom name="torso_misc" type="sphere" class="mass" size="0.003" pos="0 0 -0.005" mass="0.1826" rgba="0.5 0.5 0.5 0"/>
+<geom name="torso_misc" type="sphere" class="mass" size="0.003" pos="0 0 -0.005" mass="0.1828" rgba="0.5 0.5 0.5 0"/>
       <geom name="torso_bottom_look" type="mesh" mesh="cad_torso_bottom" class="look" rgba="0.55 0.33 0.22 1"/>
       <geom name="torso_top_look" type="mesh" mesh="cad_torso_top" class="look" rgba="0.82 0.45 0.25 1"/>
       <geom name="torso_parts_look" type="mesh" mesh="cad_torso_parts" class="look" rgba="0.15 0.3 0.25 1"/>
@@ -79,14 +79,14 @@
 
     <body name="LF_coxa" pos="-0.035 0.058 0" euler="0 0 2.46287">
       <joint name="LF_coxa" type="hinge" axis="0 0 1" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
-      <geom name="LF_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0346" rgba="0.88 0.64 0.12 1"/>
+      <geom name="LF_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0354" rgba="0.88 0.64 0.12 1"/>
 <geom name="LF_coxa_servo" type="box" class="mass" size="0.0114 0.0061 0.01125" pos="0.0054 0 -0.008" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LF_coxa_look" type="mesh" mesh="cad_coxa_L" class="look" rgba="0.88 0.63 0.11 1"/>
 <geom name="LF_coxa_servo_look" type="mesh" mesh="cad_coxa_servo_L" class="look" rgba="0.16 0.2 0.5 1"/>
       <body name="LF_femur" pos="0.06 0 0">
         <joint name="LF_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="LF_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="LF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
+        <geom name="LF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0218" rgba="0.88 0.64 0.12 1"/>
 <geom name="LF_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LF_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LF_femur_look" type="mesh" mesh="cad_femur_L" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -95,7 +95,7 @@
           <joint name="LF_tibia" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
           <geom name="LF_tibia_geom" type="capsule" fromto="0 0 0 0 0 -0.054" size="0.005" class="link"/>
           <geom name="LF_foot" type="sphere" pos="0 0 -0.054" size="0.006" class="foot"/>
-          <geom name="LF_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0151" rgba="0.88 0.64 0.12 1"/>
+          <geom name="LF_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0153" rgba="0.88 0.64 0.12 1"/>
 <geom name="LF_foot_switch" type="box" class="mass" size="0.003 0.003 0.006" pos="0.005 0 -0.048" euler="0 0 0" mass="0.002" rgba="0.76 0.23 0.23 1"/>
 <geom name="LF_tibia_look" type="mesh" mesh="cad_tibia_L" class="look" rgba="0.35 0.65 0.35 1"/>
 <geom name="LF_presser_look" type="mesh" mesh="cad_presser" class="look" rgba="0.25 0.25 0.25 1"/>
@@ -106,14 +106,14 @@
     </body>
     <body name="LM_coxa" pos="-0.045 0 0" euler="0 0 3.14159">
       <joint name="LM_coxa" type="hinge" axis="0 0 1" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
-      <geom name="LM_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0346" rgba="0.88 0.64 0.12 1"/>
+      <geom name="LM_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0354" rgba="0.88 0.64 0.12 1"/>
 <geom name="LM_coxa_servo" type="box" class="mass" size="0.0114 0.0061 0.01125" pos="0.0054 0 -0.008" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LM_coxa_look" type="mesh" mesh="cad_coxa_L" class="look" rgba="0.88 0.63 0.11 1"/>
 <geom name="LM_coxa_servo_look" type="mesh" mesh="cad_coxa_servo_L" class="look" rgba="0.16 0.2 0.5 1"/>
       <body name="LM_femur" pos="0.06 0 0">
         <joint name="LM_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="LM_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="LM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
+        <geom name="LM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0218" rgba="0.88 0.64 0.12 1"/>
 <geom name="LM_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LM_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LM_femur_look" type="mesh" mesh="cad_femur_L" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -122,7 +122,7 @@
           <joint name="LM_tibia" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
           <geom name="LM_tibia_geom" type="capsule" fromto="0 0 0 0 0 -0.054" size="0.005" class="link"/>
           <geom name="LM_foot" type="sphere" pos="0 0 -0.054" size="0.006" class="foot"/>
-          <geom name="LM_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0151" rgba="0.88 0.64 0.12 1"/>
+          <geom name="LM_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0153" rgba="0.88 0.64 0.12 1"/>
 <geom name="LM_foot_switch" type="box" class="mass" size="0.003 0.003 0.006" pos="0.005 0 -0.048" euler="0 0 0" mass="0.002" rgba="0.76 0.23 0.23 1"/>
 <geom name="LM_tibia_look" type="mesh" mesh="cad_tibia_L" class="look" rgba="0.35 0.65 0.35 1"/>
 <geom name="LM_presser_look" type="mesh" mesh="cad_presser" class="look" rgba="0.25 0.25 0.25 1"/>
@@ -133,14 +133,14 @@
     </body>
     <body name="LR_coxa" pos="-0.035 -0.058 0" euler="0 0 -2.11373">
       <joint name="LR_coxa" type="hinge" axis="0 0 1" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
-      <geom name="LR_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0346" rgba="0.88 0.64 0.12 1"/>
+      <geom name="LR_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0354" rgba="0.88 0.64 0.12 1"/>
 <geom name="LR_coxa_servo" type="box" class="mass" size="0.0114 0.0061 0.01125" pos="0.0054 0 -0.008" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LR_coxa_look" type="mesh" mesh="cad_coxa_L" class="look" rgba="0.88 0.63 0.11 1"/>
 <geom name="LR_coxa_servo_look" type="mesh" mesh="cad_coxa_servo_L" class="look" rgba="0.16 0.2 0.5 1"/>
       <body name="LR_femur" pos="0.06 0 0">
         <joint name="LR_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="LR_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="LR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
+        <geom name="LR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0218" rgba="0.88 0.64 0.12 1"/>
 <geom name="LR_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LR_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="LR_femur_look" type="mesh" mesh="cad_femur_L" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -149,7 +149,7 @@
           <joint name="LR_tibia" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
           <geom name="LR_tibia_geom" type="capsule" fromto="0 0 0 0 0 -0.054" size="0.005" class="link"/>
           <geom name="LR_foot" type="sphere" pos="0 0 -0.054" size="0.006" class="foot"/>
-          <geom name="LR_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0151" rgba="0.88 0.64 0.12 1"/>
+          <geom name="LR_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0153" rgba="0.88 0.64 0.12 1"/>
 <geom name="LR_foot_switch" type="box" class="mass" size="0.003 0.003 0.006" pos="0.005 0 -0.048" euler="0 0 0" mass="0.002" rgba="0.76 0.23 0.23 1"/>
 <geom name="LR_tibia_look" type="mesh" mesh="cad_tibia_L" class="look" rgba="0.35 0.65 0.35 1"/>
 <geom name="LR_presser_look" type="mesh" mesh="cad_presser" class="look" rgba="0.25 0.25 0.25 1"/>
@@ -160,14 +160,14 @@
     </body>
     <body name="RF_coxa" pos="0.035 0.058 0" euler="0 0 0.678724">
       <joint name="RF_coxa" type="hinge" axis="0 0 1" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
-      <geom name="RF_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0346" rgba="0.88 0.64 0.12 1"/>
+      <geom name="RF_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0354" rgba="0.88 0.64 0.12 1"/>
 <geom name="RF_coxa_servo" type="box" class="mass" size="0.0114 0.0061 0.01125" pos="0.0054 0 -0.008" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RF_coxa_look" type="mesh" mesh="cad_coxa_R" class="look" rgba="0.88 0.63 0.11 1"/>
 <geom name="RF_coxa_servo_look" type="mesh" mesh="cad_coxa_servo_R" class="look" rgba="0.16 0.2 0.5 1"/>
       <body name="RF_femur" pos="0.06 0 0">
         <joint name="RF_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="RF_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="RF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
+        <geom name="RF_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0218" rgba="0.88 0.64 0.12 1"/>
 <geom name="RF_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RF_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RF_femur_look" type="mesh" mesh="cad_femur_R" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -176,7 +176,7 @@
           <joint name="RF_tibia" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
           <geom name="RF_tibia_geom" type="capsule" fromto="0 0 0 0 0 -0.054" size="0.005" class="link"/>
           <geom name="RF_foot" type="sphere" pos="0 0 -0.054" size="0.006" class="foot"/>
-          <geom name="RF_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0151" rgba="0.88 0.64 0.12 1"/>
+          <geom name="RF_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0153" rgba="0.88 0.64 0.12 1"/>
 <geom name="RF_foot_switch" type="box" class="mass" size="0.003 0.003 0.006" pos="0.005 0 -0.048" euler="0 0 0" mass="0.002" rgba="0.76 0.23 0.23 1"/>
 <geom name="RF_tibia_look" type="mesh" mesh="cad_tibia_R" class="look" rgba="0.35 0.65 0.35 1"/>
 <geom name="RF_presser_look" type="mesh" mesh="cad_presser" class="look" rgba="0.25 0.25 0.25 1"/>
@@ -187,14 +187,14 @@
     </body>
     <body name="RM_coxa" pos="0.045 0 0" euler="0 0 0">
       <joint name="RM_coxa" type="hinge" axis="0 0 1" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
-      <geom name="RM_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0346" rgba="0.88 0.64 0.12 1"/>
+      <geom name="RM_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0354" rgba="0.88 0.64 0.12 1"/>
 <geom name="RM_coxa_servo" type="box" class="mass" size="0.0114 0.0061 0.01125" pos="0.0054 0 -0.008" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RM_coxa_look" type="mesh" mesh="cad_coxa_R" class="look" rgba="0.88 0.63 0.11 1"/>
 <geom name="RM_coxa_servo_look" type="mesh" mesh="cad_coxa_servo_R" class="look" rgba="0.16 0.2 0.5 1"/>
       <body name="RM_femur" pos="0.06 0 0">
         <joint name="RM_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="RM_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="RM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
+        <geom name="RM_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0218" rgba="0.88 0.64 0.12 1"/>
 <geom name="RM_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RM_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RM_femur_look" type="mesh" mesh="cad_femur_R" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -203,7 +203,7 @@
           <joint name="RM_tibia" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
           <geom name="RM_tibia_geom" type="capsule" fromto="0 0 0 0 0 -0.054" size="0.005" class="link"/>
           <geom name="RM_foot" type="sphere" pos="0 0 -0.054" size="0.006" class="foot"/>
-          <geom name="RM_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0151" rgba="0.88 0.64 0.12 1"/>
+          <geom name="RM_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0153" rgba="0.88 0.64 0.12 1"/>
 <geom name="RM_foot_switch" type="box" class="mass" size="0.003 0.003 0.006" pos="0.005 0 -0.048" euler="0 0 0" mass="0.002" rgba="0.76 0.23 0.23 1"/>
 <geom name="RM_tibia_look" type="mesh" mesh="cad_tibia_R" class="look" rgba="0.35 0.65 0.35 1"/>
 <geom name="RM_presser_look" type="mesh" mesh="cad_presser" class="look" rgba="0.25 0.25 0.25 1"/>
@@ -214,14 +214,14 @@
     </body>
     <body name="RR_coxa" pos="0.035 -0.058 0" euler="0 0 -1.02787">
       <joint name="RR_coxa" type="hinge" axis="0 0 1" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
-      <geom name="RR_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0346" rgba="0.88 0.64 0.12 1"/>
+      <geom name="RR_coxa_bracket" type="box" class="mass" size="0.026 0.007 0.002" pos="0.03 0 0" euler="0 0 0" mass="0.0354" rgba="0.88 0.64 0.12 1"/>
 <geom name="RR_coxa_servo" type="box" class="mass" size="0.0114 0.0061 0.01125" pos="0.0054 0 -0.008" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RR_coxa_look" type="mesh" mesh="cad_coxa_R" class="look" rgba="0.88 0.63 0.11 1"/>
 <geom name="RR_coxa_servo_look" type="mesh" mesh="cad_coxa_servo_R" class="look" rgba="0.16 0.2 0.5 1"/>
       <body name="RR_femur" pos="0.06 0 0">
         <joint name="RR_femur" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
         <geom name="RR_femur_geom" type="capsule" fromto="0 0 0 0.05 0 0" size="0.007" class="link"/>
-        <geom name="RR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0213" rgba="0.88 0.64 0.12 1"/>
+        <geom name="RR_femur_arm" type="box" class="mass" size="0.025 0.002 0.006" pos="0.025 0 0" euler="0 0 0" mass="0.0218" rgba="0.88 0.64 0.12 1"/>
 <geom name="RR_femur_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0054 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RR_tibia_servo" type="box" class="mass" size="0.0114 0.01125 0.0061" pos="0.0446 0 0" euler="0 0 0" mass="0.0134" rgba="0.16 0.19 0.22 1"/>
 <geom name="RR_femur_look" type="mesh" mesh="cad_femur_R" class="look" rgba="0.2 0.55 0.75 1"/>
@@ -230,7 +230,7 @@
           <joint name="RR_tibia" type="hinge" axis="0 -1 0" range="-1.74533 1.74533" armature="2e-05" frictionloss="0.0041604" damping="0.0005"/>
           <geom name="RR_tibia_geom" type="capsule" fromto="0 0 0 0 0 -0.054" size="0.005" class="link"/>
           <geom name="RR_foot" type="sphere" pos="0 0 -0.054" size="0.006" class="foot"/>
-          <geom name="RR_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0151" rgba="0.88 0.64 0.12 1"/>
+          <geom name="RR_tibia_arm" type="box" class="mass" size="0.004 0.004 0.027" pos="0 0 -0.03" euler="0 0 0" mass="0.0153" rgba="0.88 0.64 0.12 1"/>
 <geom name="RR_foot_switch" type="box" class="mass" size="0.003 0.003 0.006" pos="0.005 0 -0.048" euler="0 0 0" mass="0.002" rgba="0.76 0.23 0.23 1"/>
 <geom name="RR_tibia_look" type="mesh" mesh="cad_tibia_R" class="look" rgba="0.35 0.65 0.35 1"/>
 <geom name="RR_presser_look" type="mesh" mesh="cad_presser" class="look" rgba="0.25 0.25 0.25 1"/>
